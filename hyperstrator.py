@@ -4,7 +4,10 @@
 import zmq
 # Import the Thread and Lock objects from the threading module
 from threading import Thread, Lock, Event
-
+# Import the uuid4 function from the UUID module
+from uuid import uuid4
+# Import the sleep function from the time module
+from time import sleep
 import signal
 
 class ServiceExit(Exception):
@@ -43,22 +46,27 @@ class orch_base(object):
         self.socket.connect("tcp://" + host + ":" + str(port))
 
 
-    def send_msg(**kwargs):
+    def send_msg(self, kwargs):
         # Inform the CU about the configuration success
         self.socket.send_json({self.request_key: kwargs})
 
         # Wait for command
         msg = self.socket.recv_json().get(self.reply_key, None)
+        print(msg)
+        # If the message is valid
+        if msg is not None:
+            # Return host and port
+            return msg['host'], msg['port']
 
-        # Return the message (or None)
-        return msg
+        # Otherwise, return None
+        return None
 
 
 class sdn_orch(orch_base):
     host_key = "sdn_host"
     port_key = "sdn_port"
     default_host = "127.0.0.1"
-    default_port = "4000"
+    default_port = "5000"
     request_key = "sdn_req"
     reply_key = "sdn_rep"
 
@@ -67,7 +75,7 @@ class sdr_orch(orch_base):
     host_key = "sdr_host"
     port_key = "sdr_port"
     default_host = "127.0.0.1"
-    default_port = "5000"
+    default_port = "4000"
     request_key = "sdr_req"
     reply_key = "sdr_rep"
 
@@ -101,7 +109,7 @@ class hs_server(Thread):
         # Specify the type of ZMQ socket
         self.socket = self.context.socket(zmq.REP)
         # Bind ZMQ socket to host:port
-        self.socket.bind("tcp://" + "127.0.0.1" + ":" + str(local_port))
+        self.socket.bind("tcp://" + host + ":" + str(port))
 
 
     def run(self):
@@ -109,7 +117,7 @@ class hs_server(Thread):
         while not self.shutdown_flag.is_set():
             # Try to wait for command
             try:
-                # Wait for command
+                # Wait for command wF
                 cmd = self.socket.recv_json(flags=zmq.NOBLOCK)
 
             # In case of ZMQ Error
@@ -131,32 +139,40 @@ class hs_server(Thread):
                 # If the message worked
                 if ns is not None:
                     print('- Create Service')
-                    # Iterate over the list of configurations
-                    for usrp in cu['configure']:
-                        # Create the GRC
-                        self.grc_handler.create_grc(**usrp)
-                        # Consider the USRP busy
-                        self.usrp_used.append(usrp['serial'])
+                    # Create a Service ID
+                    s_id = str(uuid4())
+                    print('\tSend message to SDR orchestrator')
+                    # Send UUID and type of service to the SDR orchestrator
+                    r_host, r_port = self.sdr_orch.send_msg(
+                        {"n_rs": {'type': ns['type'], 's_id': s_id}})
+
+
+                    if False:
+
+                        # If the radio allocation failed
+                        if ((r_host is None) or (r_port is False)):
+                            # Inform the CU about the removal success
+                            self.socket.send_json(
+                                {'sr_nack': 'Failed allocating radio resources.'})
+                        # Otherwise, send message to the SDN orchestrator
+                        c_host, c_port = self.sdn_orch.send_msg(
+                            {"n_cs": {'type': ns['type'], 's_id': s_id,
+                                      'destination': (r_host, r_port),
+                                      'source': ('127.0.0.1', 6000)
+                            }})
 
                     # Inform the CU about the configuration success
-                    self.socket.send_json({'cu_ack': {'id': str(self.uuid)}})
+                    self.socket.send_json({'sr_ack': {'s_id': s_id,
+                                                      'host': "127.0.0.1",
+                                                      "port": 7000}})
 
                 # Service rerquest, remove service
                 rs = cmd.get('sr_rs', None)
 
                  # If the flag exists
-                if ru is not None:
+                if rs is not None:
                     print('- Remove Service')
-                    # Iterate over the list of configurations
-                    for usrp in ru['remove']:
-                        # Remove the GRC
-                        self.grc_handler.remove_grc(**usrp)
-                        # Consider the USRP free
-                        self.usrp_used.remove(usrp['serial'])
-
-                    # Inform the CU about the removal success
-                    self.socket.send_json({'ru_ack':{'id': str(self.uuid)}})
-
+                    print('okidoki')
 
         # Terminate zmq
         self.socket.close()
@@ -175,5 +191,5 @@ if __name__ == "__main__":
 
     except ServiceExit:
         # Terminate the RU Server
-        ru_thread.shutdown_flag.set()
+        hs_thread.shutdown_flag.set()
         print('Exitting')

@@ -19,7 +19,7 @@ def signal_handler(sig, frame):
 
 
 
-class sdn_server(Thread):
+class sdr_server(Thread):
 
     def __init__(self, **kwargs):
         # Initialise the parent class
@@ -33,7 +33,7 @@ class sdn_server(Thread):
         # Default HS Server host
         host = kwargs.get('host', '127.0.0.1')
         # Default HS Server port
-        port = kwargs.get('port', 5000)
+        port = kwargs.get('port', 4000)
 
         # Create a ZMQ context
         self.context = zmq.Context()
@@ -49,35 +49,35 @@ class sdn_server(Thread):
             cmd = self.socket.recv_json()
             print(cmd)
 
-            # SDN request
-            sdn_r = cmd.get('sdn_req', None)
+            # SDR request
+            sdr_r = cmd.get('sdr_req', None)
 
             # If the message is valid
-            if sdn_r is not None:
+            if sdr_r is not None:
                 print('- Received Message')
-                # Check wheter is it a new core service
-                ns = sdn_r.get('n_rs', None)
+                # Check wheter is it a new radio service
+                ns = sdr_r.get('n_rs', None)
 
-                # If it is a new core service
+                # If it is a new radio service
                 if ns is not None:
-                    print('- Create Core Service')
+                    print('- Create Radio Service')
                     # TODO Instantiate it
 
                     # Reply
                     self.socket.send_json(
-                        {'sdn_rep': {'host': "127.0.0.1",
-                                     "port": 6001}})
+                        {'sdr_rep': {'host': "127.0.0.1",
+                                     "port": 5001}})
 
-                # If it is a remove core service
-                rs = sdn_r.get('d_rs', None)
+                # If it is a remove radio service
+                rs = sdr_r.get('d_rs', None)
 
                 if rs is not None:
-                    print('- Remove Core Service')
+                    print('- Remove Radio Service')
                     # TODO Remove it
 
                     # Reply
                     self.socket.send_json(
-                        {'sdn_rep': 'okidoki'})
+                        {'sdr_rep': 'okidoki'})
 
 
             # If the flag exists
@@ -93,11 +93,11 @@ if __name__ == "__main__":
 
     try:
         # Start the Remote Unit Server
-        sdn_thread = sdn_server(host='127.0.0.1', port=5000)
-        print('Start SDN Orchestrator')
-        sdn_thread.start()
+        sdr_thread = sdr_server(host='127.0.0.1', port=4000)
+        print('Start SDR Orchestrator')
+        sdr_thread.start()
 
     except ServiceExit:
         # Terminate the RU Server
-        sdn_thread.shutdown_flag.set()
+        sdr_thread.shutdown_flag.set()
         print('Exitting')
