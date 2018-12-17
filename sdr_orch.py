@@ -18,8 +18,85 @@ def signal_handler(sig, frame):
     raise ServiceExit
 
 
+class ctl_base(object):
+    host_key = ""
+    port_key = ""
+    default_host = "127.0.0.1"
+    default_port = "6000"
+    request_key = ""
+    reply_key = ""
 
-class sdr_server(Thread):
+    def __init__(self, **kwargs):
+         # Connect to the server
+        self.server_connect(**kwargs)
+
+
+    def server_connect(self, **kwargs):
+        # Default Server host
+        host = kwargs.get(self.host_key, self.default_host)
+        # Default Server port
+        port = kwargs.get(self.port_key, self.default_port)
+        # Create a ZMQ context
+
+        self.context = zmq.Context()
+        #  Specity the type of ZMQ socket
+        self.socket = self.context.socket(zmq.REQ)
+        # Connect ZMQ socket to host:port
+        self.socket.connect("tcp://" + host + ":" + str(port))
+
+
+    def send_msg(self, kwargs):
+        # Send request to the orchestrator
+        self.socket.send_json({self.request_key: kwargs})
+        # Wait for command
+        msg = self.socket.recv_json().get(self.reply_key, None)
+        # If the message is not valid
+        if msg is None:
+            # Return proper error
+            return None, "Received invalid message: " + str(msg)
+        # The orchestrator couldn't decode message
+        elif 'msg_err' in msg:
+            return None, msd['msg_err']
+        # If failed creating a slice
+        elif 'nl_nack' in msg:
+            # Return the failure message
+            return None, msg['nl_nack']
+        # If succeeded creating a slice
+        elif 'nl_ack' in msg:
+            # Return host and port
+            return msg['nl_ack']['host'], msg['nl_ack']['port']
+        # If succeeded removing a slice
+        elif 'rl_ack' in msg:
+            # Return the Service ID  to confirm it
+            return msg['rl_ack'], None
+        # If failed removing a slice
+        elif 'rl_nack' in msg:
+            # Return the error message
+            return None, msg['rl_nack']
+        # Unexpected behaviour
+        else:
+            return None, "Missing ACK or NACK: " + str(msg)
+
+
+class imec_ctl(ctl_base):
+    host_key = "imec_host"
+    port_key = "imec_port"
+    default_host = "127.0.0.1"
+    default_port = "6000"
+    request_key = "imec_req"
+    reply_key = "imec_rep"
+
+
+class tcd_ctl(ctl_base):
+    host_key = "tcd_host"
+    port_key = "tcd_port"
+    default_host = "127.0.0.1"
+    default_port = "7000"
+    request_key = "tcd_req"
+    reply_key = "tcd_rep"
+
+
+class wireless_orchestrator_server(Thread):
 
     def __init__(self, **kwargs):
         # Initialise the parent class
@@ -32,6 +109,12 @@ class sdr_server(Thread):
         self.req_header = kwargs.get('req_header', 'sdr_req')
         # Get the reply header from keyword arguments
         self.rep_header = kwargs.get('rep_header', 'sdr_rep')
+
+        # IMEC Controller Handler
+        self.imec_ctl = imec_ctl()
+        # TCD Controller Handler
+        self.tcd_ctl = tcd_ctl()
+
         # Start the HS server
         self.server_bind(**kwargs)
 
@@ -56,7 +139,7 @@ class sdr_server(Thread):
 
 
     def run(self):
-        print('- Started SDR Orchestrator')
+        print('- Started Wireless Orchestrator')
         # Run while thread is active
         while not self.shutdown_flag.is_set():
             # Wait for command
@@ -91,15 +174,45 @@ class sdr_server(Thread):
                     if ns['type'] == "high-throughput":
                         # Send message to TCD SDR controller
                         print('\tTraffic type: High Throughput')
-                        # Send ACK
-                        msg = {'ns_ack': {'host': "127.0.0.1", "port": 5001}}
+                        print('\tDelegating it to the TCD Controller')
+
+                        tcd_host, tcd_port = self.tcd_ctl.send_msg(
+                            {'r_nl': {'type': ns['type'], 's_id': ns['s_id']}})
+
+                        # If the slice allocation failed
+                        if tcd_host is None:
+                            # Inform the hyperstrator about the failure
+                            print('\tFailed creating a Radio Slice in TCD')
+                            msg = {'ns_nack': tcd_port}
+
+                        # Otherwise, it succeeded
+                        else:
+                            # Inform the hyperstrator about the success
+                            print('\tSucceeded creating a Radio Slice in TCD')
+                            msg = {'ns_ack': {'host': tcd_host,
+                                              'port': tcd_port}}
 
 
                     elif ns['type'] == "low-latency":
                         # Send messate to IMEC SDR Controller
                         print('\tTraffic type: Low Latency')
-                        # Send ACK
-                        msg = {'ns_ack': {'host': "127.0.0.1", "port": 5002}}
+                        print('\tDelegating it to the IMEC Controller')
+
+                        imec_host, imec_port = self.imec_ctl.send_msg(
+                            {'r_nl': {'type': ns['type'], 's_id': ns['s_id']}})
+
+                        # If the slice allocation failed
+                        if imec_host is None:
+                            # Inform the hyperstrator about the failure
+                            print('\tFailed creating a Radio Slice in IMEC')
+                            msg = {'ns_nack': imec_port}
+
+                        # Otherwise, it succeeded
+                        else:
+                            # Inform the hyperstrator about the success
+                            print('\tSucceeded creating a Radio Slice in IMEC')
+                            msg = {'ns_ack': {'host': imec_host,
+                                              'port': imec_port}}
 
 
                     # Otherwise, couldn't identify the traffic type
@@ -126,7 +239,7 @@ class sdr_server(Thread):
                         # Send message
                         self.send_message(self.rep_header, msg)
                         # Leave if clause
-                        break
+                        continue
                     # Otherwise, it is a new service
                     else:
                         # Append it to the list of service IDs
@@ -137,16 +250,42 @@ class sdr_server(Thread):
                     if ns['type'] == "high-throughput":
                         # Send message to TCD SDR controller
                         print('\tTraffic type: High Throughput')
-                        # Send ACK
-                        msg = {'rs_ack': {'host': "127.0.0.1", "port": 5001}}
+                        print('\tDelegating it to the TCD Controller')
 
+                        tcd_host, tcd_port = self.tcd_ctl.send_msg(
+                            {'r_rl': {'type': ns['type'], 's_id': ns['s_id']}})
+
+                        # If the slice removal failed
+                        if tcd_host is None:
+                            # Inform the hyperstrator about the failure
+                            print('\tFailed removing a Radio Slice in TCD')
+                            msg = {'rs_nack': tcd_port}
+
+                        # Otherwise, it succeeded
+                        else:
+                            # Inform the hyperstrator about the success
+                            print('\tSucceeded removing a Radio Slice in TCD')
+                            msg = {'rs_ack': {'s_id': tcd_host}}
 
                     elif ns['type'] == "low-latency":
                         # Send messate to IMEC SDR Controller
                         print('\tTraffic type: Low Latency')
-                        # Send ACK
-                        msg = {'rs_ack': {'host': "127.0.0.1", "port": 5002}}
+                        print('\tDelegating it to the IMEC Controller')
 
+                        imec_host, imec_port = self.imec_ctl.send_msg(
+                            {'r_rl': {'type': ns['type'], 's_id': ns['s_id']}})
+
+                        # If the slice removal failed
+                        if imec_host is None:
+                            # Inform the hyperstrator about the failure
+                            print('\tFailed removing a Radio Slice in IMEC')
+                            msg = {'rs_nack': imec_port}
+
+                        # Otherwise, it succeeded
+                        else:
+                            # Inform the hyperstrator about the success
+                            print('\tSucceeded removing a Radio Slice in IMEC')
+                            msg = {'rs_ack': {'s_id': imec_host}}
 
                     # Otherwise, couldn't identify the traffic type
                     else:
@@ -176,10 +315,11 @@ if __name__ == "__main__":
 
     try:
         # Start the Remote Unit Server
-        sdr_thread = sdr_server(host='127.0.0.1', port=4000)
-        sdr_thread.start()
+        wireless_orchestrator_thread = wireless_orchestrator_server(
+            host='127.0.0.1', port=4000)
+        wireless_orchestrator_thread.start()
 
     except ServiceExit:
         # Terminate the RU Server
-        sdr_thread.shutdown_flag.set()
+        wireless_orchestrator_thread.shutdown_flag.set()
         print('Exitting')

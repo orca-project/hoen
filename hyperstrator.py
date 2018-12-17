@@ -165,6 +165,9 @@ class hs_server(Thread):
                         # Finish here
                         continue
 
+                    else:
+                        print('\tSucceeded creating a Radio Service')
+
                     # TODO For the future, SDN hooks
                     if False:
                         # Otherwise, send message to the SDN orchestrator
@@ -174,7 +177,7 @@ class hs_server(Thread):
                                       'source': ('127.0.0.1', 6000)
                             }})
 
-                    # Inform the CU about the configuration success
+                    # Inform the user about the configuration success
                     # TODO the host and port should come from the SDN orch.
                     self.socket.send_json({'sr_ack': {'s_id': s_id,
                                                       'host': "127.0.0.1",
