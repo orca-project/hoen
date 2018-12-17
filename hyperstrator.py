@@ -33,9 +33,9 @@ class orch_base(object):
 
 
     def server_connect(self, **kwargs):
-        # Default CU Server host
+        # Default Server host
         host = kwargs.get(self.host_key, self.default_host)
-        # Default CU Server port
+        # Default Server port
         port = kwargs.get(self.port_key, self.default_port)
         # Create a ZMQ context
 
@@ -47,19 +47,28 @@ class orch_base(object):
 
 
     def send_msg(self, kwargs):
-        # Inform the CU about the configuration success
+        # Send request to the orchestrator
         self.socket.send_json({self.request_key: kwargs})
-
         # Wait for command
         msg = self.socket.recv_json().get(self.reply_key, None)
-        print(msg)
-        # If the message is valid
-        if msg is not None:
+        # If the message is not valid
+        if msg is None:
+            # Return proper error
+            return None, "Received invalid message: " + str(msg)
+        # The orchestrator couldn't decode message
+        elif 'msg_err' in msg:
+            return None, msd['msg_err']
+        # If the request failed
+        elif 'ns_nack' in msg:
+            # Return the failure message
+            return None, msg['ns_nack']
+        # If the request succeeded
+        elif 'ns_ack' in msg:
             # Return host and port
-            return msg['host'], msg['port']
-
-        # Otherwise, return None
-        return None
+            return msg['ns_ack']['host'], msg['ns_ack']['port']
+        # Unexpected behaviour
+        else:
+            return None, "Missing ACK or NACK: " + str(msg)
 
 
 class sdn_orch(orch_base):
@@ -113,6 +122,7 @@ class hs_server(Thread):
 
 
     def run(self):
+        print('- Started Hyperstrator')
         # Run while thread is active
         while not self.shutdown_flag.is_set():
             # Try to wait for command
@@ -138,40 +148,44 @@ class hs_server(Thread):
 
                 # If the message worked
                 if ns is not None:
-                    print('- Create Service')
+                    print('- Create Service Request')
                     # Create a Service ID
                     s_id = str(uuid4())
+                    print('\tService ID:', s_id)
                     print('\tSend message to SDR orchestrator')
                     # Send UUID and type of service to the SDR orchestrator
                     r_host, r_port = self.sdr_orch.send_msg(
-                        {"n_rs": {'type': ns['type'], 's_id': s_id}})
+                        {"r_ns": {'type': ns['type'], 's_id': s_id}})
 
+                    # If the radio allocation failed
+                    if r_host is None:
+                        # Inform the CU about the removal success
+                        self.socket.send_json(
+                            {'sr_nack': r_port})
+                        # Finish here
+                        continue
 
+                    # TODO For the future, SDN hooks
                     if False:
-
-                        # If the radio allocation failed
-                        if ((r_host is None) or (r_port is False)):
-                            # Inform the CU about the removal success
-                            self.socket.send_json(
-                                {'sr_nack': 'Failed allocating radio resources.'})
                         # Otherwise, send message to the SDN orchestrator
                         c_host, c_port = self.sdn_orch.send_msg(
-                            {"n_cs": {'type': ns['type'], 's_id': s_id,
+                            {"c_ns": {'type': ns['type'], 's_id': s_id,
                                       'destination': (r_host, r_port),
                                       'source': ('127.0.0.1', 6000)
                             }})
 
                     # Inform the CU about the configuration success
+                    # TODO the host and port should come from the SDN orch.
                     self.socket.send_json({'sr_ack': {'s_id': s_id,
                                                       'host': "127.0.0.1",
                                                       "port": 7000}})
 
                 # Service rerquest, remove service
-                rs = cmd.get('sr_rs', None)
+                rs = cmd.get('sr_ds', None)
 
                  # If the flag exists
                 if rs is not None:
-                    print('- Remove Service')
+                    print('- Remove Service Request')
                     print('okidoki')
 
         # Terminate zmq

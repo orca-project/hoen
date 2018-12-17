@@ -43,6 +43,7 @@ class sdn_server(Thread):
         self.socket.bind("tcp://" + host + ":" + str(port))
 
     def run(self):
+        print('- Started SDN Orchestrator')
         # Run while thread is active
         while not self.shutdown_flag.is_set():
             # Wait for command wF

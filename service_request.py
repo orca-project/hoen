@@ -25,6 +25,7 @@ def parse_cli_args():
 
     return arg_dict
 
+
 def establish_connection(**kwargs):
     # Default RU Server host
     host = kwargs.get('host', '127.0.0.1')
@@ -39,6 +40,7 @@ def establish_connection(**kwargs):
     socket.connect("tcp://" + host + ":" + str(port))
 
     return socket
+
 
 def service_request(socket, **kwargs):
     # Ternary operator to decide the type of traffic
@@ -71,7 +73,7 @@ def service_request(socket, **kwargs):
     if nack is not None:
         print('- Failed to create service.')
         # Print reason
-        print('\tReason:', nack)
+        print('\tReason: ', nack)
         # Opsie
         exit(0)
 
@@ -79,8 +81,6 @@ def service_request(socket, **kwargs):
     if (ack is None) and (nack is None):
         print('- Failed to parse message:')
         print('\tMessage:', rep)
-
-
 
 
 if __name__ == "__main__":
