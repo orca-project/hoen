@@ -19,6 +19,9 @@ def parse_cli_args():
         '-t', '--high-throughput',
         action="store_true",
         help='High-Throughput Service')
+    group.add_argument(
+        '-s', '--service-id',
+        help='Service ID')
 
     # Parse CLI arguments
     arg_dict = vars(parser.parse_args())
@@ -83,11 +86,27 @@ def service_request(socket, **kwargs):
         print('\tMessage:', rep)
 
 
+def service_release(socket, **kwargs):
+    # Send service release messate to the hyperstrator
+    socket.send_json({'sr_ds': {'s_id': kwargs['service_id']}})
+    # Receive acknowledgement
+    rep = socket.recv_json()
+
+    # TODO WIP
+    print('Not implemented yet.')
+    exit(2)
+
 if __name__ == "__main__":
     # Parse CLI arguments
     kwargs = parse_cli_args()
     # Establish connection to the RU Server
     socket = establish_connection()
 
-    # Request new E2E service
-    service_request(socket, **kwargs)
+    # If not passing a service ID
+    if kwargs['service_id'] is None:
+        # Request new E2E service
+        service_request(socket, **kwargs)
+    # Otherwise
+    else:
+        # Release an E2E service
+        service_release(socket, **kwargs)

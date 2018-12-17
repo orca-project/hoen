@@ -190,6 +190,8 @@ class hs_server(Thread):
                 if rs is not None:
                     print('- Remove Service Request')
                     print('okidoki')
+                    self.socket.send_json({'empty': ""})
+                    print('WIP')
 
         # Terminate zmq
         self.socket.close()
