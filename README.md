@@ -62,6 +62,8 @@ Currently, each stub controller possesses two methods that IMEC and TCD must imp
 Both IMEC and TCD are free to implement, use, call, integrate, or whatever, in any way they please. Really, do whatever you want.
 We just need you to react to the calls of these two methods and return the appropriate formatted messages, as exemplified in the source-code of the stub controllers.
 
+Ideally, you won't need to modify anything apart from your respective controllers. Please enter in contact with me if you find any bugs/unexpected behaviour.
+
 # Branches
 
 There are 4 branches in thisrepository:
