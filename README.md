@@ -59,14 +59,16 @@ optional arguments:
 
 As stated above, there are two stub controllers, behaving as placeholders: *imec_controller.py* and *tcd_controller.py*. 
 Currently, each stub controller possesses two methods that IMEC and TCD must implement/override in their respective controller: the *create_slice* and *remove_slice*. 
+
 Both IMEC and TCD are free to implement, use, call, integrate, or whatever, in any way they please. Really, do whatever you want.
+
 We just need you to react to the calls of these two methods and return the appropriate formatted messages, as exemplified in the source-code of the stub controllers.
 
 Ideally, you won't need to modify anything apart from your respective controllers. Please enter in contact with me if you find any bugs/unexpected behaviour.
 
-# Branches
+## Branches
 
-There are 4 branches in thisrepository:
+There are 4 branches in this repository:
 1. The *master* branch. Let's leave it as it is, failsafe and working.
 2. The *imec*  branch. I kindly ask to IMEC to use this branch for the testing and development of their SDR part.
 3. The *tcd*  branch. I kindly ask to TCD to use this branch for the testing and development of their SDR part.
