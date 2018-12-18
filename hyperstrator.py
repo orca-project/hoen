@@ -8,16 +8,11 @@ from threading import Thread, Lock, Event
 from uuid import uuid4
 # Import the sleep function from the time module
 from time import sleep
-import signal
+# Import OS
+import os
 
-class ServiceExit(Exception):
-    pass
-
-
-def signal_handler(sig, frame):
-    # Raise ServiceExit upon call
-    raise ServiceExit
-
+def cls():
+    os.system('cls' if os.name=='nt' else 'clear')
 
 class orch_base(object):
     host_key = ""
@@ -58,14 +53,22 @@ class orch_base(object):
         # The orchestrator couldn't decode message
         elif 'msg_err' in msg:
             return None, msd['msg_err']
-        # If the request failed
-        elif 'ns_nack' in msg:
-            # Return the failure message
-            return None, msg['ns_nack']
-        # If the request succeeded
+        # If the create slice request succeeded
         elif 'ns_ack' in msg:
             # Return host and port
             return msg['ns_ack']['host'], msg['ns_ack']['port']
+        # If the create slice request failed
+        elif 'ns_nack' in msg:
+            # Return the failure message
+            return None, msg['ns_nack']
+        # If the remove slice request succeeded
+        elif 'rs_ack' in msg:
+            # Return the Service ID to confirm it
+            return msg['rs_ack'], None
+         # If the remove slice request failed
+        elif 'rs_nack' in msg:
+            # Return the failure message
+            return None, msg['rs_nack']
         # Unexpected behaviour
         else:
             return None, "Missing ACK or NACK: " + str(msg)
@@ -100,6 +103,9 @@ class hs_server(Thread):
 
         # Start the HS server
         self.server_bind(**kwargs)
+
+        # Container to hold the list of current services
+        self.s_ids = []
 
         # Create an instance of the SDN orchestrator handler
         self.sdn_orch = sdn_orch()
@@ -151,6 +157,7 @@ class hs_server(Thread):
                     print('- Create Service Request')
                     # Create a Service ID
                     s_id = str(uuid4())
+
                     print('\tService ID:', s_id)
                     print('\tSend message to SDR orchestrator')
                     # Send UUID and type of service to the SDR orchestrator
@@ -159,14 +166,13 @@ class hs_server(Thread):
 
                     # If the radio allocation failed
                     if r_host is None:
-                        # Inform the CU about the removal success
-                        self.socket.send_json(
-                            {'sr_nack': r_port})
+                        # Inform the user about the failure
+                        self.socket.send_json({'ns_nack': r_port})
                         # Finish here
                         continue
 
-                    else:
-                        print('\tSucceeded creating a Radio Service')
+                    # Otherwise, the radio allocation succeeded
+                    print('\tSucceeded creating a Radio Service')
 
                     # TODO For the future, SDN hooks
                     if False:
@@ -177,21 +183,61 @@ class hs_server(Thread):
                                       'source': ('127.0.0.1', 6000)
                             }})
 
+                    # TODO if the wired and the wireless parts worked
+                    # Append it to the list of service IDs
+                    self.s_ids.append(s_id)
+
                     # Inform the user about the configuration success
                     # TODO the host and port should come from the SDN orch.
-                    self.socket.send_json({'sr_ack': {'s_id': s_id,
-                                                      'host': "127.0.0.1",
-                                                      "port": 7000}})
+                    self.socket.send_json({'ns_ack': {'s_id': s_id,
+                                                      'host': r_host,
+                                                      "port": r_port}})
 
                 # Service rerquest, remove service
-                rs = cmd.get('sr_ds', None)
+                rs = cmd.get('sr_rs', None)
 
                  # If the flag exists
                 if rs is not None:
                     print('- Remove Service Request')
-                    print('okidoki')
-                    self.socket.send_json({'empty': ""})
-                    print('WIP')
+                    # If this service doesn't exist
+                    if rs['s_id'] not in self.s_ids:
+                        print('\tService ID doesn\' exist')
+                        # Send message
+                        self.socket.send_json(
+                            {'rs_nack': 'The service doesn\'t exist:' +
+                             rs['s_id']})
+
+                        # Leave if clause
+                        continue
+
+                    print('\tService ID:', s_id)
+                    print('\tSend message to SDR orchestrator')
+                    # Send UUID and type of service to the SDR orchestrator
+                    r_host, r_port = self.sdr_orch.send_msg(
+                        {"r_rs": {'s_id': s_id}})
+
+                    # If the radio removal failed
+                    if r_host is None:
+                        # Inform the user about the failure
+                        self.socket.send_json({'rs_nack': r_port})
+                        # Finish here
+                        continue
+
+                    # Otherwise, the radio allocation succeeded
+                    print('\tSucceeded removing a Radio Service')
+
+                    # TODO For the future, SDN hooks
+                    if False:
+                        # Otherwise, send message to the SDN orchestrator
+                        c_host, c_port = self.sdn_orch.send_msg(
+                            {"c_rs": {'s_id': s_id}})
+
+                    # TODO if the wired and the wireless parts worked
+                    # Remove it to the list of service IDs
+                    self.s_ids.remove(rs['s_id'])
+
+                    # Inform the user about the removal success
+                    self.socket.send_json({'rs_ack': {'s_id': rs['s_id']}})
 
         # Terminate zmq
         self.socket.close()
@@ -199,10 +245,9 @@ class hs_server(Thread):
 
 
 if __name__ == "__main__":
-    # Catch SIGTERM and SIGINT signals
-    # signal.signal(signal.SIGTERM, signal_handler)
-    signal.signal(signal.SIGINT, signal_handler)
-
+    # clear screen
+    cls()
+    # Handle keyboard interrupt (SIGINT)
     try:
         # Start the Remote Unit Server
         hs_thread = hs_server(host='127.0.0.1', port=3000)

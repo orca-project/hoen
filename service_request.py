@@ -55,7 +55,7 @@ def service_request(socket, **kwargs):
     rep = socket.recv_json()
 
     # Check if there's an acknowledgement
-    ack = rep.get("sr_ack", None)
+    ack = rep.get("ns_ack", None)
 
     # If received an acknowledgement
     if ack is not None:
@@ -70,7 +70,7 @@ def service_request(socket, **kwargs):
 
 
     # Check if there's a not acknowledgement
-    nack = rep.get("sr_nack", None)
+    nack = rep.get("ns_nack", None)
 
     # If received a not acknowledgement
     if nack is not None:
@@ -88,13 +88,37 @@ def service_request(socket, **kwargs):
 
 def service_release(socket, **kwargs):
     # Send service release messate to the hyperstrator
-    socket.send_json({'sr_ds': {'s_id': kwargs['service_id']}})
+    socket.send_json({'sr_rs': {'s_id': kwargs['service_id']}})
     # Receive acknowledgement
     rep = socket.recv_json()
 
-    # TODO WIP
-    print('Not implemented yet.')
-    exit(2)
+    # Check if there's an acknowledgement
+    ack = rep.get("rs_ack", None)
+
+    # If received an acknowledgement
+    if ack is not None:
+        print('- Removed Service:')
+        # Print information
+        print('\tService ID:', ack['s_id'])
+        # Exit gracefully
+        exit(0)
+
+    # Check if there's a not acknowledgement
+    nack = rep.get("rs_nack", None)
+
+    # If received a not acknowledgement
+    if nack is not None:
+        print('- Failed to remove service.')
+        # Print reason
+        print('\tReason: ', nack)
+        # Opsie
+        exit(0)
+
+    # If neither worked
+    if (ack is None) and (nack is None):
+        print('- Failed to parse message:')
+        print('\tMessage:', rep)
+
 
 if __name__ == "__main__":
     # Parse CLI arguments

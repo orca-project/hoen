@@ -1,17 +1,12 @@
 #!/usr/bin/env python3
-# Import Signal
-import signal
+
 # Import the Template SDR Controller
 from template_controllers.sdr_controller import sdr_controller_template
+# Import OS
+import os
 
-class ServiceExit(Exception):
-    pass
-
-
-def signal_handler(sig, frame):
-    # Raise ServiceExit upon call
-    raise ServiceExit
-
+def cls():
+    os.system('cls' if os.name=='nt' else 'clear')
 
 class tcd_controller(sdr_controller_template):
 
@@ -59,12 +54,12 @@ class tcd_controller(sdr_controller_template):
             # TODO You can use any logic you want. We just need the
             # resulting messages formatted like above
 
+        return msg
 
 if __name__ == "__main__":
-    # Catch SIGTERM and SIGINT signals
-    # signal.signal(signal.SIGTERM, signal_handler)
-    signal.signal(signal.SIGINT, signal_handler)
-
+    # Clear screen
+    cls()
+    # Handle keyboard interrupt (SIGINT)
     try:
         # Instantiate the TCD SDR Controller
         tcd_controller_thread = tcd_controller(
@@ -77,7 +72,8 @@ if __name__ == "__main__":
         # Start the TCD SDR Controller Server
         tcd_controller_thread.start()
 
-    except ServiceExit:
+    except KeyboardInterrupt:
         # Terminate the TCD SDR Controller Server
         tcd_controller_thread.shutdown_flag.set()
+        tcd_controller_thread.join()
         print('Exitting')

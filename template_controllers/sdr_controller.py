@@ -83,11 +83,10 @@ class sdr_controller_template(Thread):
                         self.send_msg(self.rep_header, msg)
                         # Leave if clause
                         continue
-                    # Otherwise, it is a new service
-                    else:
-                        # Append it to the list of service IDs
-                        self.s_ids.append(nl['s_id'])
-                        print('\tService ID:', nl['s_id'])
+
+                    # Append it to the list of service IDs
+                    self.s_ids.append(nl['s_id'])
+                    print('\tService ID:', nl['s_id'])
 
                     # Create a readio slice
                     msg = self.create_slice(**nl)
@@ -103,7 +102,7 @@ class sdr_controller_template(Thread):
                     print('- Remove Radio Slice')
                     # This service doesn't exist
                     if rl['s_id'] not in self.s_ids:
-                        msg = {'dl_nack': 'The radio slice doesn\' exist:' +
+                        msg = {'dl_nack': 'The radio slice doesn\'t exist:' +
                                rl['s_id']}
 
                         # Send message
@@ -111,11 +110,9 @@ class sdr_controller_template(Thread):
                         # Leave if clause
                         continue
 
-                    # Otherwise, it is an existing service
-                    else:
-                        # Remove it from the list of service IDs
-                        self.s_ids.remove(rl['s_id'])
-                        print('\tService ID:', rl['s_id'])
+                    # Remove it from the list of service IDs
+                    self.s_ids.remove(rl['s_id'])
+                    print('\tService ID:', rl['s_id'])
 
                     # Remove a Radio slice
                     msg = self.remove_slice(**rl)
@@ -131,18 +128,25 @@ class sdr_controller_template(Thread):
 
                 msg = {'msg_err': "Failed to parse message:" + str(cmd)}
                 # Send message
-                self.send_message(self.rep_header, msg)
+                self.send_msg(self.rep_header, msg)
+
+        # Terminate zmq
+        self.socket.close()
+        self.context.term()
 
 
 
 if __name__ == "__main__":
+    # clear screen
+    clear()
+    # Handle keyboard interrupt (SIGINT)
     try:
         # Start the SDR Controller Server
         sdr_controller_thread = sdr_controller_template(
             host='127.0.0.1', port=7000)
         sdr_controller_thread.start()
 
-    except:
+    except KeyboardInterrupt:
         # Terminate the SDR Controller Server
         sdr_controller_thread.shutdown_flag.set()
         print('Exitting')
