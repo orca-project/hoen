@@ -37,7 +37,8 @@ Finally, the Hyperstrator:
 $ ./hyperstrator.py
 ```
 
-Now, you can play with the *service_request.py*. Passing the flag *-t* indicates a high-throughput traffic, while the *-l* flag indicates low-latency traffic. They are mutually exclusive. 
+Now, you can play with the *service_request.py*. Passing the flag *-t* indicates a high-throughput traffic, while the *-l* flag indicates low-latency traffic. The former will delegate the creating of a radio slice to the TCD controller, whereas the latter will delegate it to the IMEC controller. They are mutually exclusive. 
+
 Upon successful reservation, you will receive the service ID of your E2E communication service, a UUID. Moreover, you can pass the flag *-s* with a valid service ID to remove a given service.
 
 It also possess a help flag (*-h*):
