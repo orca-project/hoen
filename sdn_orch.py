@@ -9,8 +9,11 @@ from time import sleep
 # Import OS
 import os
 
+import signal
+
 def cls():
     os.system('cls' if os.name=='nt' else 'clear')
+
 
 class ctl_base(object):
     name = ""
@@ -111,7 +114,6 @@ class ctl_base(object):
         return msg
 
 
-
 class ovs_ctl(ctl_base):
     name = "OVS"
     host_key = "ovs_host"
@@ -155,7 +157,8 @@ class wired_orchestrator_server(Thread):
         self.socket = self.context.socket(zmq.REP)
         # Bind ZMQ socket to host:port
         self.socket.bind("tcp://" + host + ":" + str(port))
-
+        # Timeout reception every 500 milliseconds
+        self.socket.setsockopt(zmq.RCVTIMEO, 500)
 
     def send_msg(self, message_header, message):
         # Send a message with a header
@@ -166,8 +169,15 @@ class wired_orchestrator_server(Thread):
         print('- Started Wired Orchestrator')
         # Run while thread is active
         while not self.shutdown_flag.is_set():
-            # Wait for command
-            cmd = self.socket.recv_json()
+
+            try:
+               # Wait for command
+               cmd = self.socket.recv_json()
+            # If nothing was received during the timeout
+            except zmq.Again:
+               # Try again
+               continue
+
             # SDN request
             sdn_r = cmd.get(self.req_header, None)
             # If the message is valid
@@ -259,11 +269,11 @@ if __name__ == "__main__":
     try:
         # Start the Remote Unit Server
         wired_orchestrator_thread = wired_orchestrator_server(
-            host='127.0.0.1', port=4000)
+            host='192.168.0.100', port=4000)
         wired_orchestrator_thread.start()
 
     except KeyboardInterrupt:
         # Terminate the Wired Orchestrator Server
         wired_orchestrator_thread.shutdown_flag.set()
         wired_orchestrator_thread.join()
-        print('Exitting')
+        print('Exiting')

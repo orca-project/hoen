@@ -5,8 +5,11 @@ from template_controllers.sdr_controller import sdr_controller_template
 # Import OS
 import os
 
+import signal
+
 def cls():
     os.system('cls' if os.name=='nt' else 'clear')
+
 
 class tcd_controller(sdr_controller_template):
 
@@ -56,6 +59,7 @@ class tcd_controller(sdr_controller_template):
 
         return msg
 
+
 if __name__ == "__main__":
     # Clear screen
     cls()
@@ -66,14 +70,16 @@ if __name__ == "__main__":
             name='TCD',
             req_header='tcd_req', # Don't modify
             rep_header='tcd_rep', # Don't modify
-            host='127.0.0.1',
+            host='192.168.0.100',
             port=7000)
 
         # Start the TCD SDR Controller Server
         tcd_controller_thread.start()
+        # Pause the main thread
+        signal.pause()
 
     except KeyboardInterrupt:
         # Terminate the TCD SDR Controller Server
         tcd_controller_thread.shutdown_flag.set()
         tcd_controller_thread.join()
-        print('Exitting')
+        print('Exiting')

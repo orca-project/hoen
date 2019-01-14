@@ -9,8 +9,11 @@ from time import sleep
 # Import OS
 import os
 
+import signal
+
 def cls():
     os.system('cls' if os.name=='nt' else 'clear')
+
 
 class ctl_base(object):
     name = ""
@@ -111,12 +114,11 @@ class ctl_base(object):
         return msg
 
 
-
 class imec_ctl(ctl_base):
     name = "IMEC"
     host_key = "imec_host"
     port_key = "imec_port"
-    default_host = "127.0.0.1"
+    default_host = "192.168.0.100"
     default_port = "6000"
     request_key = "imec_req"
     reply_key = "imec_rep"
@@ -126,7 +128,7 @@ class tcd_ctl(ctl_base):
     name = "TCD"
     host_key = "tcd_host"
     port_key = "tcd_port"
-    default_host = "127.0.0.1"
+    default_host = "192.168.0.100"
     default_port = "7000"
     request_key = "tcd_req"
     reply_key = "tcd_rep"
@@ -167,6 +169,8 @@ class wireless_orchestrator_server(Thread):
         self.socket = self.context.socket(zmq.REP)
         # Bind ZMQ socket to host:port
         self.socket.bind("tcp://" + host + ":" + str(port))
+        # Timeout reception every 500 milliseconds
+        self.socket.setsockopt(zmq.RCVTIMEO, 500)
 
 
     def send_msg(self, message_header, message):
@@ -178,8 +182,16 @@ class wireless_orchestrator_server(Thread):
         print('- Started Wireless Orchestrator')
         # Run while thread is active
         while not self.shutdown_flag.is_set():
+
             # Wait for command
-            cmd = self.socket.recv_json()
+            try:
+                cmd = self.socket.recv_json()
+
+            # If nothing was received during the timeout
+            except zmq.Again:
+                # Try again
+                continue
+
             # SDR request
             sdr_r = cmd.get(self.req_header, None)
             # If the message is valid
@@ -302,11 +314,13 @@ if __name__ == "__main__":
     try:
         # Start the Remote Unit Server
         wireless_orchestrator_thread = wireless_orchestrator_server(
-            host='127.0.0.1', port=4000)
+            host='192.168.0.100', port=4000)
         wireless_orchestrator_thread.start()
+        # Pause the main thread
+        signal.pause()
 
     except KeyboardInterrupt:
         # Terminate the Wireless Orchestrator Server
+        print('Exiting')
         wireless_orchestrator_thread.shutdown_flag.set()
         wireless_orchestrator_thread.join()
-        print('Exitting')

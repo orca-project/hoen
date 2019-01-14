@@ -5,6 +5,8 @@ from template_controllers.sdr_controller import sdr_controller_template
 # Import OS
 import os
 
+import signal
+
 def cls():
     os.system('cls' if os.name=='nt' else 'clear')
 
@@ -66,14 +68,16 @@ if __name__ == "__main__":
             name='IMEC',
             req_header='imec_req', # Don't modify
             rep_header='imec_rep', # Don't modify
-            host='127.0.0.1',
+            host='192.168.0.100',
             port=6000)
 
         # Start the IMEC SDR Controller Server
         imec_controller_thread.start()
+        # Pause the main thread
+        signal.pause()
 
     except KeyboardInterrupt:
         # Terminate the IMEC SDR Controller Server
         imec_controller_thread.shutdown_flag.set()
         imec_controller_thread.join()
-        print('Exitting')
+        print('Exiting')

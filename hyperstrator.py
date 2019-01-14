@@ -11,8 +11,11 @@ from time import sleep
 # Import OS
 import os
 
+import signal
+
 def cls():
     os.system('cls' if os.name=='nt' else 'clear')
+
 
 class orch_base(object):
     host_key = ""
@@ -77,7 +80,7 @@ class orch_base(object):
 class sdn_orch(orch_base):
     host_key = "sdn_host"
     port_key = "sdn_port"
-    default_host = "127.0.0.1"
+    default_host = "192.168.0.100"
     default_port = "5000"
     request_key = "sdn_req"
     reply_key = "sdn_rep"
@@ -86,7 +89,7 @@ class sdn_orch(orch_base):
 class sdr_orch(orch_base):
     host_key = "sdr_host"
     port_key = "sdr_port"
-    default_host = "127.0.0.1"
+    default_host = "192.168.0.100"
     default_port = "4000"
     request_key = "sdr_req"
     reply_key = "sdr_rep"
@@ -125,30 +128,24 @@ class hs_server(Thread):
         self.socket = self.context.socket(zmq.REP)
         # Bind ZMQ socket to host:port
         self.socket.bind("tcp://" + host + ":" + str(port))
-
+        # Timeout reception every 500 milliseconds
+        self.socket.setsockopt(zmq.RCVTIMEO, 500)
 
     def run(self):
         print('- Started Hyperstrator')
         # Run while thread is active
         while not self.shutdown_flag.is_set():
-            # Try to wait for command
-            try:
-                # Wait for command wF
-                cmd = self.socket.recv_json(flags=zmq.NOBLOCK)
 
-            # In case of ZMQ Error
-            except zmq.ZMQError as e:
-                # This means empty message
-                if e.errno == zmq.EAGAIN:
-                    # Wait for a second and try again
-                    sleep(1)
-                # Oh, this is serious
-                else :
-                    # Raise a real error
-                    raise
+             try:
+                # Wait for command
+                cmd = self.socket.recv_json()
+             # If nothing was received during the timeout
+             except zmq.Again:
+                # Try again
+                continue
 
-            # Received a command
-            else:
+             # Received a command
+             else:
                 # Service request, new service
                 ns = cmd.get('sr_ns', None)
 
@@ -250,10 +247,13 @@ if __name__ == "__main__":
     # Handle keyboard interrupt (SIGINT)
     try:
         # Start the Remote Unit Server
-        hs_thread = hs_server(host='127.0.0.1', port=3000)
+        hs_thread = hs_server(host='192.168.0.100', port=3000)
         hs_thread.start()
+        # Pause the main thread
+        signal.pause()
 
-    except ServiceExit:
-        # Terminate the RU Server
+    except KeyboardInterrupt:
+        # Terminate the Hyperstrator
         hs_thread.shutdown_flag.set()
-        print('Exitting')
+        hs_thread.join()
+        print('Exiting')

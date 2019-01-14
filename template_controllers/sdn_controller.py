@@ -5,6 +5,7 @@ import zmq
 # Import the Thread and Lock objects from the threading module
 from threading import Thread, Lock, Event
 
+import signal
 
 class sdn_controller_template(Thread):
 
@@ -25,7 +26,8 @@ class sdn_controller_template(Thread):
 
         # Start the HS server
         self.server_bind(**kwargs)
-
+        # Timeout reception every 500 milliseconds
+        self.socket.setsockopt(zmq.RCVTIMEO, 500)
 
     def server_bind(self, **kwargs):
         # Default HS Server host
@@ -61,8 +63,15 @@ class sdn_controller_template(Thread):
         print('- Started ' + self.name + ' Controller')
         # Run while thread is active
         while not self.shutdown_flag.is_set():
-            # Wait for command
-            cmd = self.socket.recv_json()
+
+            try:
+                # Wait for command
+                cmd = self.socket.recv_json()
+            # If nothing was received during the timeout
+            except zmq.Again:
+                # Try again
+                continue
+
             # SDN request
             sdn_r = cmd.get(self.req_header, None)
             # If the message is valid
@@ -145,8 +154,11 @@ if __name__ == "__main__":
         sdn_controller_thread = sdn_controller_template(
             host='127.0.0.1', port=8000)
         sdn_controller_thread.start()
+        # Pause the main thread
+        signal.pause()
 
     except KeyboardInterrupt:
-        # Terminate the SDN Controller Server
+        # Terminate the Wired Orchestrator Server
         sdn_controller_thread.shutdown_flag.set()
-        print('Exitting')
+        sdn_controller_thread.join()
+        print('Exiting')
