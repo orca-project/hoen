@@ -29,6 +29,14 @@ class sdr_controller_template(Thread):
         # Timeout reception every 500 milliseconds
         self.socket.setsockopt(zmq.RCVTIMEO, 500)
 
+        # Run post initialization operations
+        self.post_init(**kwargs)
+
+
+    def post_init(self, **kwargs):
+        # Must overside this method
+        pass
+
     def server_bind(self, **kwargs):
         # Default HS Server host
         host = kwargs.get('host', '127.0.0.1')

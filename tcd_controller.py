@@ -13,6 +13,10 @@ def cls():
 
 class tcd_controller(sdr_controller_template):
 
+    def post_init(self, **kwargs):
+        # TODO Override this method at will
+        pass
+
     def create_slice(self, **kwargs):
         # TODO Please see it here!
         # TODO This is a stub.
