@@ -118,7 +118,7 @@ class imec_ctl(ctl_base):
     name = "IMEC"
     host_key = "imec_host"
     port_key = "imec_port"
-    default_host = "192.168.0.100"
+    default_host = "192.168.0.101"
     default_port = "6000"
     request_key = "imec_req"
     reply_key = "imec_rep"
