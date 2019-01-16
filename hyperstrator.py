@@ -207,11 +207,11 @@ class hs_server(Thread):
                         # Leave if clause
                         continue
 
-                    print('\tService ID:', s_id)
+                    print('\tService ID:', rs['s_id'])
                     print('\tSend message to SDR orchestrator')
                     # Send UUID and type of service to the SDR orchestrator
                     r_host, r_port = self.sdr_orch.send_msg(
-                        {"r_rs": {'s_id': s_id}})
+                        {"r_rs": {'s_id': rs['s_id']}})
 
                     # If the radio removal failed
                     if r_host is None:
@@ -227,7 +227,7 @@ class hs_server(Thread):
                     if False:
                         # Otherwise, send message to the SDN orchestrator
                         c_host, c_port = self.sdn_orch.send_msg(
-                            {"c_rs": {'s_id': s_id}})
+                            {"c_rs": {'s_id': rs['s_id']}})
 
                     # TODO if the wired and the wireless parts worked
                     # Remove it to the list of service IDs

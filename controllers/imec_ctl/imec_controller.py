@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+# Hack to load parent module
+from sys import path
+path.append('..')
+
 # Import the Template SDR Controller
 from template_controllers.sdr_controller import sdr_controller_template
 # Import OS

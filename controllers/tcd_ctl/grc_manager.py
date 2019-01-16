@@ -63,7 +63,6 @@ class grc_manager(object):
                '--ip', host,
                '--zmq', zmq]
 
-        print(' '.join(cmd))
         # Try to create the RAT process
         try:
             # Create the RAT with subprocess and add session ID to the parent
@@ -122,7 +121,13 @@ class grc_manager(object):
                                 stdout=PIPE,
                                 stderr=PIPE,
                                 preexec_fn=setsid)
+            # Update the process status
+            (out,err) = sdr_process.communicate()
 
+            # Script not found
+            if sdr_process.returncode == 127:
+                print('Could not find script: ' + str(self.sdr_path[dirt]))
+                exit(10)
         except Exception as e:
             print('Failed creating SDR process.')
             exit(10)
