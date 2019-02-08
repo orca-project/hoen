@@ -314,7 +314,7 @@ if __name__ == "__main__":
     try:
         # Start the Remote Unit Server
         wireless_orchestrator_thread = wireless_orchestrator_server(
-            host='192.168.0.100', port=4000)
+            host='127.0.0.1', port=4000)
         wireless_orchestrator_thread.start()
         # Pause the main thread
         signal.pause()

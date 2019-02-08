@@ -37,6 +37,10 @@ class sdr_controller_template(Thread):
         # Must overside this method
         pass
 
+    def pre_exit(self, *args, **kwargs):
+        # Must overside this method
+        pass
+
     def server_bind(self, **kwargs):
         # Default HS Server host
         host = kwargs.get('host', '127.0.0.1')

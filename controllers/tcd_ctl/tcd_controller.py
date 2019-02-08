@@ -15,16 +15,25 @@ from grc_manager import grc_manager
 
 
 def cls():
-    os.system('cls' if os.name=='nt' else 'clear')
+    os.system('cls' if os.name == 'nt' else 'clear')
 
 
 class tcd_controller(sdr_controller_template):
 
     def post_init(self, **kwargs):
         # TODO Override this method at will
+        print('- Starting TCD Controller')
         self.grc_manager = grc_manager()
 
         self.usrp = self.grc_manager.create_sdr()
+
+    def pre_exit(self):
+     # Terminate the TCD SDR Controller Server
+        self.shutdown_flag.set()
+        # Release SDRs
+        self.grc_manager.remove_sdr()
+        # Join thread
+        self.join()
 
     def create_slice(self, **kwargs):
         # TODO Please see it here!
@@ -50,9 +59,7 @@ class tcd_controller(sdr_controller_template):
         # TODO Call this after the virtual radio was created
         self.grc_manager.create_rat(tech='lte')
 
-
         return msg
-
 
     def remove_slice(self, **kwargs):
         # TODO Please see it here!
@@ -88,9 +95,9 @@ if __name__ == "__main__":
         # Instantiate the TCD SDR Controller
         tcd_controller_thread = tcd_controller(
             name='TCD',
-            req_header='tcd_req', # Don't modify
-            rep_header='tcd_rep', # Don't modify
-            host='192.168.0.100',
+            req_header='tcd_req',  # Don't modify
+            rep_header='tcd_rep',  # Don't modify
+            host='127.0.0.1',
             port=7000)
 
         # Start the TCD SDR Controller Server
@@ -100,6 +107,6 @@ if __name__ == "__main__":
 
     except KeyboardInterrupt:
         # Terminate the TCD SDR Controller Server
-        tcd_controller_thread.shutdown_flag.set()
-        tcd_controller_thread.join()
+        tcd_controller_thread.pre_exit()
+
         print('Exiting')

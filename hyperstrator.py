@@ -247,7 +247,7 @@ if __name__ == "__main__":
     # Handle keyboard interrupt (SIGINT)
     try:
         # Start the Remote Unit Server
-        hs_thread = hs_server(host='192.168.0.100', port=3000)
+        hs_thread = hs_server(host='127.0.0.1', port=3000)
         hs_thread.start()
         # Pause the main thread
         signal.pause()

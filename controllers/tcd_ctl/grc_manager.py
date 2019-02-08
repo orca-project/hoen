@@ -1,12 +1,14 @@
 #!/bin/env python3
 # Import the path methods from the OS module
 from os import path, killpg, setsid, getpgid
+# Import the bash function from the bash module
+from bash import bash
 
+import signal
 from subprocess import Popen, PIPE
 
 
 class grc_manager(object):
-
     def __init__(self, **kwargs):
         # Extract parameters from keyword arguments
         rat_pool = kwargs.get('rat_path', 'rat_pool/')
@@ -40,6 +42,36 @@ class grc_manager(object):
         # Container to hold the SDR GRC processes
         self.sdr_pool = []
 
+    def uhd_find_devices(self):
+        # Try to locate uhd_find_devices binary
+        where_uhd_find_devices = bash(
+            'whereis uhd_find_devices').value().split(' ')
+
+        # If the 'whereis' command didn't return any path to the binary
+        if (len(where_uhd_find_devices) <= 1):
+            #  Deifne error message
+            msg = 'Cannot find \'uhd_find_devides\'.' + \
+              'Are the UHD drivers installed?'
+            # Throw error
+            throw_error(RuntimeError, msg)
+
+        # Invoke uhd_find_devices
+        # a = bash('/usr/bin/uhd_images_downloader').value()
+        find_devices_stdout = bash(where_uhd_find_devices[1])
+
+        # Sanitize the output
+        usrp_list = [[
+            entry.strip() for entry in usrp.split('\n')[1:]
+        ] for usrp in [
+            line.strip()
+            for line in find_devices_stdout.value().split(50 * '-')[1:]
+            if line != '\n'
+        ][1::2]]
+
+        # Convert the list of lists into a list of dictionaries
+        usrp_dict = [dict(x.split(': ') for x in usrp) for usrp in usrp_list]
+
+        return usrp_dict
 
     def create_rat(self, **kwargs):
         # Extract parameters from keyword arguments
@@ -55,24 +87,24 @@ class grc_manager(object):
         zmq = 'tcp://127.0.0.1:' + str(zmq)
 
         # Contruct command arguments
-        cmd = [self.rat_path[tech],
-               '--freq', str(freq),
-               '--gain', str(gain),
-               '--subdev', 'A:A',
-               '--port', str(port),
-               '--ip', host,
-               '--zmq', zmq]
+        cmd = [
+            self.rat_path[tech], '--freq',
+            str(freq), '--gain',
+            str(gain), '--subdev', 'A:A', '--port',
+            str(port), '--ip', host, '--zmq', zmq
+        ]
 
         # Try to create the RAT process
         try:
             # Create the RAT with subprocess and add session ID to the parent
-            rat_process = Popen(' '.join(cmd),
-                                shell=True,
-                                stdout=PIPE,
-                                stderr=PIPE,
-                                preexec_fn=setsid)
+            rat_process = Popen(
+                ' '.join(cmd),
+                shell=True,
+                stdout=PIPE,
+                stderr=PIPE,
+                preexec_fn=setsid)
             # Update the process status
-            (out,err) = rat_process.communicate()
+            (out, err) = rat_process.communicate()
 
             # Script not found
             if rat_process.returncode == 127:
@@ -90,55 +122,70 @@ class grc_manager(object):
         print('- Created RAT')
         print(kwargs)
 
-
-
     def create_sdr(self, **kwargs):
         # Extract parameters from keyword arguments
-        freq = kwargs.get('centre_freq', 2e9)
-        rate = kwargs.get('samp_rate', 1e6)
-        gain = kwargs.get('norm_gain', 1)
-        dirt = kwargs.get('direction', 'tx')
+        config = {}
+        config["freq"] = kwargs.get('centre_freq', 2e9)
+        config["rate"] = kwargs.get('samp_rate', 1e6)
+        config["gain"] = kwargs.get('norm_gain', 1)
+        config["dirt"] = kwargs.get('direction', 'tx')
 
-        host = kwargs.get('host', '127.0.0.1')
-        port = kwargs.get('port', 6000)
-        usrp = kwargs.get('serial', '')
+        config["host"] = kwargs.get('host', '127.0.0.1')
+        config["port"] = kwargs.get('port', 6000)
+        config["usrp"] = kwargs.get('serial', '')
+
+        # If there's now serial
+        if not config['usrp']:
+            # Get the serial of an existing USRP
+            print('- Findind USRP')
+            found = self.uhd_find_devices()
+
+            if not found:
+                print('\t- USRP not found.')
+                exit(10)
+
+            else:
+                config["usrp"] = found[0]['serial']
 
         # Contruct command arguments
-        cmd = [self.sdr_path[dirt],
-               '--freq', str(freq),
-               '--rate', str(rate),
-               '--gain', str(gain),
-               '--subdev', 'A:A',
-               '--port', str(port),
-               '--ip', host,
-               '--usrp', '\'serial=' + usrp + '\'']
+        cmd = [
+            self.sdr_path[config["dirt"]], '--freq',
+            str(config["freq"]), '--rate',
+            str(config["rate"]), '--gain',
+            str(config["gain"]), '--subdev', 'A:A', '--port',
+            str(config["port"]), '--ip', config["host"], '--usrp',
+            '\'serial=' + config["usrp"] + '\''
+        ]
 
         # Try to create the SDR process
         try:
             # Create the SDR with subprocess and add session ID to the parent
-            sdr_process = Popen(' '.join(cmd),
-                                shell=True,
-                                stdout=PIPE,
-                                stderr=PIPE,
-                                preexec_fn=setsid)
+            sdr_process = Popen(
+                cmd, stdout=PIPE, stderr=PIPE, preexec_fn=setsid)
             # Update the process status
-            (out,err) = sdr_process.communicate()
 
-            # Script not found
-            if sdr_process.returncode == 127:
-                print('Could not find script: ' + str(self.sdr_path[dirt]))
-                exit(10)
         except Exception as e:
-            print('Failed creating SDR process.')
+            print('- Failed creating SDR process.')
+            # print(e)
             exit(10)
 
+        # Process created
         else:
-            # If succeded, append to SDR GRC pool
-            self.sdr_pool.append({'serial': usrp, 'process': sdr_process})
+            # Check if it abruptly exited
+            if not sdr_process.poll() is None:
+                print('Failed creating SDR process.')
+                exit(10)
+
+            else:
+                # If succeded, append to SDR GRC pool
+                self.sdr_pool.append({
+                    'serial': config["usrp"],
+                    'process': sdr_process
+                })
 
         print('- Created SDR')
-        print(kwargs)
-
+        for x in config:
+            print('\t-' + x + ": " + str(config[x]))
 
     def remove_rat(self, **kwargs):
         # Extract parameters from keyword arguments
@@ -161,18 +208,18 @@ class grc_manager(object):
         # Extract parameters from keyword arguments
         serial = kwargs.get('serial', '')
 
+        print('- Removing SDRs')
         # Iterate over the list of current processes
         for sdr in self.sdr_pool[:]:
             # If a SDR matches the USRP serial
-            if sdr['serial'] == serial:
+            if sdr['serial'] == serial or not serial:
                 # Kill the sdr process and all it's child processes
                 killpg(getpgid(sdr['process'].pid), signal.SIGKILL)
+                print('\t- Removed USRP: ' + sdr['serial'])
 
                 # Remove it from the SDR pool
                 self.sdr_pool.remove(sdr)
 
-        print('- Removed SDR')
-        print(kwargs)
 
 # TODO RAT idenfifier
 # TODO Unique RAT port
