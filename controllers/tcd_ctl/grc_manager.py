@@ -74,57 +74,60 @@ class grc_manager(object):
         return usrp_dict
 
     def create_rat(self, **kwargs):
+        # Container to hold the configuration
+        config = {}
         # Extract parameters from keyword arguments
-        freq = kwargs.get('centre_freq', 2e9)
-        gain = kwargs.get('norm_gain', 1)
-        tech = kwargs.get('technology', 'lte')
+        config["freq"] = kwargs.get('centre_freq', 2e9)
+        config["gain"] = kwargs.get('norm_gain', 1)
+        config["tech"] = kwargs.get('technology', 'lte')
 
-        host = kwargs.get('host', '0.0.0.0')
-        port = kwargs.get('port', 6000)
-        zmq = kwargs.get('zmq', 9000)
+        config["host"] = kwargs.get('host', '0.0.0.0')
+        config["port"] = kwargs.get('port', 6000)
+        config["zmq"] = kwargs.get('zmq', 9000)
 
         # Append the ZMQ address and protocol type to the ZMQ port
-        zmq = 'tcp://127.0.0.1:' + str(zmq)
+        config["zmq"] = 'tcp://127.0.0.1:' + str(config["zmq"])
 
         # Contruct command arguments
         cmd = [
-            self.rat_path[tech], '--freq',
-            str(freq), '--gain',
-            str(gain), '--subdev', 'A:A', '--port',
-            str(port), '--ip', host, '--zmq', zmq
+            self.rat_path[config["tech"]], '--freq',
+            str(config["freq"]), '--gain',
+            str(config["gain"]), '--subdev', 'A:A', '--port',
+            str(config["port"]), '--ip', config["host"], '--zmq', config["zmq"]
         ]
 
         # Try to create the RAT process
         try:
             # Create the RAT with subprocess and add session ID to the parent
-            rat_process = Popen(
-                ' '.join(cmd),
-                shell=True,
-                stdout=PIPE,
-                stderr=PIPE,
-                preexec_fn=setsid)
-            # Update the process status
-            (out, err) = rat_process.communicate()
-
-            # Script not found
-            if rat_process.returncode == 127:
-                print('Could not find script: ' + str(self.rat_path[tech]))
-                exit(10)
+            rat_process = Popen(stdout=PIPE, stderr=PIPE, preexec_fn=setsid)
 
         except Exception as e:
-            print('Failed creating RAT process.')
+            print('- Failed creating RAT process.')
+            # print(e)
             exit(10)
 
+        # Process created
         else:
-            # If succeeded, append to SDR pool
-            self.rat_pool.append({'tech': tech, 'process': rat_process})
+            # Check if it abruptly exited
+            if not rat_process.poll() is None:
+                print('Failed creating RAT process.')
+                exit(10)
+
+            else:
+                # If succeeded, append to RAT pool
+                self.rat_pool.append({
+                    'tech': config["tech"],
+                    'process': rat_process
+                })
 
         print('- Created RAT')
-        print(kwargs)
+        for x in config:
+            print('\t-' + x + ": " + str(config[x]))
 
     def create_sdr(self, **kwargs):
-        # Extract parameters from keyword arguments
+        # Container to hold the configuration
         config = {}
+        # Extract parameters from keyword arguments
         config["freq"] = kwargs.get('centre_freq', 2e9)
         config["rate"] = kwargs.get('samp_rate', 1e6)
         config["gain"] = kwargs.get('norm_gain', 1)
@@ -191,12 +194,14 @@ class grc_manager(object):
         # Extract parameters from keyword arguments
         serial = kwargs.get('serial', '')
 
+        print('- Removing RATs')
         # Iterate over the list of current processes
         for rat in self.rat_pool[:]:
-            # If a SDR matches the USRP serial
-            if rat['serial'] == serial:
-                # Kill the sdr process and all it's child processes
+            # If a RAT matches the RAT s_id
+            if rat['serial'] == serial or not serial:
+                # Kill the RAT process and all it's child processes
                 killpg(getpgid(rat['process'].pid), signal.SIGKILL)
+                print('\t- Removed RAT: ' + rat['serial'])
 
                 # Remove it from the SDR pool
                 self.rat_pool.remove(rat)

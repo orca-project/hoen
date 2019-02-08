@@ -80,7 +80,7 @@ class orch_base(object):
 class sdn_orch(orch_base):
     host_key = "sdn_host"
     port_key = "sdn_port"
-    default_host = "192.168.0.100"
+    default_host = "127.0.0.1"
     default_port = "5000"
     request_key = "sdn_req"
     reply_key = "sdn_rep"
@@ -89,7 +89,7 @@ class sdn_orch(orch_base):
 class sdr_orch(orch_base):
     host_key = "sdr_host"
     port_key = "sdr_port"
-    default_host = "192.168.0.100"
+    default_host = "127.0.0.1"
     default_port = "4000"
     request_key = "sdr_req"
     reply_key = "sdr_rep"

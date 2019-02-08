@@ -128,7 +128,7 @@ class tcd_ctl(ctl_base):
     name = "TCD"
     host_key = "tcd_host"
     port_key = "tcd_port"
-    default_host = "192.168.0.100"
+    default_host = "127.0.0.1"
     default_port = "7000"
     request_key = "tcd_req"
     reply_key = "tcd_rep"
