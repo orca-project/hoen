@@ -9,46 +9,31 @@ from subprocess import Popen, PIPE
 
 
 class managed_process(object):
-
+    # The process PID
     p_id = None
 
+    def __init__(self, cmd):
+        # Check for the type of variable
+        if not isinstance(cmd, list):
+            print('\t- Wrong argument type, not a list')
+            raise Exception
 
-    def __init__(self, **kwargs):
+        # Create the subprocess and add session ID to the parent
+        process = Popen(
+            cmd, stdout=PIPE, stderr=PIPE, preexec_fn=setsid)
 
-        # Contruct command arguments
-        cmd = [
-            self.rat_path[config["tech"]], '--freq',
-            str(config["freq"]), '--gain',
-            str(config["gain"]), '--subdev', 'A:A', '--port',
-            str(config["port"]), '--ip', config["host"], '--zmq', config["zmq"]
-        ]
+        # Check if it abruptly exited
+        if not process.poll() is None:
+            print('\t- Process failed abruptly.')
+            raise Exception
 
-        # Try to create the RAT process
-        try:
-            # Create the RAT with subprocess and add session ID to the parent
-            rat_process = Popen(
-                cmd, stdout=PIPE, stderr=PIPE, preexec_fn=setsid)
-
-        except Exception as e:
-            print('- Failed creating RAT process.', e)
-            # print(e)
-            return False
-
-        # Process created
-        else:
-            # Check if it abruptly exited
-            if not rat_process.poll() is None:
-                print('Failed creating RAT process.')
-                return False
-
-            else:
-
-                get
+        # Get the group process ID to kill everything
+        self.process = process
+        self.p_id = getpgid(process.pid)
 
     def halt(self, **kwargs):
-        # Kill the RAT process and all it's child processes
-        killpg(getpgid(rat['process'].pid), signal.SIGKILL)
-
+        # Kill the process and all it's child processes
+        killpg(self.p_id, signal.SIGKILL)
 
 
 class grc_manager(object):
@@ -139,23 +124,21 @@ class grc_manager(object):
             str(config["port"]), '--ip', config["host"], '--zmq', config["zmq"]
         ]
 
+        # Create process
+        try:
+            process = managed_process(cmd)
 
-        process = self.process_man.create_pprocess(cmd)
-
-        if not process:
+        except:
+            # Check the process failed
             return False
-        else:
-            # If succeeded, append to RAT pool
-                self.rat_pool.append({
-                    'tech': config["tech"],
-                    'process': rat_process
-                })
 
-                print('- Created RAT')
-                for x in config:
-                    print('\t-' + x + ": " + str(config[x]))
-                    return True
+        # If succeeded, append to RAT pool
+        self.rat_pool.append({'tech': config["tech"], 'process': process})
 
+        print('- Created RAT')
+        for x in config:
+            print('\t-' + x + ": " + str(config[x]))
+            return True
 
     def create_sdr(self, **kwargs):
         # Container to hold the configuration
@@ -178,7 +161,7 @@ class grc_manager(object):
 
             if not found:
                 print('\t- USRP not found.')
-                exit(10)
+                return False
 
             else:
                 config["usrp"] = found[0]['serial']
@@ -193,31 +176,16 @@ class grc_manager(object):
             '\'serial=' + config["usrp"] + '\''
         ]
 
-        # Try to create the SDR process
         try:
-            # Create the SDR with subprocess and add session ID to the parent
-            sdr_process = Popen(
-                cmd, stdout=PIPE, stderr=PIPE, preexec_fn=setsid)
-            # Update the process status
+            # Create process
+            process = managed_process(cmd)
 
-        except Exception as e:
-            print('- Failed creating SDR process.')
-            # print(e)
-            exit(10)
+        except:
+            # If it failed
+            return False
 
-        # Process created
-        else:
-            # Check if it abruptly exited
-            if not sdr_process.poll() is None:
-                print('Failed creating SDR process.')
-                exit(10)
-
-            else:
-                # If succeded, append to SDR GRC pool
-                self.sdr_pool.append({
-                    'serial': config["usrp"],
-                    'process': sdr_process
-                })
+        # If succeeded, append to SDR GRC pool
+        self.sdr_pool.append({'serial': config["usrp"], 'process': process})
 
         print('- Created SDR')
         for x in config:
@@ -230,17 +198,13 @@ class grc_manager(object):
         print('- Removing RATs')
         # Iterate over the list of current processes
         for rat in self.rat_pool[:]:
-            # If a RAT matches the RAT s_id
+            # If a RAT matches the RAT s_id or we should remove all RATs
             if rat['serial'] == serial or not serial:
                 # Kill the RAT process and all it's child processes
-                killpg(getpgid(rat['process'].pid), signal.SIGKILL)
+                rat['process'].halt()
                 print('\t- Removed RAT: ' + rat['serial'])
-
                 # Remove it from the SDR pool
                 self.rat_pool.remove(rat)
-
-        print('- Removed RAT')
-        print(kwargs)
 
     def remove_sdr(self, **kwargs):
         # Extract parameters from keyword arguments
@@ -249,12 +213,11 @@ class grc_manager(object):
         print('- Removing SDRs')
         # Iterate over the list of current processes
         for sdr in self.sdr_pool[:]:
-            # If a SDR matches the USRP serial
+            # If a SDR matches the USRP serial or we should remove all SDRs
             if sdr['serial'] == serial or not serial:
                 # Kill the sdr process and all it's child processes
-                killpg(getpgid(sdr['process'].pid), signal.SIGKILL)
+                sdr['process'].halt()
                 print('\t- Removed USRP: ' + sdr['serial'])
-
                 # Remove it from the SDR pool
                 self.sdr_pool.remove(sdr)
 
