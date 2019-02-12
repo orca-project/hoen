@@ -14,14 +14,15 @@ def parse_cli_args():
     group.add_argument(
         '-l', '--low-latency',
         action="store_true",
-        help='Low-Latency Service')
+        help='create a low-latency service')
     group.add_argument(
         '-t', '--high-throughput',
         action="store_true",
-        help='High-Throughput Service')
+        help='create a high-throughput service')
     group.add_argument(
         '-s', '--service-id',
-        help='Service ID')
+        metavar='S_ID',
+        help='remove a service based on its S_ID')
 
     # Parse CLI arguments
     arg_dict = vars(parser.parse_args())

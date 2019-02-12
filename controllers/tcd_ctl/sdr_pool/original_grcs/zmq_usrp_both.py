@@ -3,7 +3,7 @@
 ##################################################
 # GNU Radio Python Flow Graph
 # Title: Zmq Usrp Both
-# Generated: Thu Nov 29 07:36:38 2018
+# Generated: Tue Feb 12 16:34:26 2019
 ##################################################
 
 
@@ -25,20 +25,21 @@ class zmq_usrp_both(gr.top_block):
         ##################################################
         # Variables
         ##################################################
-        self.port = port = 5000
+        self.source_port = source_port = 2201
         self.ip = ip = '127.0.0.1'
-        self.usrp_address = usrp_address = '192.168.0.2'
-        self.server_address_0 = server_address_0 = 'udp://' + ip + ':' + str(port+1)
-        self.server_address = server_address = 'udp://' + ip + ':' + str(port)
+        self.destination_port = destination_port = 2501
+        self.usrp_address = usrp_address = "serial=30C628B"
+        self.source_address = source_address = 'tcp://' + ip + ':' + str(source_port)
         self.samp_rate = samp_rate = 1e6
         self.gain = gain = 1
+        self.destination_address = destination_address = 'tcp://' + ip + ':' + str(destination_port)
         self.centre_freq = centre_freq = 2e9
 
         ##################################################
         # Blocks
         ##################################################
-        self.zeromq_push_sink_0 = zeromq.push_sink(gr.sizeof_gr_complex, 1, server_address, 100, False, -1)
-        self.zeromq_pull_source_0 = zeromq.pull_source(gr.sizeof_gr_complex, 1, server_address_0, 100, False, -1)
+        self.zeromq_push_sink_0 = zeromq.push_sink(gr.sizeof_gr_complex, 1, destination_address, 100, True, -1)
+        self.zeromq_pull_source_0 = zeromq.pull_source(gr.sizeof_gr_complex, 1, source_address, 100, True, -1)
         self.uhd_usrp_source_0 = uhd.usrp_source(
         	",".join((usrp_address, "")),
         	uhd.stream_args(
@@ -70,21 +71,27 @@ class zmq_usrp_both(gr.top_block):
         self.connect((self.uhd_usrp_source_0, 0), (self.zeromq_push_sink_0, 0))
         self.connect((self.zeromq_pull_source_0, 0), (self.uhd_usrp_sink_0, 0))
 
-    def get_port(self):
-        return self.port
+    def get_source_port(self):
+        return self.source_port
 
-    def set_port(self, port):
-        self.port = port
-        self.set_server_address_0('udp://' + self.ip + ':' + str(self.port+1))
-        self.set_server_address('udp://' + self.ip + ':' + str(self.port))
+    def set_source_port(self, source_port):
+        self.source_port = source_port
+        self.set_source_address('tcp://' + self.ip + ':' + str(self.source_port))
 
     def get_ip(self):
         return self.ip
 
     def set_ip(self, ip):
         self.ip = ip
-        self.set_server_address_0('udp://' + self.ip + ':' + str(self.port+1))
-        self.set_server_address('udp://' + self.ip + ':' + str(self.port))
+        self.set_source_address('tcp://' + self.ip + ':' + str(self.source_port))
+        self.set_destination_address('tcp://' + self.ip + ':' + str(self.destination_port))
+
+    def get_destination_port(self):
+        return self.destination_port
+
+    def set_destination_port(self, destination_port):
+        self.destination_port = destination_port
+        self.set_destination_address('tcp://' + self.ip + ':' + str(self.destination_port))
 
     def get_usrp_address(self):
         return self.usrp_address
@@ -92,17 +99,11 @@ class zmq_usrp_both(gr.top_block):
     def set_usrp_address(self, usrp_address):
         self.usrp_address = usrp_address
 
-    def get_server_address_0(self):
-        return self.server_address_0
+    def get_source_address(self):
+        return self.source_address
 
-    def set_server_address_0(self, server_address_0):
-        self.server_address_0 = server_address_0
-
-    def get_server_address(self):
-        return self.server_address
-
-    def set_server_address(self, server_address):
-        self.server_address = server_address
+    def set_source_address(self, source_address):
+        self.source_address = source_address
 
     def get_samp_rate(self):
         return self.samp_rate
@@ -124,6 +125,12 @@ class zmq_usrp_both(gr.top_block):
         self.uhd_usrp_sink_0.set_normalized_gain(self.gain, 0)
 
 
+    def get_destination_address(self):
+        return self.destination_address
+
+    def set_destination_address(self, destination_address):
+        self.destination_address = destination_address
+
     def get_centre_freq(self):
         return self.centre_freq
 
@@ -137,6 +144,11 @@ def main(top_block_cls=zmq_usrp_both, options=None):
 
     tb = top_block_cls()
     tb.start()
+    try:
+        raw_input('Press Enter to quit: ')
+    except EOFError:
+        pass
+    tb.stop()
     tb.wait()
 
 

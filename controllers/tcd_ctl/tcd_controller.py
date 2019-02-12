@@ -27,6 +27,7 @@ class tcd_controller(sdr_controller_template):
 
         self.usrp = self.grc_manager.create_sdr()
 
+
     def pre_exit(self):
      # Terminate the TCD SDR Controller Server
         self.shutdown_flag.set()
@@ -34,6 +35,7 @@ class tcd_controller(sdr_controller_template):
         self.grc_manager.remove_sdr()
         # Join thread
         self.join()
+
 
     def create_slice(self, **kwargs):
         # TODO Please see it here!
@@ -57,9 +59,13 @@ class tcd_controller(sdr_controller_template):
             # resulting messages formatted like above
 
         # TODO Call this after the virtual radio was created
-        self.grc_manager.create_rat(tech='lte')
+
+        created = self.grc_manager.create_rat(tech='lte')
+
+        print(created)
 
         return msg
+
 
     def remove_slice(self, **kwargs):
         # TODO Please see it here!

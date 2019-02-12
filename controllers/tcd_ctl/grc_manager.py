@@ -8,6 +8,49 @@ import signal
 from subprocess import Popen, PIPE
 
 
+class managed_process(object):
+
+    p_id = None
+
+
+    def __init__(self, **kwargs):
+
+        # Contruct command arguments
+        cmd = [
+            self.rat_path[config["tech"]], '--freq',
+            str(config["freq"]), '--gain',
+            str(config["gain"]), '--subdev', 'A:A', '--port',
+            str(config["port"]), '--ip', config["host"], '--zmq', config["zmq"]
+        ]
+
+        # Try to create the RAT process
+        try:
+            # Create the RAT with subprocess and add session ID to the parent
+            rat_process = Popen(
+                cmd, stdout=PIPE, stderr=PIPE, preexec_fn=setsid)
+
+        except Exception as e:
+            print('- Failed creating RAT process.', e)
+            # print(e)
+            return False
+
+        # Process created
+        else:
+            # Check if it abruptly exited
+            if not rat_process.poll() is None:
+                print('Failed creating RAT process.')
+                return False
+
+            else:
+
+                get
+
+    def halt(self, **kwargs):
+        # Kill the RAT process and all it's child processes
+        killpg(getpgid(rat['process'].pid), signal.SIGKILL)
+
+
+
 class grc_manager(object):
     def __init__(self, **kwargs):
         # Extract parameters from keyword arguments
@@ -96,33 +139,23 @@ class grc_manager(object):
             str(config["port"]), '--ip', config["host"], '--zmq', config["zmq"]
         ]
 
-        # Try to create the RAT process
-        try:
-            # Create the RAT with subprocess and add session ID to the parent
-            rat_process = Popen(stdout=PIPE, stderr=PIPE, preexec_fn=setsid)
 
-        except Exception as e:
-            print('- Failed creating RAT process.')
-            # print(e)
-            exit(10)
+        process = self.process_man.create_pprocess(cmd)
 
-        # Process created
+        if not process:
+            return False
         else:
-            # Check if it abruptly exited
-            if not rat_process.poll() is None:
-                print('Failed creating RAT process.')
-                exit(10)
-
-            else:
-                # If succeeded, append to RAT pool
+            # If succeeded, append to RAT pool
                 self.rat_pool.append({
                     'tech': config["tech"],
                     'process': rat_process
                 })
 
-        print('- Created RAT')
-        for x in config:
-            print('\t-' + x + ": " + str(config[x]))
+                print('- Created RAT')
+                for x in config:
+                    print('\t-' + x + ": " + str(config[x]))
+                    return True
+
 
     def create_sdr(self, **kwargs):
         # Container to hold the configuration

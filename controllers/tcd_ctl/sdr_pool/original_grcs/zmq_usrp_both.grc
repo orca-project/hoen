@@ -66,7 +66,7 @@
     </param>
     <param>
       <key>run_options</key>
-      <value>run</value>
+      <value>prompt</value>
     </param>
     <param>
       <key>run</key>
@@ -120,6 +120,60 @@
     </param>
     <param>
       <key>_coordinate</key>
+      <value>(416, 100)</value>
+    </param>
+    <param>
+      <key>_rotation</key>
+      <value>0</value>
+    </param>
+    <param>
+      <key>id</key>
+      <value>destination_address</value>
+    </param>
+    <param>
+      <key>value</key>
+      <value>'tcp://' + ip + ':' + str(destination_port)</value>
+    </param>
+  </block>
+  <block>
+    <key>variable</key>
+    <param>
+      <key>comment</key>
+      <value></value>
+    </param>
+    <param>
+      <key>_enabled</key>
+      <value>True</value>
+    </param>
+    <param>
+      <key>_coordinate</key>
+      <value>(288, 100)</value>
+    </param>
+    <param>
+      <key>_rotation</key>
+      <value>0</value>
+    </param>
+    <param>
+      <key>id</key>
+      <value>destination_port</value>
+    </param>
+    <param>
+      <key>value</key>
+      <value>2501</value>
+    </param>
+  </block>
+  <block>
+    <key>variable</key>
+    <param>
+      <key>comment</key>
+      <value></value>
+    </param>
+    <param>
+      <key>_enabled</key>
+      <value>True</value>
+    </param>
+    <param>
+      <key>_coordinate</key>
       <value>(240, 508)</value>
     </param>
     <param>
@@ -147,7 +201,7 @@
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(176, 92)</value>
+      <value>(232, 12)</value>
     </param>
     <param>
       <key>_rotation</key>
@@ -160,33 +214,6 @@
     <param>
       <key>value</key>
       <value>'127.0.0.1'</value>
-    </param>
-  </block>
-  <block>
-    <key>variable</key>
-    <param>
-      <key>comment</key>
-      <value></value>
-    </param>
-    <param>
-      <key>_enabled</key>
-      <value>True</value>
-    </param>
-    <param>
-      <key>_coordinate</key>
-      <value>(296, 92)</value>
-    </param>
-    <param>
-      <key>_rotation</key>
-      <value>0</value>
-    </param>
-    <param>
-      <key>id</key>
-      <value>port</value>
-    </param>
-    <param>
-      <key>value</key>
-      <value>5000</value>
     </param>
   </block>
   <block>
@@ -228,7 +255,7 @@
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(8, 92)</value>
+      <value>(120, 100)</value>
     </param>
     <param>
       <key>_rotation</key>
@@ -236,11 +263,11 @@
     </param>
     <param>
       <key>id</key>
-      <value>server_address</value>
+      <value>source_address</value>
     </param>
     <param>
       <key>value</key>
-      <value>'udp://' + ip + ':' + str(port)</value>
+      <value>'tcp://' + ip + ':' + str(source_port)</value>
     </param>
   </block>
   <block>
@@ -255,7 +282,7 @@
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(392, 92)</value>
+      <value>(16, 100)</value>
     </param>
     <param>
       <key>_rotation</key>
@@ -263,11 +290,11 @@
     </param>
     <param>
       <key>id</key>
-      <value>server_address_0</value>
+      <value>source_port</value>
     </param>
     <param>
       <key>value</key>
-      <value>'udp://' + ip + ':' + str(port+1)</value>
+      <value>2201</value>
     </param>
   </block>
   <block>
@@ -294,7 +321,7 @@
     </param>
     <param>
       <key>value</key>
-      <value>'192.168.0.2'</value>
+      <value>"serial=30C628B"</value>
     </param>
   </block>
   <block>
@@ -969,7 +996,7 @@
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(296, 164)</value>
+      <value>(296, 180)</value>
     </param>
     <param>
       <key>_rotation</key>
@@ -2300,11 +2327,11 @@
     </param>
     <param>
       <key>_enabled</key>
-      <value>True</value>
+      <value>1</value>
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(24, 300)</value>
+      <value>(24, 332)</value>
     </param>
     <param>
       <key>_rotation</key>
@@ -2463,7 +2490,7 @@
     <key>zeromq_pull_source</key>
     <param>
       <key>address</key>
-      <value>server_address_0</value>
+      <value>source_address</value>
     </param>
     <param>
       <key>alias</key>
@@ -2483,7 +2510,7 @@
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(24, 196)</value>
+      <value>(24, 236)</value>
     </param>
     <param>
       <key>_rotation</key>
@@ -2511,7 +2538,7 @@
     </param>
     <param>
       <key>pass_tags</key>
-      <value>False</value>
+      <value>True</value>
     </param>
     <param>
       <key>timeout</key>
@@ -2526,7 +2553,7 @@
     <key>zeromq_push_sink</key>
     <param>
       <key>address</key>
-      <value>server_address</value>
+      <value>destination_address</value>
     </param>
     <param>
       <key>alias</key>
@@ -2542,11 +2569,11 @@
     </param>
     <param>
       <key>_enabled</key>
-      <value>True</value>
+      <value>1</value>
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(296, 332)</value>
+      <value>(296, 364)</value>
     </param>
     <param>
       <key>_rotation</key>
@@ -2566,7 +2593,7 @@
     </param>
     <param>
       <key>pass_tags</key>
-      <value>False</value>
+      <value>True</value>
     </param>
     <param>
       <key>timeout</key>
