@@ -12,7 +12,7 @@ import os
 import signal
 
 from grc_manager import grc_manager
-
+from route_manager import route_manager
 
 def cls():
     os.system('cls' if os.name == 'nt' else 'clear')
@@ -23,14 +23,20 @@ class tcd_controller(sdr_controller_template):
     def post_init(self, **kwargs):
         # TODO Override this method at will
         print('- Starting TCD Controller')
+        # Start the GRC manager
         self.grc_manager = grc_manager()
+        # Start the route manager
+        self.route_manager = route_manager()
 
+        # Attach to the USRP
         self.usrp = self.grc_manager.create_sdr()
 
 
     def pre_exit(self):
      # Terminate the TCD SDR Controller Server
         self.shutdown_flag.set()
+        # Release RATs
+        self.grc_manager.remove_rat()
         # Release SDRs
         self.grc_manager.remove_sdr()
         # Join thread
@@ -62,89 +68,78 @@ class tcd_controller(sdr_controller_template):
             # Return NACK
             return {'nl_nack': {'msg': 'Invalid RAT: ' + str(tech)}}
 
-        # TODO Please see it here!
-        # TODO This is a stub.
-        # TODO Please fill this with the required functionality.
 
-        # TCD: This is where you must create a radio slice
+        # First step: Create virtual RF front-end
+        # TODO do something here
 
-        # # If succeeded creating the slice
-        # if True:
-        #     # TODO We treat the radio slice as a network sink
-        #     # Send ACK
-        #     msg = {'nl_ack': {'host': "<IP>", "port": 7001}}
 
-        # # If failed creating slice
-        # else:
-        #     # Send NACK
-        #     msg = {'nl_nack': {'<Reason for failing>'}}
-
-        #     # TODO You can use any logic you want. We just need the
-        #     # resulting messages formatted like above
-
-        # # TODO Call this after the virtual radio was created
-
+        # Second step: Create the RAT
         try:
             # Create a new software radio
-            created = self.grc_manager.create_rat(technology=tech,
-                                                  direction=dirx,
-                                                  service_id=s_id)
+            rat_id = self.grc_manager.create_rat(technology=tech,
+                                                 direction=dirx,
+                                                 service_id=s_id)
 
         # If failed creating software radio
         except Exception as e:
             # Send NACK
             print('\t' + str(e))
-            msg = {'nl_nack': {"msg": str(e)}}
+            return {'nl_nack': {"msg": str(e)}}
 
-        # Otherwise, it worked
-        else:
-            msg = {'nl_ack': {'host': "<IP>", "port": 7001}}
 
-        # After handling each case, return message
-        finally:
-            # Return message
-            return msg
+
+        # Third step: Configure routes
+        try:
+            host = self.route_manager.create_route(rat_id=rat_id)
+
+        # If failed establishing routes
+        except Exception as e:
+            # Send NACK
+            print('\t' + str(e))
+            return {'nl_nack': {"msg": str(e)}}
+
+        # Return host and port -- TODO may drop port entirely
+        return {'nl_ack': {'host': host, "port": 7001}}
 
 
     def remove_slice(self, **kwargs):
-        # # TODO Please see it here!
-        # # TODO This is a stub.
-        # # TODO Please fill this with the required functionality.
+        # Extract parameters from keyword arguments
+        s_id = kwargs.get('s_id', None)
 
-        # # TCD: This is where you must remove a radio slice
+        # Check for missing S_ID
+        if s_id is None:
+            # Return NACK
+            return {'nl_nack': {'msg': 'Missing Service ID.'}}
 
-        # # If succeeded removing the slice
-        # if True:
-        #     # Send ACK
-        #     msg = {'rl_ack': {'s_id': kwargs['s_id']}}
 
-        # # If failed removing slice
-        # else:
-        #     # Send NACK
-        #     msg = {'rl_nack': {'<Reason for failing>'}}
-
-        #     # TODO You can use any logic you want. We just need the
-        #     # resulting messages formatted like above
-
-        # # TODO Call this before the virtual radio is removed
-
+        #First Step: Remove the RAT
         try:
             # Remove a software radio
-            self.grc_manager.remove_rat(service_id=kwargs['s_id'])
+            rat_id = self.grc_manager.remove_rat(s_id=s_id)
 
         # If it failed removing the software radio
         except Exception as e:
              # Send NACK
-            msg = {'rl_nack': {"msg": 'Failed removing Radio Stack.'}}
+            print('\t' + str(e))
+            return {'rl_nack': {"msg": str(e)}}
 
-        # Otherwise, it worked
-        else:
-            msg = {'rl_ack': {'s_id': kwargs['s_id']}}
+        # Second step: Remove routes
+        try:
+            self.route_manager.remove_route(rat_id=rat_id)
 
-        # After handling each case, return message
-        finally:
-            # Return message
-            return msg
+        # If failed establishing routes
+        except Exception as e:
+            # Send NACK
+            print('\t' + str(e))
+            return {'nl_nack': {"msg": str(e)}}
+
+
+        # Third step: Remove virtual RF front-end
+        # TODO do something here
+
+
+        # Return host and port -- TODO may drop port entirely
+        return {'rl_ack': {'s_id': kwargs['s_id']}}
 
 
 if __name__ == "__main__":

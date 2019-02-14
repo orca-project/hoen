@@ -12,6 +12,7 @@ class managed_process(object):
     # The process PID
     p_id = None
 
+    # Spawn an external process
     def __init__(self, cmd):
         # Check for the type of variable
         if not isinstance(cmd, list):
@@ -31,11 +32,14 @@ class managed_process(object):
         self.process = process
         self.p_id = getpgid(process.pid)
 
+
+    # Stop the process group
     def halt(self, **kwargs):
         # Kill the process and all it's child processes
         killpg(self.p_id, signal.SIGKILL)
 
 
+    # Called upon garbage collection
     def __del__(self):
         if self.p_id is not None:
             self.halt()
@@ -165,6 +169,9 @@ class grc_manager(object):
                 (self.operation_mode != 'trx'):
             raise Exception('Invalid operation mode: ' + str(config['dirx']))
 
+        # Hold the RAT ID
+        rat_id = self.rat_counter
+
         # Construct command arguments
         cmd = [
             self.rat_path[config["tech"]][config["dirx"]],
@@ -173,7 +180,7 @@ class grc_manager(object):
             '--destination_ip', config['destination_ip'],
             '--destination_port_suffix', str(config['destination_port_suffix']),
             '--packet_len', str(config['packet_len']),
-            '--rat_id', str(self.rat_counter)
+            '--rat_id', str(rat_id)
         ]
 
         # Create process
@@ -188,6 +195,7 @@ class grc_manager(object):
         # If succeeded, append to RAT pool
         self.rat_pool[config["s_id"]] = {
             'tech': config["tech"],
+            'rat_id': rat_id,
             'process': process}
 
         # Increment the RAT counter
@@ -196,6 +204,12 @@ class grc_manager(object):
         print('- Created RAT')
         for item in config:
             print('\t-' + item + ": " + str(config[item]))
+
+
+        #Also print the RAT ID
+        print('\t-RAT ID: ' + str(rat_id))
+        # Return the RAT ID
+        return rat_id
 
     def create_sdr(self, **kwargs):
         # Container to hold USRP configuration
@@ -264,14 +278,22 @@ class grc_manager(object):
 
         print('- Removing RATs')
         # Iterate over the list of current processes
-        for rat_id in list(self.rat_pool.keys()):
+        for service_id in list(self.rat_pool.keys()):
             # If a RAT matches the RAT s_id or we should remove all RATs
-            if rat_id == s_id or not s_id:
+            if service_id == s_id or not s_id:
                 # Kill the RAT process and all it's child processes
-                self.rat_pool[rat_id]['process'].halt()
-                print('\t- Removed RAT: ' + rat_id)
-                # Remove it from the SDR pool
-                self.rat_pool.pop(rat_id)
+                self.rat_pool[service_id]['process'].halt()
+                print('\t- Removed RAT: ' + service_id)
+
+                # If there's no specific Service ID
+                if not s_id:
+                    # Remove it from the SDR pool
+                    self.rat_pool.pop(service_id)
+
+                # Otherwise
+                else:
+                    # Remove the RAT and return its RAT ID
+                    return self.rat_pool.pop(service_id)['rat_id']
 
 
     def remove_sdr(self, **kwargs):
