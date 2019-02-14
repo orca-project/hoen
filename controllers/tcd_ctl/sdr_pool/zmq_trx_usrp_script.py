@@ -23,9 +23,9 @@ def zmq_usrp_both(**kwargs):
     ##################################################
     # Variables
     ##################################################
-    source_port = kwargs.get('source_port', 1201)
+    source_port = kwargs.get('source_port', 201)
     ip = kwargs.get('ip', '127.0.0.1')
-    destination_port = kwargs.get('destination_port', 1501)
+    destination_port = kwargs.get('destination_port', 501)
     port_offset = kwargs.get('port_offset', 0)
 
     usrp_address = kwargs.get('usrp', "serial=30C6272")
@@ -36,7 +36,8 @@ def zmq_usrp_both(**kwargs):
     source_address = 'tcp://' + ip + ':' + str(source_port + port_offset)
     destination_address = 'tcp://' + ip + ':' + str(destination_port +
                                                     port_offset)
-
+    print(source_address)
+    print(destination_address)
     ##################################################
     # Blocks
     ##################################################
@@ -89,9 +90,9 @@ def get_args():
     # Add CLI arguments
     parser.add_argument('--ip', type=str, default='127.0.0.1', help='IP')
     parser.add_argument(
-        '--source_port', type=int, default=1201, help='source port')
+        '--source_port', type=int, default=201, help='source port')
     parser.add_argument(
-        '--destination_port', type=int, default=1501, help='destination port')
+        '--destination_port', type=int, default=501, help='destination port')
     parser.add_argument(
         '--port_offset',
         type=int,
