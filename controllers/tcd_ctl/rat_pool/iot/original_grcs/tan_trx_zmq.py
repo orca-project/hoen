@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 ##################################################
 # GNU Radio Python Flow Graph
-# Title: Tan Tx Zmq
-# Generated: Tue Feb 12 16:15:10 2019
+# Title: Tan Trx Zmq
+# Generated: Tue Feb 12 16:34:02 2019
 ##################################################
 
 
@@ -17,15 +17,15 @@ from gnuradio.filter import firdes
 from optparse import OptionParser
 
 
-class tan_tx_zmq(gr.top_block):
+class tan_trx_zmq(gr.top_block):
 
     def __init__(self):
-        gr.top_block.__init__(self, "Tan Tx Zmq")
+        gr.top_block.__init__(self, "Tan Trx Zmq")
 
         ##################################################
         # Variables
         ##################################################
-        self.source_suffix = source_suffix = 200
+        self.source_suffix = source_suffix = 501
         self.rat_id = rat_id = 2
         self.destination_suffix = destination_suffix = 201
         self.source_port = source_port = (rat_id * 1000) + source_suffix
@@ -39,27 +39,41 @@ class tan_tx_zmq(gr.top_block):
         ##################################################
         # Blocks
         ##################################################
-        self.zeromq_push_sink_0 = zeromq.push_sink(gr.sizeof_gr_complex, 1, destination_address, 100, False, -1)
-        self.zeromq_pull_source_0 = zeromq.pull_source(gr.sizeof_char, 1, source_address, 100, False, -1)
+        self.zeromq_push_sink_0 = zeromq.push_sink(gr.sizeof_gr_complex, 1, destination_address, 100, True, -1)
+        self.zeromq_pull_source_0_0 = zeromq.pull_source(gr.sizeof_gr_complex, 1, source_address, 100, True, -1)
         self.digital_ofdm_tx_0 = digital.ofdm_tx(
         	  fft_len=64, cp_len=16,
-        	  packet_length_tag_key='packet_len_tag',
+        	  packet_length_tag_key='packet_len',
         	  bps_header=1,
         	  bps_payload=1,
         	  rolloff=0,
         	  debug_log=False,
         	  scramble_bits=False
         	 )
-        self.blocks_stream_to_tagged_stream_0 = blocks.stream_to_tagged_stream(gr.sizeof_char, 1, packet_len, 'packet_len_tag')
+        self.digital_ofdm_rx_0 = digital.ofdm_rx(
+        	  fft_len=64, cp_len=16,
+        	  frame_length_tag_key='frame_'+'rx_len',
+        	  packet_length_tag_key='rx_len',
+        	  bps_header=1,
+        	  bps_payload=1,
+        	  debug_log=False,
+        	  scramble_bits=False
+        	 )
+        self.blocks_tuntap_pdu_0 = blocks.tuntap_pdu('tap' + str(rat_id), 1000, True)
+        self.blocks_tagged_stream_to_pdu_0 = blocks.tagged_stream_to_pdu(blocks.byte_t, 'packet_len')
+        self.blocks_pdu_to_tagged_stream_0 = blocks.pdu_to_tagged_stream(blocks.byte_t, 'packet_len')
         self.blocks_multiply_const_vxx_0 = blocks.multiply_const_vcc((0.06, ))
 
         ##################################################
         # Connections
         ##################################################
+        self.msg_connect((self.blocks_tagged_stream_to_pdu_0, 'pdus'), (self.blocks_tuntap_pdu_0, 'pdus'))
+        self.msg_connect((self.blocks_tuntap_pdu_0, 'pdus'), (self.blocks_pdu_to_tagged_stream_0, 'pdus'))
         self.connect((self.blocks_multiply_const_vxx_0, 0), (self.zeromq_push_sink_0, 0))
-        self.connect((self.blocks_stream_to_tagged_stream_0, 0), (self.digital_ofdm_tx_0, 0))
+        self.connect((self.blocks_pdu_to_tagged_stream_0, 0), (self.digital_ofdm_tx_0, 0))
+        self.connect((self.digital_ofdm_rx_0, 0), (self.blocks_tagged_stream_to_pdu_0, 0))
         self.connect((self.digital_ofdm_tx_0, 0), (self.blocks_multiply_const_vxx_0, 0))
-        self.connect((self.zeromq_pull_source_0, 0), (self.blocks_stream_to_tagged_stream_0, 0))
+        self.connect((self.zeromq_pull_source_0_0, 0), (self.digital_ofdm_rx_0, 0))
 
     def get_source_suffix(self):
         return self.source_suffix
@@ -122,8 +136,6 @@ class tan_tx_zmq(gr.top_block):
 
     def set_packet_len(self, packet_len):
         self.packet_len = packet_len
-        self.blocks_stream_to_tagged_stream_0.set_packet_len(self.packet_len)
-        self.blocks_stream_to_tagged_stream_0.set_packet_len_pmt(self.packet_len)
 
     def get_destination_address(self):
         return self.destination_address
@@ -132,10 +144,15 @@ class tan_tx_zmq(gr.top_block):
         self.destination_address = destination_address
 
 
-def main(top_block_cls=tan_tx_zmq, options=None):
+def main(top_block_cls=tan_trx_zmq, options=None):
 
     tb = top_block_cls()
     tb.start()
+    try:
+        raw_input('Press Enter to quit: ')
+    except EOFError:
+        pass
+    tb.stop()
     tb.wait()
 
 

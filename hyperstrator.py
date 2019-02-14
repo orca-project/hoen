@@ -163,6 +163,7 @@ class hs_server(Thread):
 
                     # If the radio allocation failed
                     if r_host is None:
+                        print('\tFailed creating Radio Slice')
                         # Inform the user about the failure
                         self.socket.send_json({'ns_nack': r_port})
                         # Finish here

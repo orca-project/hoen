@@ -106,7 +106,8 @@ class sdr_controller_template(Thread):
 
                     # Append it to the list of service IDs
                     self.s_ids.append(nl['s_id'])
-                    print('\tService ID:', nl['s_id'])
+                    print('\tService ID:\t', nl['s_id'])
+                    print('\tRadio Stack:\t', nl['type'])
 
                     # Create a readio slice
                     msg = self.create_slice(**nl)
