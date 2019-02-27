@@ -85,7 +85,7 @@ class ctl_base(object):
         if host is None:
             # Inform the hyperstrator about the failure
             print('\tFailed creating a Radio Slice in ' + self.name)
-            msg = {'ns_nack': port}
+            msg = {'ns_nack': {'msg': port}}
 
         # Otherwise, it succeeded
         else:
@@ -104,7 +104,7 @@ class ctl_base(object):
         if host is None:
             # Inform the hyperstrator about the failure
             print('\tFailed removing a Radio Slice in ' + self.name)
-            msg = {'rs_nack': port}
+            msg = {'rs_nack': {'msg': port}}
 
         # Otherwise, it succeeded
         else:

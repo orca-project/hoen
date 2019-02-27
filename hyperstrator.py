@@ -80,7 +80,7 @@ class orch_base(object):
 class sdn_orch(orch_base):
     host_key = "sdn_host"
     port_key = "sdn_port"
-    default_host = "192.168.0.100"
+    default_host = "127.0.0.1"
     default_port = "5000"
     request_key = "sdn_req"
     reply_key = "sdn_rep"
@@ -218,6 +218,7 @@ class hyperstrator_server(Thread):
 
                     # If the radio allocation failed
                     if r_host is None:
+                        print('\tFailed creating Radio Slice')
                         # Inform the user about the failure
                         self.socket.send_json({self.create_nack: r_port})
                         # Finish here
