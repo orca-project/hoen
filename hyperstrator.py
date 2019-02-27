@@ -6,15 +6,15 @@ import zmq
 from threading import Thread, Lock, Event
 # Import the uuid4 function from the UUID module
 from uuid import uuid4
-# Import the sleep function from the time module
-from time import sleep
-# Import OS
-import os
+# Import the system method from the OS module
+from os import system, name
+# Import the Pause method from the Signal module
+from signal import pause
 
-import signal
-
+# Clear terminal screen
 def cls():
-    os.system('cls' if os.name=='nt' else 'clear')
+    # Perform action based on the current platform
+    system('cls' if name=='nt' else 'clear')
 
 
 class orch_base(object):
@@ -85,27 +85,29 @@ class sdn_orch(orch_base):
     request_key = "sdn_req"
     reply_key = "sdn_rep"
 
-
+# TODO put the orchestrators inside the hyperstrator class
 class sdr_orch(orch_base):
     host_key = "sdr_host"
     port_key = "sdr_port"
-    default_host = "192.168.0.100"
-    default_port = "4000"
+    default_host = "127.0.0.1"
+    default_port = "2000"
     request_key = "sdr_req"
     reply_key = "sdr_rep"
 
 
-class hs_server(Thread):
+class hyperstrator_server(Thread):
 
     def __init__(self, **kwargs):
-        # Initialise the parent class
+        # Initialize the parent class
         Thread.__init__(self)
 
         # Flat to exit gracefully
         self.shutdown_flag = Event()
 
-        # Start the HS server
-        self.server_bind(**kwargs)
+        # Parse keyword arguments
+        self._parse_kwargs(**kwargs)
+        # Bind the server
+        self._server_bind(**kwargs)
 
         # Container to hold the list of current services
         self.s_ids = []
@@ -115,12 +117,63 @@ class hs_server(Thread):
         # Create an instance of the SDR orchestrator handler
         self.sdr_orch = sdr_orch()
 
+    # Extract message headers from keyword arguments
+    def _parse_kwargs(self, **kwargs):
+        # Get the error message header from keyword arguments
+        self.error_msg = kwargs.get('error_msg', 'msg_err')
 
-    def server_bind(self, **kwargs):
+         # Get the create service message from keyword arguments
+        self.create_msg = kwargs.get('create_msg', 'sr_cs')
+         # Get the create service acknowledgment from keyword arguments
+        self.create_ack = kwargs.get('create_ack', 'cs_ack')
+        # Get the create service not acknowledgment from keyword arguments
+        self.create_nack = kwargs.get('create_nack', 'cs_nack')
+
+        # Get the request service message from keyword arguments
+        self.request_msg = kwargs.get('request_msg', 'sr_rs')
+         # Get the create service acknowledgment from keyword arguments
+        self.request_ack = kwargs.get('request_ack', 'rs_ack')
+        # Get the create service not acknowledgment from keyword arguments
+        self.request_nack = kwargs.get('request_nack', 'rs_nack')
+
+        # Get the remove service message from keyword arguments
+        self.update_msg = kwargs.get('update_msg', 'sr_us')
+         # Get the create service acknowledgment from keyword arguments
+        self.update_ack = kwargs.get('update_ack', 'us_ack')
+        # Get the create service not acknowledgment from keyword arguments
+        self.update_nack = kwargs.get('update_nack', 'us_nack')
+
+        # Get the remove service message from keyword arguments
+        self.delete_msg = kwargs.get('delete_msg', 'sr_ds')
+         # Get the create service acknowledgment from keyword arguments
+        self.delete_ack = kwargs.get('delete_ack', 'ds_ack')
+        # Get the create service not acknowledgment from keyword arguments
+        self.delete_nack = kwargs.get('delete_nack', 'ds_nack')
+
+        # Get the create radio slice message from keyword arguments
+        self.create_radio = kwargs.get('create_radio', 'r_cs')
+        # Get the request radio slice message from keyword arguments
+        self.request_radio = kwargs.get('request_radio', 'r_rs')
+        # Get the update radio slice message from keyword arguments
+        self.update_radio = kwargs.get('update_radio', 'r_us')
+        # Get the remove radio slice message from keyword arguments
+        self.remove_radio = kwargs.get('delete_radio', 'r_ds')
+
+        # Get the create core slice message from keyword arguments
+        self.create_core = kwargs.get('create_core', 'c_cs')
+        # Get the request core slice message from keyword arguments
+        self.request_core = kwargs.get('request_core', 'c_rs')
+        # Get the update core slice message from keyword arguments
+        self.update_core = kwargs.get('update_core', 'c_us')
+        # Get the remove core slice message from keyword arguments
+        self.remove_remove = kwargs.get('delete_msg', 'c_ds')
+
+    # Bind server to socket
+    def _server_bind(self, **kwargs):
         # Default HS Server host
-        host = kwargs.get('hs_host', '127.0.0.1')
+        host = kwargs.get('host', '127.0.0.1')
         # Default HS Server port
-        port = kwargs.get('hs_port', 3000)
+        port = kwargs.get('port', 1000)
 
         # Create a ZMQ context
         self.context = zmq.Context()
@@ -130,6 +183,7 @@ class hs_server(Thread):
         self.socket.bind("tcp://" + host + ":" + str(port))
         # Timeout reception every 500 milliseconds
         self.socket.setsockopt(zmq.RCVTIMEO, 500)
+
 
     def run(self):
         print('- Started Hyperstrator')
@@ -147,10 +201,10 @@ class hs_server(Thread):
              # Received a command
              else:
                 # Service request, new service
-                ns = cmd.get('sr_ns', None)
+                create_service = cmd.get(self.create_msg, None)
 
                 # If the message worked
-                if ns is not None:
+                if create_service is not None:
                     print('- Create Service Request')
                     # Create a Service ID
                     s_id = str(uuid4())
@@ -159,12 +213,13 @@ class hs_server(Thread):
                     print('\tSend message to SDR orchestrator')
                     # Send UUID and type of service to the SDR orchestrator
                     r_host, r_port = self.sdr_orch.send_msg(
-                        {"r_ns": {'type': ns['type'], 's_id': s_id}})
+                        {self.create_radio: {'type': create_service['type'],
+                                             's_id': s_id}})
 
                     # If the radio allocation failed
                     if r_host is None:
                         # Inform the user about the failure
-                        self.socket.send_json({'ns_nack': r_port})
+                        self.socket.send_json({self.create_nack: r_port})
                         # Finish here
                         continue
 
@@ -175,9 +230,11 @@ class hs_server(Thread):
                     if False:
                         # Otherwise, send message to the SDN orchestrator
                         c_host, c_port = self.sdn_orch.send_msg(
-                            {"c_ns": {'type': ns['type'], 's_id': s_id,
-                                      'destination': (r_host, r_port),
-                                      'source': ('127.0.0.1', 6000)
+                            {self.create_core: {
+                                'type': create_service['type'],
+                                's_id': s_id,
+                                'destination': (r_host, r_port),
+                                'source': ('127.0.0.1', 6000)
                             }})
 
                     # TODO if the wired and the wireless parts worked
@@ -186,37 +243,37 @@ class hs_server(Thread):
 
                     # Inform the user about the configuration success
                     # TODO the host and port should come from the SDN orch.
-                    self.socket.send_json({'ns_ack': {'s_id': s_id,
-                                                      'host': r_host,
-                                                      "port": r_port}})
+                    self.socket.send_json({self.create_ack: {'s_id': s_id,
+                                                             'host': r_host,
+                                                             "port": r_port}})
 
                 # Service rerquest, remove service
-                rs = cmd.get('sr_rs', None)
+                remove_service = cmd.get(self.remove_msg, None)
 
                  # If the flag exists
-                if rs is not None:
+                if remove_service is not None:
                     print('- Remove Service Request')
                     # If this service doesn't exist
-                    if rs['s_id'] not in self.s_ids:
+                    if remove_service['s_id'] not in self.s_ids:
                         print('\tService ID doesn\' exist')
                         # Send message
                         self.socket.send_json(
-                            {'rs_nack': 'The service doesn\'t exist:' +
-                             rs['s_id']})
+                            {self.remove_nack: 'The service doesn\'t exist:' +
+                             remove_service['s_id']})
 
                         # Leave if clause
                         continue
 
-                    print('\tService ID:', rs['s_id'])
+                    print('\tService ID:', remove_service['s_id'])
                     print('\tSend message to SDR orchestrator')
                     # Send UUID and type of service to the SDR orchestrator
                     r_host, r_port = self.sdr_orch.send_msg(
-                        {"r_rs": {'s_id': rs['s_id']}})
+                        {self.remove_radio: {'s_id': remove_service['s_id']}})
 
                     # If the radio removal failed
                     if r_host is None:
                         # Inform the user about the failure
-                        self.socket.send_json({'rs_nack': r_port})
+                        self.socket.send_json({self.remove_nack: r_port})
                         # Finish here
                         continue
 
@@ -227,14 +284,15 @@ class hs_server(Thread):
                     if False:
                         # Otherwise, send message to the SDN orchestrator
                         c_host, c_port = self.sdn_orch.send_msg(
-                            {"c_rs": {'s_id': rs['s_id']}})
+                            {self.remove_core: {'s_id': remove_slice['s_id']}})
 
                     # TODO if the wired and the wireless parts worked
                     # Remove it to the list of service IDs
-                    self.s_ids.remove(rs['s_id'])
+                    self.s_ids.remove(remove_service['s_id'])
 
                     # Inform the user about the removal success
-                    self.socket.send_json({'rs_ack': {'s_id': rs['s_id']}})
+                    self.socket.send_json(
+                        {self.remove_ack: {'s_id': remove_service['s_id']}})
 
         # Terminate zmq
         self.socket.close()
@@ -242,18 +300,34 @@ class hs_server(Thread):
 
 
 if __name__ == "__main__":
-    # clear screen
+    # Clear screen
     cls()
+
     # Handle keyboard interrupt (SIGINT)
     try:
-        # Start the Remote Unit Server
-        hs_thread = hs_server(host='192.168.0.100', port=3000)
-        hs_thread.start()
+        # Instantiate the Hyperstrator Server
+        hyperstrator_thread = hyperstrator_server(
+            host='192.168.0.100',
+            port=1000,
+            error_msg='msg_err',
+            create_msg='sr_cs',
+            create_ack='cs_ack',
+            create_nack='cs_nack',
+            remove_msg='sr_rs',
+            remove_ack='rs_ack',
+            remove_nack='rs_nack',
+            create_radio='r_rs',
+            remove_radio='r_rr',
+            create_core='c_rs',
+            remove_core='c_rr',
+        )
+        # Start the Hyperstrator Thread
+        hyperstrator_thread.start()
         # Pause the main thread
-        signal.pause()
+        pause()
 
     except KeyboardInterrupt:
         # Terminate the Hyperstrator
-        hs_thread.shutdown_flag.set()
-        hs_thread.join()
+        hyperstrator_thread.shutdown_flag.set()
+        hyperstrator_thread.join()
         print('Exiting')

@@ -4,8 +4,8 @@
 from sys import path
 path.append('..')
 
-# Import the Template SDR Controller
-from template_controllers.sdr_controller import sdr_controller_template
+# Import the Template Controller
+from template_controller.template_controller import controller_base
 # Import OS
 import os
 # Import signal
@@ -18,7 +18,7 @@ def cls():
     os.system('cls' if os.name=='nt' else 'clear')
 
 
-class tcd_controller(sdr_controller_template):
+class tcd_controller(controller_base):
 
     def post_init(self, **kwargs):
         # TODO Override this method at will
@@ -37,12 +37,12 @@ class tcd_controller(sdr_controller_template):
         if True:
             # TODO We treat the radio slice as a network sink
             # Send ACK
-            msg = {'nl_ack': {'host': "<IP>", "port": 7001}}
+            msg = {self.create_ack: {'host': "<IP>", "port": 7001}}
 
         # If failed creating slice
         else:
             # Send NACK
-            msg = {'nl_nack': {'<Reason for failing>'}}
+            msg = {self.create_nack: {'<Reason for failing>'}}
 
             # TODO You can use any logic you want. We just need the
             # resulting messages formatted like above
@@ -64,12 +64,12 @@ class tcd_controller(sdr_controller_template):
         # If succeeded removing the slice
         if True:
             # Send ACK
-            msg = {'rl_ack': {'s_id': kwargs['s_id']}}
+            msg = {self.remove_ack: {'s_id': kwargs['s_id']}}
 
         # If failed removing slice
         else:
             # Send NACK
-            msg = {'rl_nack': {'<Reason for failing>'}}
+            msg = {self.remove_nack: {'<Reason for failing>'}}
 
             # TODO You can use any logic you want. We just need the
             # resulting messages formatted like above
@@ -90,8 +90,8 @@ if __name__ == "__main__":
             name='TCD',
             req_header='tcd_req', # Don't modify
             rep_header='tcd_rep', # Don't modify
-            host='192.168.0.100',
-            port=7000)
+            host='127.0.0.1',
+            port=4000)
 
         # Start the TCD SDR Controller Server
         tcd_controller_thread.start()

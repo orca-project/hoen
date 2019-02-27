@@ -50,12 +50,12 @@ def service_request(socket, **kwargs):
     traffic_type = 'high-throughput' if kwargs['high_throughput'] else \
         'low-latency'
     # Send service request messate to the hyperstrator
-    socket.send_json({'sr_ns': {'type': traffic_type}})
+    socket.send_json({'sr_cs': {'type': traffic_type}})
     # Receive acknowledgement
     rep = socket.recv_json()
 
     # Check if there's an acknowledgement
-    ack = rep.get("ns_ack", None)
+    ack = rep.get("cs_ack", None)
 
     # If received an acknowledgement
     if ack is not None:
@@ -70,7 +70,7 @@ def service_request(socket, **kwargs):
 
 
     # Check if there's a not acknowledgement
-    nack = rep.get("ns_nack", None)
+    nack = rep.get("cs_nack", None)
 
     # If received a not acknowledgement
     if nack is not None:
