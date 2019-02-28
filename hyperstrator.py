@@ -54,6 +54,10 @@ class orch_base(object):
         self.socket.connect("tcp://" + host + ":" + str(port))
         # Timeout reception every 5 seconds
         self.socket.setsockopt(zmq.RCVTIMEO, 5000)
+        # # Allow multiple requests and replies
+        self.socket.setsockopt(zmq.REQ_RELAXED, 1)
+        # # Add IDs to ZMQ messages
+        self.socket.setsockopt(zmq.REQ_CORRELATE, 1)
 
 
     def send_msg(self, kwargs):
@@ -75,7 +79,7 @@ class orch_base(object):
             return None, "Received invalid message: " + str(msg)
         # The orchestrator couldn't decode message
         elif self.error_msg in msg:
-            return None, msd[self.error_msg]
+            return None, msg[self.error_msg]
         # If the create slice request succeeded
         elif self.create_ack in msg:
             # Return host and port
@@ -95,8 +99,6 @@ class orch_base(object):
         # Unexpected behaviour
         else:
             return None, "Missing ACK or NACK: " + str(msg)
-
-
 
 
 class hyperstrator_server(Thread):
@@ -201,7 +203,6 @@ class hyperstrator_server(Thread):
         self.socket.bind("tcp://" + host + ":" + str(port))
         # Timeout reception every 500 milliseconds
         self.socket.setsockopt(zmq.RCVTIMEO, 500)
-
 
     def run(self):
         print('- Started Hyperstrator')
@@ -313,6 +314,21 @@ class hyperstrator_server(Thread):
                     self.socket.send_json(
                         {self.remove_ack: {'s_id': remove_service['s_id']}})
 
+                # Check for unknown messages
+                unknown_msg = [x for x in request if x not in [self.create_msg,
+                                                               self.request_msg,
+                                                               self.update_msg,
+                                                               self.delete_msg]]
+                # If there is at least an existing unknown message
+                if unknown_msg:
+                    print('- Unknown message')
+                    print('\t', 'Message:', unknown_msg[0])
+
+                    msg = {self.error_msg: "Unknown message:" + \
+                           str(unknown_msg[0])}
+                    # Send message
+                    self.socket.send_msg(self.rep_header, msg)
+
         # Terminate zmq
         self.socket.close()
         self.context.term()
@@ -331,10 +347,10 @@ if __name__ == "__main__":
             error_msg='msg_err',
             create_msg='sr_cs',
             remove_msg='sr_rs',
-            create_radio='r_rs',
-            remove_radio='r_rr',
-            create_core='c_rs',
-            remove_core='c_rr',
+            create_radio='wl_cr',
+            remove_radio='wl_dr',
+            create_core='wd_cc',
+            remove_core='wd_rc',
         )
         # Start the Hyperstrator Thread
         hyperstrator_thread.start()

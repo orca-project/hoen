@@ -20,6 +20,16 @@ class controller_base(Thread):
         # Get the name from keyword arguments
         self.name = kwargs.get('name', 'CTL')
 
+        # Parse keyword arguments
+        self._parse_kwargs(**kwargs)
+        # Start the controller server
+        self._server_bind(**kwargs)
+
+        # Run post initialization operations
+        self.post_init(**kwargs)
+
+    # Extract message headers from keyword arguments
+    def _parse_kwargs(self, **kwargs):
         # Get the request header from keyword arguments
         self.req_header = kwargs.get('req_header', 'ctl_req')
         # Get the reply header from keyword arguments
@@ -28,34 +38,40 @@ class controller_base(Thread):
         self.error_msg = kwargs.get('error_msg', 'msg_err')
 
          # Get the create slice message from keyword arguments
-        self.create_msg = kwargs.get('create_msg', 'c_sl')
-         # Get the create slice acknowledgment from keyword arguments
-        self.create_ack = kwargs.get('create_ack', 'c_ack')
-        # Get the create slice not acknowledgment from keyword arguments
-        self.create_nack = kwargs.get('create_nack', 'c_nack')
+        self.create_msg = kwargs.get('create_msg', 'ct_cs')
+         # Get the create service acknowledgment from keyword arguments
+        self.create_ack = "_".join([self.create_msg.split('_')[-1], "ack"])
+        # Get the create service not acknowledgment from keyword arguments
+        self.create_nack = "_".join([self.create_msg.split('_')[-1], "nack"])
 
-        # Get the remove slice message from keyword arguments
-        self.remove_msg = kwargs.get('remove_msg', 'r_sl')
-         # Get the create slice acknowledgment from keyword arguments
-        self.remove_ack = kwargs.get('remove_ack', 'r_ack')
-        # Get the create slice not acknowledgment from keyword arguments
-        self.remove_nack = kwargs.get('remove_nack', 'r_nack')
+        # Get the request service message from keyword arguments
+        self.request_msg = kwargs.get('request_msg', 'ct_rs')
+         # Get the create service acknowledgment from keyword arguments
+        self.request_ack = "_".join([self.request_msg.split('_')[-1], "ack"])
+        # Get the create service not acknowledgment from keyword arguments
+        self.request_nack = "_".join([self.request_msg.split('_')[-1], "nack"])
 
-        # Start the controller server
-        self.server_bind(**kwargs)
-        # Timeout reception every 500 milliseconds
-        self.socket.setsockopt(zmq.RCVTIMEO, 500)
+        # Get the remove service message from keyword arguments
+        self.update_msg = kwargs.get('update_msg', 'ct_us')
+         # Get the create service acknowledgment from keyword arguments
+        self.update_ack = "_".join([self.update_msg.split('_')[-1], "ack"])
+        # Get the create service not acknowledgment from keyword arguments
+        self.update_nack = "_".join([self.update_msg.split('_')[-1], "nack"])
 
-        # Run post initialization operations
-        self.post_init(**kwargs)
+        # Get the remove service message from keyword arguments
+        self.delete_msg = kwargs.get('delete_msg', 'ct_ds')
+         # Get the create service acknowledgment from keyword arguments
+        self.delete_ack = "_".join([self.delete_msg.split('_')[-1], "ack"])
+        # Get the create service not acknowledgment from keyword arguments
+        self.delete_nack = "_".join([self.delete_msg.split('_')[-1], "nack"])
 
 
-    def post_init(self, **kwargs):
+    def _post_init(self, **kwargs):
         # Must overside this method
         pass
 
 
-    def server_bind(self, **kwargs):
+    def _server_bind(self, **kwargs):
         # Default HS Server host
         host = kwargs.get('host', '127.0.0.1')
         # Default HS Server port
@@ -67,6 +83,8 @@ class controller_base(Thread):
         self.socket = self.context.socket(zmq.REP)
         # Bind ZMQ socket to host:port
         self.socket.bind("tcp://" + host + ":" + str(port))
+        # Timeout reception every 500 milliseconds
+        self.socket.setsockopt(zmq.RCVTIMEO, 500)
 
 
     def send_msg(self, message_header, message):
@@ -78,7 +96,7 @@ class controller_base(Thread):
         # Must override this method
         pass
 
-    def search_slice(self, **kwargs):
+    def request_slice(self, **kwargs):
         # Must override this method
         pass
 
@@ -86,7 +104,7 @@ class controller_base(Thread):
         # Must override this method
         pass
 
-    def remove_slice(self, **kwargs):
+    def delete_slice(self, **kwargs):
         # Must overside this method
         pass
 
@@ -135,15 +153,15 @@ class controller_base(Thread):
                     self.send_msg(self.rep_header, msg)
 
                 # Check whether it is a removal
-                remove_slice = ctl_r.get(self.remove_msg, None)
+                delete_slice = ctl_r.get(self.delete_msg, None)
 
-                # If we must remove a slice
-                if remove_slice is not None:
-                    print('- Remove Slice')
+                # If we must delete a slice
+                if delete_slice is not None:
+                    print('- Delete Slice')
                     # This service doesn't exist
-                    if remove_slice['s_id'] not in self.s_ids:
-                        msg = {self.remove_nack: 'The slice doesn\'t exist:' +
-                               remove_slice['s_id']}
+                    if delete_slice['s_id'] not in self.s_ids:
+                        msg = {self.delete_nack: 'The slice doesn\'t exist:' +
+                               delete_slice['s_id']}
 
                         # Send message
                         self.send_message(self.rep_header, msg)
@@ -160,6 +178,20 @@ class controller_base(Thread):
                     # Send message
                     self.send_msg(self.rep_header, msg)
 
+                # Check for unknown messages
+                unknown_msg = [x for x in request if x not in [self.create_msg,
+                                                               self.request_msg,
+                                                               self.update_msg,
+                                                               self.delete_msg]]
+                # If there is at least an existing unknown message
+                if unknown_msg:
+                    print('- Unknown message')
+                    print('\t', 'Message:', unknown_msg[0])
+
+                    msg = {self.error_msg: "Unknown message:" + \
+                           str(unknown_msg[0])}
+                    # Send message
+                    self.socket.send_msg(self.rep_header, msg)
 
             # Failed to parse message
             else:
@@ -188,12 +220,10 @@ if __name__ == "__main__":
             req_header='ctl_req',
             rep_header='ctl_rep',
             error_msg='msg_err',
-            create_msg='c_sl',
-            create_ack='c_ack',
-            create_nack='c_nack',
-            remove_msg='r_sl',
-            remove_ack='r_ack',
-            remove_nack='r_nack',
+            create_msg='tc_cs',
+            request_msg='tc_rs',
+            update_msg='tc_us',
+            delete_msg='tc_ds',
             host='127.0.0.1',
             port=3000)
 

@@ -150,7 +150,7 @@ if __name__ == "__main__":
             req_header='tcd_req', # Don't modify
             rep_header='tcd_rep', # Don't modify
             host='127.0.0.1',
-            port=4000)
+            port=3200)
 
         # Start the TCD SDR Controller Server
         tcd_controller_thread.start()
