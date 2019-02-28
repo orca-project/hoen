@@ -34,7 +34,7 @@ def establish_connection(**kwargs):
     # Default RU Server host
     host = kwargs.get('host', '127.0.0.1')
     # Default RU Server port
-    port = kwargs.get('port', 3000)
+    port = kwargs.get('port', 1100)
 
     # Create a ZMQ context
     context = zmq.Context()
@@ -47,16 +47,21 @@ def establish_connection(**kwargs):
 
 
 def service_request(socket, **kwargs):
+
+    create_msg = 'sr_cs'
+    create_ack = 'cs_ack'
+    create_nack = 'cs_nack'
+
     # Ternary operator to decide the type of traffic
     traffic_type = 'high-throughput' if kwargs['high_throughput'] else \
         'low-latency'
     # Send service request messate to the hyperstrator
-    socket.send_json({'sr_cs': {'type': traffic_type}})
-    # Receive acknowledgement
+    socket.send_json({create_msg: {'type': traffic_type}})
+    # Receive acknowledgment
     rep = socket.recv_json()
 
-    # Check if there's an acknowledgement
-    ack = rep.get("cs_ack", None)
+    # Check if there's an acknowledgment
+    ack = rep.get(create_ack, None)
 
     # If received an acknowledgement
     if ack is not None:
@@ -71,7 +76,7 @@ def service_request(socket, **kwargs):
 
 
     # Check if there's a not acknowledgement
-    nack = rep.get("cs_nack", None)
+    nack = rep.get(create_nack, None)
 
     # If received a not acknowledgement
     if nack is not None:
@@ -88,13 +93,18 @@ def service_request(socket, **kwargs):
 
 
 def service_release(socket, **kwargs):
+
+    delete_msg = "sr_ds"
+    delete_ack = "ds_ack"
+    delete_nack = "ds_nack"
+
     # Send service release messate to the hyperstrator
-    socket.send_json({'sr_rs': {'s_id': kwargs['service_id']}})
-    # Receive acknowledgement
+    socket.send_json({delete_msg: {'s_id': kwargs['service_id']}})
+    # Receive acknowledgment
     rep = socket.recv_json()
 
     # Check if there's an acknowledgement
-    ack = rep.get("rs_ack", None)
+    ack = rep.get(delete_ack, None)
 
     # If received an acknowledgement
     if ack is not None:
@@ -105,7 +115,7 @@ def service_release(socket, **kwargs):
         exit(0)
 
     # Check if there's a not acknowledgement
-    nack = rep.get("rs_nack", None)
+    nack = rep.get(delete_nack, None)
 
     # If received a not acknowledgement
     if nack is not None:

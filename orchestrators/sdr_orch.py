@@ -16,20 +16,46 @@ def cls():
 
 
 class ctl_base(object):
-    name = ""
-    host_key = ""
-    port_key = ""
-    default_host = "127.0.0.1"
-    default_port = "6000"
-    request_key = ""
-    reply_key = ""
 
     def __init__(self, **kwargs):
-         # Connect to the server
-        self.server_connect(**kwargs)
+        # Extract parameters from keyword arguments
+        self.name = kwargs.get('name', '')
+        self.type = kwargs.get('type', '')
+        self.host_key = kwargs.get("host_key", "")
+        self.port_key = kwargs.get("port_key", "")
+        self.default_host = kwargs.get("default_host", "127.0.0.1")
+        self.default_port = kwargs.get("default_port", "1600")
+        self.request_key = kwargs.get("request_key", "")
+        self.reply_key = kwargs.get("reply_key", "")
+
+        # Parse keyword arguments
+        self._parse_kwargs(**kwargs)
+        # Connect to the server
+        self._server_connect(**kwargs)
 
 
-    def server_connect(self, **kwargs):
+    # Extract message headers from keyword arguments
+    def _parse_kwargs(self, **kwargs):
+        # Get the error message header from keyword arguments
+        self.error_msg = kwargs.get("error_msg", "msg_err")
+
+        self.create_msg = kwargs.get("create_msg", "wlc_crs")
+        self.create_ack = "_".join([self.create_msg.split('_')[-1], "ack"])
+        self.create_nack = "_".join([self.create_msg.split('_')[-1], "nack"])
+
+        self.request_msg = kwargs.get("request_msg", "wlc_rrs" )
+        self.request_ack = "_".join([self.request_msg.split('_')[-1], "ack"])
+        self.request_nack = "_".join([self.request_msg.split('_')[-1], "nack"])
+
+        self.update_msg = kwargs.get("update_msg", "wlc_urs")
+        self.update_ack = "_".join([self.update_msg.split('_')[-1], "ack"])
+        self.update_nack = "_".join([self.update_msg.split('_')[-1], "nack"])
+
+        self.delete_msg = kwargs.get("delete_msg", "wlc_drs" )
+        self.delete_ack = "_".join([self.delete_msg.split('_')[-1], "ack"])
+        self.delete_nack = "_".join([self.delete_msg.split('_')[-1], "nack"])
+
+    def _server_connect(self, **kwargs):
         # Default Server host
         host = kwargs.get(self.host_key, self.default_host)
         # Default Server port
@@ -37,103 +63,101 @@ class ctl_base(object):
         # Create a ZMQ context
 
         self.context = zmq.Context()
-        #  Specity the type of ZMQ socket
+        #  Specify the type of ZMQ socket
         self.socket = self.context.socket(zmq.REQ)
         # Connect ZMQ socket to host:port
         self.socket.connect("tcp://" + host + ":" + str(port))
+        # Timeout reception every 5 seconds
+        self.socket.setsockopt(zmq.RCVTIMEO, 5000)
 
 
-    def send_msg(self, **kwargs):
+    def _send_msg(self, **kwargs):
         # Send message the hyperstrator
         self.socket.send_json({self.request_key: kwargs})
-        # Wait for command
-        msg = self.socket.recv_json().get(self.reply_key, None)
+
+        try:
+            # Wait for command
+            msg = self.socket.recv_json().get(self.reply_key, None)
+        # If nothing was received during the timeout
+        except zmq.Again:
+            # Try again
+            return None, "Connection timeout to " + self.name + " Controller"
+
 
         # If the message is not valid
         if msg is None:
             # Return proper error
             return None, "Received invalid message: " + str(msg)
         # The orchestrator couldn't decode message
-        elif 'msg_err' in msg:
-            return None, msd['msg_err']
+        elif self.rep_error_msg in msg:
+            return None, msg[self.rep_error_msg]
         # If failed creating a slice
-        elif 'nl_nack' in msg:
+        elif self.rep_create_nack in msg:
             # Return the failure message
-            return None, msg['nl_nack']
+            return None, msg[self.rep_create_nack]
         # If succeeded creating a slice
-        elif 'nl_ack' in msg:
+        elif self.rep_create_ack in msg:
             # Return host and port
-            return msg['nl_ack']['host'], msg['nl_ack']['port']
+            return msg[self.rep_create_ack]['host'], \
+                msg[self.rep_create_ack]['port']
         # If succeeded removing a slice
-        elif 'rl_ack' in msg:
+        elif self.rep_delete_ack in msg:
             # Return the Service ID  to confirm it
-            return msg['rl_ack'], None
+            return msg[self.rep_delete_ack], None
         # If failed removing a slice
-        elif 'rl_nack' in msg:
+        elif self.rep_delete_nack in msg:
             # Return the error message
-            return None, msg['rl_nack']
-        # Unexpected behaviour
+            return None, msg[self.rep_delete_nack]
+        # Unexpected behavior
         else:
             return None, "Missing ACK or NACK: " + str(msg)
 
 
-    def create_radio_slice(self, s_id, s_type):
+    def create_slice(self, s_id, s_type):
         # Send creation message
-        host, port = self.send_msg({'r_nl': {'type': s_type, 's_id': s_id}})
+        host, port = self._send_msg({self.create_msg: {'type': s_type,
+                                                       's_id': s_id}})
 
         # If the slice allocation failed
         if host is None:
             # Inform the hyperstrator about the failure
-            print('\tFailed creating a Radio Slice in ' + self.name)
-            msg = {'ns_nack': {'msg': port}}
+            print('\tFailed creating a ' + self.type + ' Slice in ' + self.name)
+            msg = {self.create_nack: {'msg': port}}
 
         # Otherwise, it succeeded
         else:
             # Inform the hyperstrator about the success
-            print('\tSucceeded creating a Radio Slice in ' + self.name)
-            msg = {'ns_ack': {'host': host, 'port': port}}
+            print('\tSucceeded creating a ' + self.type + ' Slice in ' + self.name)
+            msg = {self.create_ack: {'host': host, 'port': port}}
 
         return msg
 
+    def request_slice(self):
+        # TODO Implement method
+        pass
 
-    def remove_radio_slice(self, s_id, s_type):
+    def update_slice(self):
+        # TODO implement method
+        pass
+
+    def delete_slice(self, s_id, s_type):
         # Send removal message
-        host, port = self.send_msg({'r_rl': {'type': s_type, 's_id': s_id}})
+        host, port = self._send_msg({self.delete_msg: {'type': s_type,
+                                                         's_id': s_id}})
 
         # If the slice removal failed
         if host is None:
             # Inform the hyperstrator about the failure
-            print('\tFailed removing a Radio Slice in ' + self.name)
-            msg = {'rs_nack': {'msg': port}}
+            print('\tFailed removing a ' + self.type + ' Slice in ' + self.name)
+            msg = {self.delete_nack: {'msg': port}}
 
         # Otherwise, it succeeded
         else:
             # Inform the hyperstrator about the success
-            print('\tSucceeded removing a Radio Slice in ' + self.name)
-            msg = {'rs_ack': {'s_id': host}}
+            print('\tSucceeded removing a ' + self.type + ' Slice in ' + self.name)
+            msg = {self.delete_ack: {'s_id': host}}
 
         return msg
-
-
-class imec_ctl(ctl_base):
-    name = "IMEC"
-    host_key = "imec_host"
-    port_key = "imec_port"
-    default_host = "192.168.0.101"
-    default_port = "6000"
-    request_key = "imec_req"
-    reply_key = "imec_rep"
-
-
-class tcd_ctl(ctl_base):
-    name = "TCD"
-    host_key = "tcd_host"
-    port_key = "tcd_port"
-    default_host = "127.0.0.1"
-    default_port = "4000"
-    request_key = "tcd_req"
-    reply_key = "tcd_rep"
-
 
 class wireless_orchestrator_server(Thread):
 
@@ -144,21 +168,71 @@ class wireless_orchestrator_server(Thread):
         self.shutdown_flag = Event()
         # COntainer to hold the list of Service IDs
         self.s_ids = {}
+
+
+        # Parse keyword arguments
+        self._parse_kwargs(**kwargs)
+        # Start the HS server
+        self._server_bind(**kwargs)
+
+        # IMEC Controller Handler
+        self.imec_ctl = ctl_base(
+            name="IMEC",
+            host_key="imec_host",
+            port_key="imec_port",
+            default_host="1127.0.0.1",
+            default_port="3100",
+            request_key="imec_req",
+            reply_key="imec_rep")
+
+        # TCD Controller Handler
+        self.tcd_ctl = ctl_base(
+            name="TCD",
+            host_key="tcd_host",
+            port_key="tcd_port",
+            default_host="127.0.0.1",
+            default_port="3200",
+            request_key="tcd_req",
+            reply_key="tcd_rep")
+
+    # Extract message headers from keyword arguments
+    def _parse_kwargs(self, **kwargs):
+        # Get the error message header from keyword arguments
+        self.error_msg = kwargs.get('error_msg', 'msg_err')
+
         # Get the request header from keyword arguments
         self.req_header = kwargs.get('req_header', 'sdr_req')
         # Get the reply header from keyword arguments
         self.rep_header = kwargs.get('rep_header', 'sdr_rep')
 
-        # IMEC Controller Handler
-        self.imec_ctl = imec_ctl()
-        # TCD Controller Handler
-        self.tcd_ctl = tcd_ctl()
+        # Get the create service message from keyword arguments
+        self.create_msg = kwargs.get('create_msg', 'wl_cr')
+         # Get the create service acknowledgment from keyword arguments
+        self.create_ack = "_".join([self.create_msg.split('_')[-1], "ack"])
+        # Get the create service not acknowledgment from keyword arguments
+        self.create_nack = "_".join([self.create_msg.split('_')[-1], "nack"])
 
-        # Start the HS server
-        self.server_bind(**kwargs)
+        # Get the request service message from keyword arguments
+        self.request_msg = kwargs.get('request_msg', 'wl_rr')
+         # Get the create service acknowledgment from keyword arguments
+        self.request_ack = "_".join([self.request_msg.split('_')[-1], "ack"])
+        # Get the create service not acknowledgment from keyword arguments
+        self.request_nack = "_".join([self.request_msg.split('_')[-1], "nack"])
+
+        self.update_msg = kwargs.get('update_msg', 'wl_ur')
+         # Get the create service acknowledgment from keyword arguments
+        self.update_ack = "_".join([self.update_msg.split('_')[-1], "ack"])
+        # Get the create service not acknowledgment from keyword arguments
+        self.update_nack = "_".join([self.update_msg.split('_')[-1], "nack"])
+
+        self.delete_msg = kwargs.get('delete_msg', 'wl_dr')
+         # Get the create service acknowledgment from keyword arguments
+        self.delete_ack = "_".join([self.delete_msg.split('_')[-1], "ack"])
+        # Get the create service not acknowledgment from keyword arguments
+        self.delete_nack = "_".join([self.delete_msg.split('_')[-1], "nack"])
 
 
-    def server_bind(self, **kwargs):
+    def _server_bind(self, **kwargs):
         # Default HS Server host
         host = kwargs.get('host', '127.0.0.1')
         # Default HS Server port
@@ -193,75 +267,79 @@ class wireless_orchestrator_server(Thread):
                 # Try again
                 continue
 
-            # SDR request
-            sdr_r = cmd.get(self.req_header, None)
+            # Request
+            request = cmd.get(self.req_header, None)
+
             # If the message is valid
-            if sdr_r is not None:
+            if request is not None:
                 print('- Received Message')
-                # Check wheter is it a new radio service
-                ns = sdr_r.get('r_ns', None)
+                # Check whether is it a new radio service
+                print(request)
+                create_slice = request.get(self.create_msg, None)
 
                 # If it is a new radio service
-                if ns is not None:
+                if create_slice is not None:
                     print('- Create Radio Service')
                     # This service already exists
-                    if ns['s_id'] in self.s_ids:
+                    if create_slice['s_id'] in self.s_ids:
                         print('\tService ID already exists.')
-                        msg = {'ns_nack': 'The service already exists: ' +
-                               ns['s_id']}
+                        msg = {self.create_nack:
+                               'The service already exists: ' + \
+                               create_slice['s_id']}
                         # Send message
                         self.send_msg(self.rep_header, msg)
                         # Leave if clause
                         continue
                     # Otherwise, it is a new service
                     # Append it to the list of service IDs
-                    self.s_ids[ns['s_id']] = ns.get('type', None)
+                    self.s_ids[create_slice['s_id']] = create_slice.get('type',
+                                                                        None)
 
-                    print('\tService ID:', ns['s_id'])
+                    print('\tService ID:', create_slice['s_id'])
 
                     # Decide what to do based on the type of traffic
-                    if ns['type'] == "high-throughput":
+                    if create_slice['type'] == "high-throughput":
                         # Send message to TCD SDR controller
                         print('\tTraffic type: High Throughput')
                         print('\tDelegating it to the TCD Controller')
 
                         # Send the message to create a radio slice
                         msg = self.tcd_ctl.create_radio_slice(
-                            ns['s_id'], ns['type'])
+                            create_slice['s_id'], create_slice['type'])
 
-                    elif ns['type'] == "low-latency":
+                    elif create_slice['type'] == "low-latency":
                         # Send messate to IMEC SDR Controller
                         print('\tTraffic type: Low Latency')
                         print('\tDelegating it to the IMEC Controller')
 
                         # Send the message to create a radio slice
                         msg = self.imec_ctl.create_radio_slice(
-                            ns['s_id'], ns['type'])
+                            create_slice['s_id'], create_slice['type'])
 
                     # Otherwise, couldn't identify the traffic type
                     else:
                         print('\tInvalid traffic type.')
                         # Send NACK
-                        msg = {'ns_nack':
-                               'Couldn\'t identify the traffic type:' +
-                              str(ns['type'])}
+                        msg = {self.create_nack:
+                               'Could not identify the traffic type:' +
+                              str(create_slice['type'])}
 
                         # Remove the service from the list of service IDs
-                        del self.s_ids[ns['s_id']]
+                        del self.s_ids[create_slice['s_id']]
 
                     # Send message
                     self.send_msg(self.rep_header, msg)
 
                 # If it is a remove radio service
-                rs = sdr_r.get('r_rs', None)
+                delete_slice = request.get(self.delete_msg, None)
 
-                if rs is not None:
+                if delete_slice is not None:
                     print('- Remove Radio Service')
                     # If this service doesn't exist
-                    if rs['s_id'] not in self.s_ids:
+                    if delete_slice['s_id'] not in self.s_ids:
                         print('\tService ID doesn\' exist')
                         msg = {'ds_nack': 'The service doesn\' exist:' +
-                               rs['s_id']}
+                               delete_slice['s_id']}
 
                         # Send message
                         self.send_msg(self.rep_header, msg)
@@ -269,26 +347,28 @@ class wireless_orchestrator_server(Thread):
                         continue
 
                     # Decide what to do based on the type of traffic
-                    if self.s_ids[rs['s_id']] == "high-throughput":
+                    if self.s_ids[delete_slice['s_id']] == "high-throughput":
                         # Send message to TCD SDR controller
                         print('\tTraffic type: High Throughput')
                         print('\tDelegating it to the TCD Controller')
 
                         # Send message to remove radio slice
                         msg = self.tcd_ctl.remove_radio_slice(
-                            rs['s_id'], self.s_ids[rs['s_id']])
+                            delete_slice['s_id'],
+                            self.s_ids[delete_slice['s_id']])
 
-                    elif self.s_ids[rs['s_id']] == "low-latency":
+                    elif self.s_ids[delete_slice['s_id']] == "low-latency":
                         # Send messate to IMEC SDR Controller
                         print('\tTraffic type: Low Latency')
                         print('\tDelegating it to the IMEC Controller')
 
                         # Send message to remove radio slice
                         msg = self.imec_ctl.remove_radio_slice(
-                            rs['s_id'], self.s_ids[rs['s_id']])
+                            delete_slice['s_id'],
+                            self.s_ids[delete_slice['s_id']])
 
                     # Remove the service from the list of service IDs
-                    del self.s_ids[rs['s_id']]
+                    del self.s_ids[delete_slice['s_id']]
 
 
                     # Send message
@@ -299,7 +379,7 @@ class wireless_orchestrator_server(Thread):
                 print('- Failed to parse message')
                 print('\tMessage:', cmd)
 
-                msg = {'msg_err': "Failed to parse message:" + str(cmd)}
+                msg = {self.error_msg: "Failed to parse message:" + str(cmd)}
                 # Send message
                 self.send_msg(self.rep_header, msg)
 
@@ -315,7 +395,7 @@ if __name__ == "__main__":
     try:
         # Start the Remote Unit Server
         wireless_orchestrator_thread = wireless_orchestrator_server(
-            host='127.0.0.1', port=2000)
+            host='127.0.0.1', port=2100)
         wireless_orchestrator_thread.start()
         # Pause the main thread
         signal.pause()

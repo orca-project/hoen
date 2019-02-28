@@ -18,14 +18,24 @@ def cls():
 
 
 class orch_base(object):
-    host_key = ""
-    port_key = ""
-    default_host = "127.0.0.1"
-    default_port = "3000"
-    request_key = ""
-    reply_key = ""
 
     def __init__(self, **kwargs):
+        # Extract parameters from keyword arguments
+        self.name = kwargs.get("name", "")
+        self.host_key = kwargs.get("host_key", "")
+        self.port_key = kwargs.get("port_key", "")
+        self.default_host = kwargs.get("default_host", "127.0.0.1")
+        self.default_port = kwargs.get("default_port", "3000")
+        self.request_key = kwargs.get("request_key", "")
+        self.reply_key = kwargs.get("reply_key", "")
+
+        # Get message headers
+        self.error_msg = kwargs.get("error_msg", "msg_err")
+        self.create_ack = kwargs.get("create_ack", "cs_ack")
+        self.create_nack = kwargs.get("create_msg", "cs_nack")
+        self.delete_ack = kwargs.get("delete_ack", "ds_ack")
+        self.delete_nack = kwargs.get("delete_nack", "ds_nack")
+
          # Connect to the server
         self.server_connect(**kwargs)
 
@@ -42,57 +52,51 @@ class orch_base(object):
         self.socket = self.context.socket(zmq.REQ)
         # Connect ZMQ socket to host:port
         self.socket.connect("tcp://" + host + ":" + str(port))
+        # Timeout reception every 5 seconds
+        self.socket.setsockopt(zmq.RCVTIMEO, 5000)
 
 
     def send_msg(self, kwargs):
         # Send request to the orchestrator
         self.socket.send_json({self.request_key: kwargs})
-        # Wait for command
-        msg = self.socket.recv_json().get(self.reply_key, None)
+
+        try:
+            # Wait for command
+            msg = self.socket.recv_json().get(self.reply_key, None)
+
+        # If nothing was received during the timeout
+        except zmq.Again:
+            # Try again
+            return None, "Connection timeout to " + self.name + " Orchestrator"
+
         # If the message is not valid
         if msg is None:
             # Return proper error
             return None, "Received invalid message: " + str(msg)
         # The orchestrator couldn't decode message
-        elif 'msg_err' in msg:
-            return None, msd['msg_err']
+        elif self.error_msg in msg:
+            return None, msd[self.error_msg]
         # If the create slice request succeeded
-        elif 'ns_ack' in msg:
+        elif self.create_ack in msg:
             # Return host and port
-            return msg['ns_ack']['host'], msg['ns_ack']['port']
+            return msg[self.create_ack]['host'], msg[self.create_ack]['port']
         # If the create slice request failed
-        elif 'ns_nack' in msg:
+        elif self.create_nack in msg:
             # Return the failure message
-            return None, msg['ns_nack']
+            return None, msg[self.create_nack]
         # If the remove slice request succeeded
-        elif 'rs_ack' in msg:
+        elif self.delete_ack in msg:
             # Return the Service ID to confirm it
-            return msg['rs_ack'], None
+            return msg[self.delete_ack], None
          # If the remove slice request failed
-        elif 'rs_nack' in msg:
+        elif self.delete_nack in msg:
             # Return the failure message
-            return None, msg['rs_nack']
+            return None, msg[self.delete_nack]
         # Unexpected behaviour
         else:
             return None, "Missing ACK or NACK: " + str(msg)
 
 
-class sdn_orch(orch_base):
-    host_key = "sdn_host"
-    port_key = "sdn_port"
-    default_host = "127.0.0.1"
-    default_port = "5000"
-    request_key = "sdn_req"
-    reply_key = "sdn_rep"
-
-# TODO put the orchestrators inside the hyperstrator class
-class sdr_orch(orch_base):
-    host_key = "sdr_host"
-    port_key = "sdr_port"
-    default_host = "127.0.0.1"
-    default_port = "2000"
-    request_key = "sdr_req"
-    reply_key = "sdr_rep"
 
 
 class hyperstrator_server(Thread):
@@ -113,9 +117,23 @@ class hyperstrator_server(Thread):
         self.s_ids = []
 
         # Create an instance of the SDN orchestrator handler
-        self.sdn_orch = sdn_orch()
+        self.sdn_orch = orch_base(name="Wireless Network",
+                                  host_key="sdn_host",
+                                  port_key="sdn_port",
+                                  default_host="127.0.0.1",
+                                  default_port="2200",
+                                  request_key="sdn_req",
+                                  reply_key="sdn_rep")
+
         # Create an instance of the SDR orchestrator handler
-        self.sdr_orch = sdr_orch()
+        self.sdr_orch = orch_base(name="Wired Network",
+                                  host_key="sdr_host",
+                                  port_key="sdr_port",
+                                  default_host="127.0.0.1",
+                                  default_port="2100",
+                                  request_key="sdr_req",
+                                  reply_key="sdr_rep")
+
 
     # Extract message headers from keyword arguments
     def _parse_kwargs(self, **kwargs):
@@ -125,48 +143,48 @@ class hyperstrator_server(Thread):
          # Get the create service message from keyword arguments
         self.create_msg = kwargs.get('create_msg', 'sr_cs')
          # Get the create service acknowledgment from keyword arguments
-        self.create_ack = kwargs.get('create_ack', 'cs_ack')
+        self.create_ack = "_".join([self.create_msg.split('_')[-1], "ack"])
         # Get the create service not acknowledgment from keyword arguments
-        self.create_nack = kwargs.get('create_nack', 'cs_nack')
+        self.create_nack = "_".join([self.create_msg.split('_')[-1], "nack"])
 
         # Get the request service message from keyword arguments
         self.request_msg = kwargs.get('request_msg', 'sr_rs')
          # Get the create service acknowledgment from keyword arguments
-        self.request_ack = kwargs.get('request_ack', 'rs_ack')
+        self.request_ack = "_".join([self.request_msg.split('_')[-1], "ack"])
         # Get the create service not acknowledgment from keyword arguments
-        self.request_nack = kwargs.get('request_nack', 'rs_nack')
+        self.request_nack = "_".join([self.request_msg.split('_')[-1], "nack"])
 
         # Get the remove service message from keyword arguments
         self.update_msg = kwargs.get('update_msg', 'sr_us')
          # Get the create service acknowledgment from keyword arguments
-        self.update_ack = kwargs.get('update_ack', 'us_ack')
+        self.update_ack = "_".join([self.update_msg.split('_')[-1], "ack"])
         # Get the create service not acknowledgment from keyword arguments
-        self.update_nack = kwargs.get('update_nack', 'us_nack')
+        self.update_nack = "_".join([self.update_msg.split('_')[-1], "nack"])
 
         # Get the remove service message from keyword arguments
         self.delete_msg = kwargs.get('delete_msg', 'sr_ds')
          # Get the create service acknowledgment from keyword arguments
-        self.delete_ack = kwargs.get('delete_ack', 'ds_ack')
+        self.delete_ack = "_".join([self.delete_msg.split('_')[-1], "ack"])
         # Get the create service not acknowledgment from keyword arguments
-        self.delete_nack = kwargs.get('delete_nack', 'ds_nack')
+        self.delete_nack = "_".join([self.delete_msg.split('_')[-1], "nack"])
 
         # Get the create radio slice message from keyword arguments
-        self.create_radio = kwargs.get('create_radio', 'r_cs')
+        self.create_radio = kwargs.get('create_radio', 'wl_cr')
         # Get the request radio slice message from keyword arguments
-        self.request_radio = kwargs.get('request_radio', 'r_rs')
+        self.request_radio = kwargs.get('request_radio', 'wl_rr')
         # Get the update radio slice message from keyword arguments
-        self.update_radio = kwargs.get('update_radio', 'r_us')
+        self.update_radio = kwargs.get('update_radio', 'wl_ur')
         # Get the remove radio slice message from keyword arguments
-        self.remove_radio = kwargs.get('delete_radio', 'r_ds')
+        self.remove_radio = kwargs.get('delete_radio', 'wl_dr')
 
         # Get the create core slice message from keyword arguments
-        self.create_core = kwargs.get('create_core', 'c_cs')
+        self.create_core = kwargs.get('create_core', 'wd_cc')
         # Get the request core slice message from keyword arguments
-        self.request_core = kwargs.get('request_core', 'c_rs')
+        self.request_core = kwargs.get('request_core', 'wd_rc')
         # Get the update core slice message from keyword arguments
-        self.update_core = kwargs.get('update_core', 'c_us')
+        self.update_core = kwargs.get('update_core', 'wd_uc')
         # Get the remove core slice message from keyword arguments
-        self.remove_remove = kwargs.get('delete_msg', 'c_ds')
+        self.remove_remove = kwargs.get('delete_msg', 'wd_dc')
 
     # Bind server to socket
     def _server_bind(self, **kwargs):
@@ -308,15 +326,11 @@ if __name__ == "__main__":
     try:
         # Instantiate the Hyperstrator Server
         hyperstrator_thread = hyperstrator_server(
-            host='192.168.0.100',
-            port=1000,
+            host='127.0.0.1',
+            port=1100,
             error_msg='msg_err',
             create_msg='sr_cs',
-            create_ack='cs_ack',
-            create_nack='cs_nack',
             remove_msg='sr_rs',
-            remove_ack='rs_ack',
-            remove_nack='rs_nack',
             create_radio='r_rs',
             remove_radio='r_rr',
             create_core='c_rs',
