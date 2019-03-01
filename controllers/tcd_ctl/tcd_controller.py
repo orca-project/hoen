@@ -101,7 +101,7 @@ class tcd_controller(base_controller):
         return True, {'host': host}
 
 
-    def remove_slice(self, **kwargs):
+    def delete_slice(self, **kwargs):
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
 
