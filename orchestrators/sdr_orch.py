@@ -40,12 +40,10 @@ class wireless_orchestrator_server(base_orchestrator):
     def create_slice(self, **kwargs):
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
-        s_type = kwargs.get('s_type', None)
-
+        s_type = kwargs.get('type', None)
+        print(s_type)
         # Append it to the list of service IDs
         self.s_ids[s_id] = s_type
-
-        print('\t', 'Service ID:', s_id)
 
         # Decide what to do based on the type of traffic
         if s_type == "high-throughput":
@@ -61,7 +59,7 @@ class wireless_orchestrator_server(base_orchestrator):
             return success, msg
 
 
-        elif create_slice['type'] == "low-latency":
+        elif s_type == "low-latency":
             # Send messate to IMEC SDR Controller
             print('\t', 'Traffic type: Low Latency')
             print('\t', 'Delegating it to the IMEC Controller')
@@ -83,14 +81,12 @@ class wireless_orchestrator_server(base_orchestrator):
             # Send error message
             msg = 'Could not identify the traffic type:' + str(s_type)
             # Inform the user about the creation
-            return success, msg
+            return False, msg
 
 
     def delete_slice(self, **kwargs):
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
-
-        print('\t', 'Service ID:', s_id)
 
         # Decide what to do based on the type of traffic
         if self.s_ids[s_id] == "high-throughput":
@@ -118,9 +114,6 @@ class wireless_orchestrator_server(base_orchestrator):
             # Inform the user about the removal
             return success, msg
 
-        # Remove the service from the list of service IDs
-        del self.s_ids[s_id]
-
 
 if __name__ == "__main__":
     # clear screen
@@ -129,12 +122,18 @@ if __name__ == "__main__":
     try:
         # Start the Remote Unit Server
         wireless_orchestrator_thread = wireless_orchestrator_server(
+            name='SDR',
+            req_header='sdr_req',
+            rep_header='sdr_rep',
+            error_msg='msg_err',
+            create_msg='wl_cr',
+            request_msg='wl_rr',
+            update_msg='wl_ur',
+            delete_msg='wl_dr',
             host='127.0.0.1',
-            port=2100,
-
-
-
+            port=2100
         )
+
         wireless_orchestrator_thread.start()
         # Pause the main thread
         signal.pause()

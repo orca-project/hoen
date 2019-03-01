@@ -131,16 +131,42 @@ class ctl_base(object):
         success, msg = self._send_msg(
             self.request_ack, self.request_nack, **{self.request_msg: kwargs})
 
-        print('not implemented.')
-        return False, None
+        # If the slice request failed
+        if not success:
+            # Inform the hyperstrator about the failure
+            print('\t', 'Failed requesting a ' + self.type + ' Slice in ' + \
+                  self.name)
+            return False, msg
+
+        # Otherwise, it succeeded
+        else:
+            # Inform the hyperstrator about the success
+            print('\t', 'Succeeded requesting a ' + self.type + \
+                  ' Slice in ' + self.name)
+            return True, msg
+
+        return msg
 
     def update_slice(self):
         # Send update message
         success, msg = self._send_msg(
             self.update_ack, self.update_nack, **{self.update_msg: kwargs})
 
-        print('not implemented.')
-        return False, None
+        # If the slice update failed
+        if not success:
+            # Inform the hyperstrator about the failure
+            print('\t', 'Failed updating a ' + self.type + ' Slice in ' + \
+                  self.name)
+            return False, msg
+
+        # Otherwise, it succeeded
+        else:
+            # Inform the hyperstrator about the success
+            print('\t', 'Succeeded updating a ' + self.type + ' Slice in ' + \
+                  self.name)
+            return True, msg
+
+        return msg
 
     def delete_slice(self, **kwargs):
         # Send removal message
@@ -163,41 +189,23 @@ class ctl_base(object):
 
         return msg
 
-class wireless_orchestrator_server(Thread):
+class base_orchestrator(Thread):
 
     def __init__(self, **kwargs):
         # Initialise the parent class
         Thread.__init__(self)
         # Flat to exit gracefully
         self.shutdown_flag = Event()
-        # COntainer to hold the list of Service IDs
+        # Container to hold the list of Service IDs
         self.s_ids = {}
-
 
         # Parse keyword arguments
         self._parse_kwargs(**kwargs)
         # Start the HS server
         self._server_bind(**kwargs)
 
-        # IMEC Controller Handler
-        self.imec_ctl = ctl_base(
-            name="IMEC",
-            host_key="imec_host",
-            port_key="imec_port",
-            default_host="1127.0.0.1",
-            default_port="3100",
-            request_key="imec_req",
-            reply_key="imec_rep")
-
-        # TCD Controller Handler
-        self.tcd_ctl = ctl_base(
-            name="TCD",
-            host_key="tcd_host",
-            port_key="tcd_port",
-            default_host="127.0.0.1",
-            default_port="3200",
-            request_key="tcd_req",
-            reply_key="tcd_rep")
+        # Run post initialization operations
+        self.post_init(**kwargs)
 
     # Extract message headers from keyword arguments
     def _parse_kwargs(self, **kwargs):
@@ -252,7 +260,7 @@ class wireless_orchestrator_server(Thread):
         self.socket.setsockopt(zmq.RCVTIMEO, 500)
 
 
-    def send_msg(self, message_type, message):
+    def _send_msg(self, message_type, message):
         # Send a message with a header
         self.socket.send_json({self.rep_header: {message_type: message}})
 
@@ -289,7 +297,7 @@ class wireless_orchestrator_server(Thread):
                         msg = 'The service already exists: ' + \
                             create_slice['s_id']
                         # Send message
-                        self.send_msg(self.create_nack, msg)
+                        self._send_msg(self.create_nack, msg)
                         # Leave if clause
                         continue
 
@@ -300,49 +308,12 @@ class wireless_orchestrator_server(Thread):
 
                     print('\t', 'Service ID:', create_slice['s_id'])
 
-                    # Decide what to do based on the type of traffic
-                    if create_slice['type'] == "high-throughput":
-                        # Send message to TCD SDR controller
-                        print('\t', 'Traffic type: High Throughput')
-                        print('\t', 'Delegating it to the TCD Controller')
+                    # Create new slice
+                    success, msg = self.create_slice(**create_slice)
 
-                        # Send the message to create a slice
-                        success, msg = self.tcd_ctl.create_slice(
-                            **{'s_id': create_slice['s_id'],
-                               'type': create_slice['type']})
-
-                        # Inform the user about the creation
-                        self.send_msg(self.create_ack if success \
-                                      else self.create_nack, msg)
-
-                    elif create_slice['type'] == "low-latency":
-                        # Send messate to IMEC SDR Controller
-                        print('\t', 'Traffic type: Low Latency')
-                        print('\t', 'Delegating it to the IMEC Controller')
-
-                        # Send the message to create a slice
-                        success, msg = self.imec_ctl.create_slice(
-                            **{'s_id': create_slice['s_id'],
-                               'type': create_slice['type']})
-
-                        # Inform the user about the creation
-                        self.send_msg(self.create_ack if success \
-                                      else self.create_nack, msg)
-
-                    # Otherwise, couldn't identify the traffic type
-                    else:
-                        print('\t', 'Invalid traffic type.')
-
-                        # Remove the service from the list of service IDs
-                        del self.s_ids[create_slice['s_id']]
-
-                        # Send error message
-                        msg = 'Could not identify the traffic type:' + \
-                              str(create_slice['type'])
-
-                        # Inform the user about the creation
-                        self.send_msg(self.error_msg, msg)
-
+                    # Send message
+                    self._send_msg(self.create_ack if success else \
+                                   self.create_nack, msg)
 
                 # If it is a remove service
                 delete_slice = request.get(self.delete_msg, None)
@@ -356,41 +327,23 @@ class wireless_orchestrator_server(Thread):
                             delete_slice['s_id']
 
                         # Send message
-                        self.send_msg(self.delete_nack, msg)
+                        self._send_msg(self.delete_nack, msg)
                         # Leave if clause
                         continue
 
-                    # Decide what to do based on the type of traffic
-                    if self.s_ids[delete_slice['s_id']] == "high-throughput":
-                        # Send message to TCD SDR controller
-                        print('\t', 'Traffic type: High Throughput')
-                        print('\t', 'Delegating it to the TCD Controller')
+                    # Remove it from the list of service IDs
+                    del self.s_ids[delete_slice['s_id']]
 
-                        # Send message to remove slice
-                        success, msg = self.tcd_ctl.delete_slice(
-                            **{'s_id': delete_slice['s_id'],
-                               'type': self.s_ids[delete_slice['s_id']]})
+                    print('\t', 'Service ID:', delete_slice['s_id'])
 
-                        # Inform the user about the removal
-                        self.send_msg(self.delete_ack if success \
-                                      else self.delete_nack, msg)
+                    # Remove a slice
+                    success, msg = self.delete_slice(**delete_slice)
 
-                    elif self.s_ids[delete_slice['s_id']] == "low-latency":
-                        # Send messate to IMEC SDR Controller
-                        print('\t', 'Traffic type: Low Latency')
-                        print('\t', 'Delegating it to the IMEC Controller')
-
-                        # Send message to remove slice
-                        success, msg = self.imec_ctl.delete_slice(
-                            **{'s_id': delete_slice['s_id'],
-                               'type': self.s_ids[delete_slice['s_id']]})
-
-                        # Inform the user about the removal
-                        self.send_msg(self.delete_ack if success \
-                                      else self.delete_nack, msg)
+                    # Send message
+                    self._send_msg(self.delete_ack if success else \
+                                   self.delete_nack, msg)
 
                     # Remove the service from the list of service IDs
-                    del self.s_ids[delete_slice['s_id']]
 
 
                 # Check for unknown messages
@@ -403,18 +356,18 @@ class wireless_orchestrator_server(Thread):
                     print('- Unknown message')
                     print('\t', 'Message:', unknown_msg[0])
 
-                    msg = "Unknown message:" + str(unknown_msg[0])
+                    msg = "Unknown message: " + str(unknown_msg[0])
                     # Send message
-                    self.send_msg(self.error_msg, msg)
+                    self._send_msg(self.error_msg, msg)
 
             # Failed to parse message
             else:
                 print('- Failed to parse message')
                 print('\t', 'Message:', cmd)
 
-                msg = "Failed to parse message:" + str(cmd)
+                msg = "Failed to parse message: " + str(cmd)
                 # Send message
-                self.send_msg(self.error_msg, msg)
+                self._send_msg(self.error_msg, msg)
 
         # Terminate zmq
         self.socket.close()
@@ -424,17 +377,29 @@ class wireless_orchestrator_server(Thread):
 if __name__ == "__main__":
     # clear screen
     cls()
+
     # Handle keyboard interrupt (SIGINT)
     try:
         # Start the Remote Unit Server
-        wireless_orchestrator_thread = wireless_orchestrator_server(
-            host='127.0.0.1', port=2100)
-        wireless_orchestrator_thread.start()
+        template_orchestrator_thread = template_orchestrator(
+            name='ORC',
+            req_header='orc_req',
+            rep_header='orc_rep',
+            error_msg='msg_err',
+            create_msg='oc_cs',
+            request_msg='oc_rs',
+            update_msg='oc_us',
+            delete_msg='oc_ds',
+            host='127.0.0.1',
+            port=2000)
+
+        # Start the Template Orchestrator Thread
+        template_orchestrator_thread.start()
         # Pause the main thread
         signal.pause()
 
     except KeyboardInterrupt:
-        # Terminate the Wireless Orchestrator Server
+        # Terminate the Template Orchestrator Server
         print('Exiting')
-        wireless_orchestrator_thread.shutdown_flag.set()
-        wireless_orchestrator_thread.join()
+        template_orchestrator_thread.shutdown_flag.set()
+        template_orchestrator_thread.join()

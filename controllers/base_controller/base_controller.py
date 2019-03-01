@@ -190,7 +190,7 @@ class base_controller(Thread):
                     print('- Unknown message')
                     print('\t', 'Message:', unknown_msg[0])
 
-                    msg = "Unknown message:" + str(unknown_msg[0])
+                    msg = "Unknown message: " + str(unknown_msg[0])
                     # Send message
                     self._send_msg(self.error_msg, msg)
 
@@ -199,7 +199,7 @@ class base_controller(Thread):
                 print('- Failed to parse message')
                 print('\t', 'Message:', request)
 
-                msg = "Failed to parse message:" + str(request)
+                msg = "Failed to parse message: " + str(request)
                 # Send message
                 self._send_msg(self.error_msg, msg)
 

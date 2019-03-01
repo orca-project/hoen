@@ -132,16 +132,42 @@ class orch_base(object):
         success, msg = self._send_msg(
             self.request_ack, self.request_nack, **{self.request_msg: kwargs})
 
-        print('not implemented.')
-        return False, None
+        # If the slice request failed
+        if not success:
+            # Inform the hyperstrator about the failure
+            print('\t', 'Failed requesting a ' + self.type + ' Slice in ' + \
+                  self.name)
+            return False, msg
+
+        # Otherwise, it succeeded
+        else:
+            # Inform the hyperstrator about the success
+            print('\t', 'Succeeded requesting a ' + self.type + \
+                  ' Slice in ' + self.name)
+            return True, msg
+
+        return msg
 
     def update_slice(self):
         # Send update message
         success, msg = self._send_msg(
             self.update_ack, self.update_nack, **{self.update_msg: kwargs})
 
-        print('not implemented.')
-        return False, None
+        # If the slice update failed
+        if not success:
+            # Inform the hyperstrator about the failure
+            print('\t', 'Failed updating a ' + self.type + ' Slice in ' + \
+                  self.name)
+            return False, msg
+
+        # Otherwise, it succeeded
+        else:
+            # Inform the hyperstrator about the success
+            print('\t', 'Succeeded updating a ' + self.type + ' Slice in ' + \
+                  self.name)
+            return True, msg
+
+        return msg
 
     def delete_slice(self, **kwargs):
         # Send removal message
