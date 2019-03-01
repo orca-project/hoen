@@ -22,6 +22,7 @@ class orch_base(object):
     def __init__(self, **kwargs):
         # Extract parameters from keyword arguments
         self.name = kwargs.get("name", "")
+        self.type = kwargs.get('type', '')
         self.host_key = kwargs.get("host_key", "")
         self.port_key = kwargs.get("port_key", "")
         self.default_host = kwargs.get("default_host", "127.0.0.1")
@@ -29,18 +30,33 @@ class orch_base(object):
         self.request_key = kwargs.get("request_key", "")
         self.reply_key = kwargs.get("reply_key", "")
 
-        # Get message headers
-        self.error_msg = kwargs.get("error_msg", "msg_err")
-        self.create_ack = kwargs.get("create_ack", "cs_ack")
-        self.create_nack = kwargs.get("create_msg", "cs_nack")
-        self.delete_ack = kwargs.get("delete_ack", "ds_ack")
-        self.delete_nack = kwargs.get("delete_nack", "ds_nack")
-
+        # Parse keyword arguments
+        self._parse_kwargs(**kwargs)
          # Connect to the server
-        self.server_connect(**kwargs)
+        self._server_connect(**kwargs)
 
+    # Extract message headers from keyword arguments
+    def _parse_kwargs(self, **kwargs):
+        # Get the error message header from keyword arguments
+        self.error_msg = kwargs.get("error_msg", "msg_err")
 
-    def server_connect(self, **kwargs):
+        self.create_msg = kwargs.get("create_msg", "bo_crs")
+        self.create_ack = "_".join([self.create_msg.split('_')[-1], "ack"])
+        self.create_nack = "_".join([self.create_msg.split('_')[-1], "nack"])
+
+        self.request_msg = kwargs.get("request_msg", "bo_rrs" )
+        self.request_ack = "_".join([self.request_msg.split('_')[-1], "ack"])
+        self.request_nack = "_".join([self.request_msg.split('_')[-1], "nack"])
+
+        self.update_msg = kwargs.get("update_msg", "bo_urs")
+        self.update_ack = "_".join([self.update_msg.split('_')[-1], "ack"])
+        self.update_nack = "_".join([self.update_msg.split('_')[-1], "nack"])
+
+        self.delete_msg = kwargs.get("delete_msg", "bo_drs" )
+        self.delete_ack = "_".join([self.delete_msg.split('_')[-1], "ack"])
+        self.delete_nack = "_".join([self.delete_msg.split('_')[-1], "nack"])
+
+    def _server_connect(self, **kwargs):
         # Default Server host
         host = kwargs.get(self.host_key, self.default_host)
         # Default Server port
@@ -60,7 +76,7 @@ class orch_base(object):
         self.socket.setsockopt(zmq.REQ_CORRELATE, 1)
 
 
-    def send_msg(self, kwargs):
+    def _send_msg(self, ack, nack, **kwargs):
         # Send request to the orchestrator
         self.socket.send_json({self.request_key: kwargs})
 
@@ -71,34 +87,82 @@ class orch_base(object):
         # If nothing was received during the timeout
         except zmq.Again:
             # Try again
-            return None, "Connection timeout to " + self.name + " Orchestrator"
+            return False, "Connection timeout to " + self.name + " Orchestrator"
 
         # If the message is not valid
         if msg is None:
             # Return proper error
-            return None, "Received invalid message: " + str(msg)
+            return False, "Received invalid message: " + str(msg)
         # The orchestrator couldn't decode message
         elif self.error_msg in msg:
-            return None, msg[self.error_msg]
-        # If the create slice request succeeded
-        elif self.create_ack in msg:
+            # Return message and error code
+            return False, msg[self.error_msg]
+        # If the request succeeded
+        elif ack in msg:
             # Return host and port
-            return msg[self.create_ack]['host'], msg[self.create_ack]['port']
+            return True, msg[ack]
         # If the create slice request failed
-        elif self.create_nack in msg:
+        elif nack in msg:
             # Return the failure message
-            return None, msg[self.create_nack]
-        # If the remove slice request succeeded
-        elif self.delete_ack in msg:
-            # Return the Service ID to confirm it
-            return msg[self.delete_ack], None
-         # If the remove slice request failed
-        elif self.delete_nack in msg:
-            # Return the failure message
-            return None, msg[self.delete_nack]
-        # Unexpected behaviour
+            return False, msg[nack]
         else:
-            return None, "Missing ACK or NACK: " + str(msg)
+            return False, "Missing ACK or NACK: " + str(msg)
+
+    def create_slice(self, **kwargs):
+        # Send Creation message
+        success, msg = self._send_msg(
+            self.create_ack, self.create_nack, **{self.create_msg: kwargs})
+
+        # If the slice allocation failed
+        if not success:
+            # Inform the hyperstrator about the failure
+            print('\t', 'Failed creating a ' + self.type + ' Slice in ' + \
+                  self.name)
+            return False, msg
+
+        # Otherwise, it succeeded
+        else:
+            # Inform the hyperstrator about the success
+            print('\t', 'Succeeded creating a ' + self.type + ' Slice in ' + \
+                  self.name)
+            return True, msg
+
+    def request_slice(self, **kwargs):
+        # Send request message
+        success, msg = self._send_msg(
+            self.request_ack, self.request_nack, **{self.request_msg: kwargs})
+
+        print('not implemented.')
+        return False, None
+
+    def update_slice(self):
+        # Send update message
+        success, msg = self._send_msg(
+            self.update_ack, self.update_nack, **{self.update_msg: kwargs})
+
+        print('not implemented.')
+        return False, None
+
+    def delete_slice(self, **kwargs):
+        # Send removal message
+        success, msg = self._send_msg(
+            self.delete_ack, self.delete_nack, **{self.delete_msg: kwargs})
+
+        # If the slice removal failed
+        if not success:
+            # Inform the hyperstrator about the failure
+            print('\t', 'Failed removing a ' + self.type + ' Slice in ' + \
+                  self.name)
+            return False, msg
+
+        # Otherwise, it succeeded
+        else:
+            # Inform the hyperstrator about the success
+            print('\t', 'Succeeded removing a ' + self.type + ' Slice in ' + \
+                  self.name)
+            return True, msg
+
+        return msg
 
 
 class hyperstrator_server(Thread):
@@ -119,20 +183,28 @@ class hyperstrator_server(Thread):
         self.s_ids = []
 
         # Create an instance of the SDN orchestrator handler
-        self.sdn_orch = orch_base(name="Wireless Network",
+        self.sdn_orch = orch_base(name="Wired Network",
                                   host_key="sdn_host",
                                   port_key="sdn_port",
                                   default_host="127.0.0.1",
                                   default_port="2200",
+                                  create_msg="wd_cc",
+                                  request_msg="wd_rc",
+                                  update_msg="wd_uc",
+                                  delete_msg="wd_dc",
                                   request_key="sdn_req",
                                   reply_key="sdn_rep")
 
         # Create an instance of the SDR orchestrator handler
-        self.sdr_orch = orch_base(name="Wired Network",
+        self.sdr_orch = orch_base(name="Wireless Network",
                                   host_key="sdr_host",
                                   port_key="sdr_port",
                                   default_host="127.0.0.1",
                                   default_port="2100",
+                                  create_msg="wl_cr",
+                                  request_msg="wl_rr",
+                                  update_msg="wl_ur",
+                                  delete_msg="wl_dr",
                                   request_key="sdr_req",
                                   reply_key="sdr_rep")
 
@@ -170,24 +242,6 @@ class hyperstrator_server(Thread):
         # Get the create service not acknowledgment from keyword arguments
         self.delete_nack = "_".join([self.delete_msg.split('_')[-1], "nack"])
 
-        # Get the create radio slice message from keyword arguments
-        self.create_radio = kwargs.get('create_radio', 'wl_cr')
-        # Get the request radio slice message from keyword arguments
-        self.request_radio = kwargs.get('request_radio', 'wl_rr')
-        # Get the update radio slice message from keyword arguments
-        self.update_radio = kwargs.get('update_radio', 'wl_ur')
-        # Get the remove radio slice message from keyword arguments
-        self.remove_radio = kwargs.get('delete_radio', 'wl_dr')
-
-        # Get the create core slice message from keyword arguments
-        self.create_core = kwargs.get('create_core', 'wd_cc')
-        # Get the request core slice message from keyword arguments
-        self.request_core = kwargs.get('request_core', 'wd_rc')
-        # Get the update core slice message from keyword arguments
-        self.update_core = kwargs.get('update_core', 'wd_uc')
-        # Get the remove core slice message from keyword arguments
-        self.remove_remove = kwargs.get('delete_msg', 'wd_dc')
-
     # Bind server to socket
     def _server_bind(self, **kwargs):
         # Default HS Server host
@@ -204,14 +258,18 @@ class hyperstrator_server(Thread):
         # Timeout reception every 500 milliseconds
         self.socket.setsockopt(zmq.RCVTIMEO, 500)
 
+    def send_msg(self, message_type, message):
+        # Send a message with a header
+        self.socket.send_json({message_type: message})
+
     def run(self):
         print('- Started Hyperstrator')
         # Run while thread is active
         while not self.shutdown_flag.is_set():
 
              try:
-                # Wait for command
-                cmd = self.socket.recv_json()
+                # Wait for request
+                request = self.socket.recv_json()
              # If nothing was received during the timeout
              except zmq.Again:
                 # Try again
@@ -220,7 +278,7 @@ class hyperstrator_server(Thread):
              # Received a command
              else:
                 # Service request, new service
-                create_service = cmd.get(self.create_msg, None)
+                create_service = request.get(self.create_msg, None)
 
                 # If the message worked
                 if create_service is not None:
@@ -228,34 +286,31 @@ class hyperstrator_server(Thread):
                     # Create a Service ID
                     s_id = str(uuid4())
 
-                    print('\tService ID:', s_id)
-                    print('\tSend message to SDR orchestrator')
+                    print('\t', 'Service ID:', s_id)
+                    print('\t', 'Send message to SDR orchestrator')
                     # Send UUID and type of service to the SDR orchestrator
-                    r_host, r_port = self.sdr_orch.send_msg(
-                        {self.create_radio: {'type': create_service['type'],
-                                             's_id': s_id}})
+                    radio_success, radio_msg = self.sdr_orch.create_slice(
+                        **{'type': create_service['type'], 's_id': s_id})
 
                     # If the radio allocation failed
-                    if r_host is None:
-                        print('\tFailed creating Radio Slice')
+                    if not radio_success:
+                        print('\t', 'Failed creating Radio Slice')
                         # Inform the user about the failure
-                        self.socket.send_json({self.create_nack: r_port})
+                        self.send_msg(self.create_nack, radio_msg)
                         # Finish here
                         continue
 
                     # Otherwise, the radio allocation succeeded
-                    print('\tSucceeded creating a Radio Service')
+                    print('\t', 'Succeeded creating a Radio Service')
 
                     # TODO For the future, SDN hooks
                     if False:
                         # Otherwise, send message to the SDN orchestrator
-                        c_host, c_port = self.sdn_orch.send_msg(
-                            {self.create_core: {
-                                'type': create_service['type'],
-                                's_id': s_id,
-                                'destination': (r_host, r_port),
-                                'source': ('127.0.0.1', 6000)
-                            }})
+                        core_success, core_msg = self.sdn_orch.create_slice(
+                            **{'type': create_service['type'],
+                               's_id': s_id,
+                               'destination': radio_msg['host'],
+                               'source': '127.0.0.1'})
 
                     # TODO if the wired and the wireless parts worked
                     # Append it to the list of service IDs
@@ -263,56 +318,55 @@ class hyperstrator_server(Thread):
 
                     # Inform the user about the configuration success
                     # TODO the host and port should come from the SDN orch.
-                    self.socket.send_json({self.create_ack: {'s_id': s_id,
-                                                             'host': r_host,
-                                                             "port": r_port}})
+                    self.send_msg(self.create_ack, {'s_id': s_id,
+                                                    'host': radio_msg['host']})
 
                 # Service rerquest, remove service
-                remove_service = cmd.get(self.remove_msg, None)
+                delete_service = request.get(self.delete_msg, None)
 
                  # If the flag exists
-                if remove_service is not None:
-                    print('- Remove Service Request')
+                if delete_service is not None:
+                    print('- Delete Service Request')
                     # If this service doesn't exist
-                    if remove_service['s_id'] not in self.s_ids:
-                        print('\tService ID doesn\' exist')
+                    if delete_service['s_id'] not in self.s_ids:
+                        print('\t', 'Service ID does not exist')
                         # Send message
-                        self.socket.send_json(
-                            {self.remove_nack: 'The service doesn\'t exist:' +
-                             remove_service['s_id']})
+                        self.send_msg(self.delete_nack,
+                                      'The service does not exist: ' + \
+                                      delete_service['s_id'])
 
                         # Leave if clause
                         continue
 
-                    print('\tService ID:', remove_service['s_id'])
-                    print('\tSend message to SDR orchestrator')
+                    print('\t', 'Service ID:', delete_service['s_id'])
+                    print('\t', 'Send message to SDR orchestrator')
                     # Send UUID and type of service to the SDR orchestrator
-                    r_host, r_port = self.sdr_orch.send_msg(
-                        {self.remove_radio: {'s_id': remove_service['s_id']}})
+                    radio_success, radio_msg = self.sdr_orch.delete_slice(
+                        **{'s_id': delete_service['s_id']})
 
                     # If the radio removal failed
-                    if r_host is None:
+                    if not radio_success:
                         # Inform the user about the failure
-                        self.socket.send_json({self.remove_nack: r_port})
+                        self.send_msg(self.delete_nack, radio_msg,)
                         # Finish here
                         continue
 
                     # Otherwise, the radio allocation succeeded
-                    print('\tSucceeded removing a Radio Service')
+                    print('\t', 'Succeeded removing a Radio Service')
 
                     # TODO For the future, SDN hooks
                     if False:
                         # Otherwise, send message to the SDN orchestrator
-                        c_host, c_port = self.sdn_orch.send_msg(
-                            {self.remove_core: {'s_id': remove_slice['s_id']}})
+                        core_success, core_msg = self.sdn_orch.delete_slice(
+                            **{'s_id': delete_slice['s_id']})
 
                     # TODO if the wired and the wireless parts worked
                     # Remove it to the list of service IDs
-                    self.s_ids.remove(remove_service['s_id'])
+                    self.s_ids.remove(delete_service['s_id'])
 
                     # Inform the user about the removal success
-                    self.socket.send_json(
-                        {self.remove_ack: {'s_id': remove_service['s_id']}})
+                    self.send_msg(self.delete_ack,
+                                  {'s_id': delete_service['s_id']})
 
                 # Check for unknown messages
                 unknown_msg = [x for x in request if x not in [self.create_msg,
@@ -327,7 +381,7 @@ class hyperstrator_server(Thread):
                     msg = {self.error_msg: "Unknown message:" + \
                            str(unknown_msg[0])}
                     # Send message
-                    self.socket.send_msg(self.rep_header, msg)
+                    self.send_msg(self.error_msg, msg)
 
         # Terminate zmq
         self.socket.close()

@@ -68,8 +68,7 @@ def service_request(socket, **kwargs):
         print('- Created Service:')
         # Print information
         print('\tService ID:', ack['s_id'], '\n',
-              '\tHost:', ack['host'], '\n',
-              '\tPort:', ack['port'])
+              '\tHost:', ack['host'])
 
         # Exit gracefully
         exit(0)

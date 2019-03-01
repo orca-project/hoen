@@ -5,7 +5,7 @@ from sys import path
 path.append('..')
 
 # Import the Template Controller
-from template_controller.template_controller import controller_base
+from base_controller.base_controller import base_controller
 # Import OS
 import os
 # Import signal
@@ -18,7 +18,7 @@ def cls():
     os.system('cls' if os.name == 'nt' else 'clear')
 
 
-class tcd_controller(controller_base):
+class tcd_controller(base_controller):
 
     def post_init(self, **kwargs):
         # TODO Override this method at will
@@ -51,12 +51,12 @@ class tcd_controller(controller_base):
         # Check for missing S_ID
         if s_id is None:
             # Return NACK
-            return {self.create_nack: {'msg': 'Missing Service ID.'}}
+            return False, 'Missing Service ID.'
 
         # Check for invalid direction
         if dirx not in ['rx', 'tx', 'trx']:
             # Return NACK
-            return {self.create_nack: {'msg': 'Invalid RAT direction: ' + str(dirx)}}
+            return False, 'Invalid RAT direction: ' + str(dirx)
 
         # Convert traffic type to RAT
         if tech == 'high-throughput':
@@ -65,7 +65,7 @@ class tcd_controller(controller_base):
             tech = ' iot'
         else:
             # Return NACK
-            return {self.create_nack: {'msg': 'Invalid RAT: ' + str(tech)}}
+            return False, 'Invalid RAT: ' + str(tech)
 
 
         # First step: Create virtual RF front-end
@@ -83,7 +83,7 @@ class tcd_controller(controller_base):
         except Exception as e:
             # Send NACK
             print('\t' + str(e))
-            return {self.create_nack: {"msg": str(e)}}
+            return False, str(e)
 
 
 
@@ -95,10 +95,10 @@ class tcd_controller(controller_base):
         except Exception as e:
             # Send NACK
             print('\t' + str(e))
-            return {self.create_nack: {"msg": str(e)}}
+            return False, str(e)
 
         # Return host and port -- TODO may drop port entirely
-        return {self.create_ack: {'host': host, "port": 7001}}
+        return True, {'host': host}
 
 
     def remove_slice(self, **kwargs):
@@ -108,7 +108,7 @@ class tcd_controller(controller_base):
         # Check for missing S_ID
         if s_id is None:
             # Return NACK
-            return {self.delete_nack: {'msg': 'Missing Service ID.'}}
+            return False, 'Missing Service ID.'
 
         #First Step: Remove the RAT
         try:
@@ -119,7 +119,7 @@ class tcd_controller(controller_base):
         except Exception as e:
              # Send NACK
             print('\t' + str(e))
-            return {self.delete_nack: {"msg": str(e)}}
+            return False, str(e)
 
         # Second step: Remove routes
         try:
@@ -129,14 +129,14 @@ class tcd_controller(controller_base):
         except Exception as e:
             # Send NACK
             print('\t' + str(e))
-            return {self.delete_nack: {"msg": str(e)}}
+            return False, str(e)
 
         # Third step: Remove virtual RF front-end
         # TODO do something here
 
 
         # Return host and port -- TODO may drop port entirely
-        return {self.delete_ack: {'s_id': kwargs['s_id']}}
+        return True, {'s_id': kwargs['s_id']}
 
 
 if __name__ == "__main__":
@@ -149,6 +149,10 @@ if __name__ == "__main__":
             name='TCD',
             req_header='tcd_req', # Don't modify
             rep_header='tcd_rep', # Don't modify
+            create_msg='wlc_crs',
+            request_msg='wlc_rrs',
+            update_msg='wlc_urs',
+            delete_msg='wlc_drs',
             host='127.0.0.1',
             port=3200)
 

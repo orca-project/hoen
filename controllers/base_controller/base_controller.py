@@ -7,7 +7,7 @@ from threading import Thread, Lock, Event
 # Import the Pause method of the Signal module
 from signal import pause
 
-class controller_base(Thread):
+class base_controller(Thread):
 
     def __init__(self, **kwargs):
         # Initialise the parent class
@@ -87,9 +87,9 @@ class controller_base(Thread):
         self.socket.setsockopt(zmq.RCVTIMEO, 500)
 
 
-    def send_msg(self, message_header, message):
+    def _send_msg(self, message_type, message):
         # Send a message with a header
-        self.socket.send_json({message_header: message})
+        self.socket.send_json({self.rep_header: {message_type: message}})
 
 
     def create_slice(self, **kwargs):
@@ -123,12 +123,12 @@ class controller_base(Thread):
                 continue
 
             # CTL request
-            ctl_r = cmd.get(self.req_header, None)
+            request = cmd.get(self.req_header, None)
             # If the message is valid
-            if ctl_r is not None:
+            if request is not None:
                 print('- Received Message')
                 # Check wheter is it a new slice
-                create_slice = ctl_r.get(self.create_msg, None)
+                create_slice = request.get(self.create_msg, None)
 
                 # If we must create a new slice
                 if create_slice is not None:
@@ -136,47 +136,49 @@ class controller_base(Thread):
                     # This service already exists
                     if create_slice['s_id'] in self.s_ids:
                         print('\tService ID already exists.')
-                        msg = {self.create_nack: 'The Slice already exists: ' +
-                               create_slice['s_id']}
+                        msg = 'The Slice already exists: ' + \
+                            create_slice['s_id']
                         # Send message
-                        self.send_msg(self.rep_header, msg)
+                        self._send_msg(self.create_nack, msg)
                         # Leave if clause
                         continue
 
                     # Append it to the list of service IDs
                     self.s_ids.append(create_slice['s_id'])
-                    print('\tService ID:', create_slice['s_id'])
+                    print('\t', 'Service ID:', create_slice['s_id'])
 
                     # Create new slice
-                    msg = self.create_slice(**create_slice)
+                    success, msg = self.create_slice(**create_slice)
                     # Send message
-                    self.send_msg(self.rep_header, msg)
+                    self._send_msg(self.create_ack if success else \
+                                   self.create_nack, msg)
 
                 # Check whether it is a removal
-                delete_slice = ctl_r.get(self.delete_msg, None)
+                delete_slice = request.get(self.delete_msg, None)
 
                 # If we must delete a slice
                 if delete_slice is not None:
                     print('- Delete Slice')
                     # This service doesn't exist
                     if delete_slice['s_id'] not in self.s_ids:
-                        msg = {self.delete_nack: 'The slice doesn\'t exist:' +
-                               delete_slice['s_id']}
+                        msg = 'The slice does not exist:' + \
+                            delete_slice['s_id']
 
                         # Send message
-                        self.send_message(self.rep_header, msg)
+                        self._send_msg(self.delete_nack, msg)
                         # Leave if clause
                         continue
 
                     # Remove it from the list of service IDs
-                    self.s_ids.remove(remove_slice['s_id'])
-                    print('\tService ID:', remove_slice['s_id'])
+                    self.s_ids.remove(delete_slice['s_id'])
+                    print('\t', 'Service ID:', delete_slice['s_id'])
 
                     # Remove a slice
-                    msg = self.remove_slice(**remove_slice)
+                    success, msg = self.delete_slice(**delete_slice)
 
                     # Send message
-                    self.send_msg(self.rep_header, msg)
+                    self._send_msg(self.delete_ack if success else \
+                                   self.delete_nack, msg)
 
                 # Check for unknown messages
                 unknown_msg = [x for x in request if x not in [self.create_msg,
@@ -188,19 +190,18 @@ class controller_base(Thread):
                     print('- Unknown message')
                     print('\t', 'Message:', unknown_msg[0])
 
-                    msg = {self.error_msg: "Unknown message:" + \
-                           str(unknown_msg[0])}
+                    msg = "Unknown message:" + str(unknown_msg[0])
                     # Send message
-                    self.socket.send_msg(self.rep_header, msg)
+                    self._send_msg(self.error_msg, msg)
 
             # Failed to parse message
             else:
                 print('- Failed to parse message')
-                print('\tMessage:', cmd)
+                print('\t', 'Message:', request)
 
-                msg = {self.error_msg: "Failed to parse message:" + str(cmd)}
+                msg = "Failed to parse message:" + str(request)
                 # Send message
-                self.send_msg(self.rep_header, msg)
+                self._send_msg(self.error_msg, msg)
 
         # Terminate zmq
         self.socket.close()
@@ -215,7 +216,7 @@ if __name__ == "__main__":
     # Handle keyboard interrupt (SIGINT)
     try:
         # Instantiate the Template Controller thread
-        template_controller_thread = controller_base(
+        template_controller_thread = base_controller(
             name='CTL',
             req_header='ctl_req',
             rep_header='ctl_rep',
