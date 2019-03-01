@@ -1,265 +1,75 @@
 #!/usr/bin/env python3
 
-# Import the ZMQ module
-import zmq
-# Import the Thread and Lock objects from the threading module
-from threading import Thread, Lock, Event
-# Import the sleep function from the time module
-from time import sleep
-# Import OS
-import os
+# Hack to load parent module
+from sys import path
+path.append('..')
 
+# Import the Template Orchestrator
+from base_orchestrator.base_orchestrator import base_orchestrator, ctl_base
+# Import the System and Name methods from the OS module
+from os import system, name
+# Import signal
 import signal
 
 def cls():
-    os.system('cls' if os.name=='nt' else 'clear')
+    system('cls' if name=='nt' else 'clear')
+
+class wired_orchestrator(base_orchestrator):
+
+    def post_init(self, **kwargs):
+        # IMEC Controller Handler
+        self.ovs_ctl = ctl_base(
+            name="OVS",
+            host_key="ovs_host",
+            port_key="ovs_port",
+            default_host="127.0.0.1",
+            default_port="3300",
+            request_key="ovs_req",
+            reply_key="ovs_rep")
 
 
-class ctl_base(object):
-    name = ""
-    host_key = ""
-    port_key = ""
-    default_host = "127.0.0.1"
-    default_port = "6000"
-    request_key = ""
-    reply_key = ""
+    def create_slice(self, **kwargs):
+        # Extract parameters from keyword arguments
+        s_id = kwargs.get('s_id', None)
+        s_type = kwargs.get('type', None)
 
-    def __init__(self, **kwargs):
-         # Connect to the server
-        self.server_connect(**kwargs)
+        # Append it to the list of service IDs
+        self.s_ids[s_id] = s_type
 
-
-    def server_connect(self, **kwargs):
-        # Default Server host
-        host = kwargs.get(self.host_key, self.default_host)
-        # Default Server port
-        port = kwargs.get(self.port_key, self.default_port)
-        # Create a ZMQ context
-
-        self.context = zmq.Context()
-        #  Specity the type of ZMQ socket
-        self.socket = self.context.socket(zmq.REQ)
-        # Connect ZMQ socket to host:port
-        self.socket.connect("tcp://" + host + ":" + str(port))
+        if s_type not in ["high-throughput", "low-latency"]:
+            # Send error message
+            msg = 'Could not identify the traffic type:' + str(s_type)
+            # Inform the user about the creation
+            return False, msg
 
 
-    def send_msg(self, kwargs):
-        # Send request to the orchestrator
-        self.socket.send_json({self.request_key: kwargs})
-        # Wait for command
-        msg = self.socket.recv_json().get(self.reply_key, None)
-        # If the message is not valid
-        if msg is None:
-            # Return proper error
-            return None, "Received invalid message: " + str(msg)
-        # The orchestrator couldn't decode message
-        elif 'msg_err' in msg:
-            return None, msd['msg_err']
-        # If failed creating a slice
-        elif 'nl_nack' in msg:
-            # Return the failure message
-            return None, msg['nl_nack']
-        # If succeeded creating a slice
-        elif 'nl_ack' in msg:
-            # Return host and port
-            return msg['nl_ack']['host'], msg['nl_ack']['port']
-        # If succeeded removing a slice
-        elif 'rl_ack' in msg:
-            # Return the Service ID  to confirm it
-            return msg['rl_ack'], None
-        # If failed removing a slice
-        elif 'rl_nack' in msg:
-            # Return the error message
-            return None, msg['rl_nack']
-        # Unexpected behaviour
-        else:
-            return None, "Missing ACK or NACK: " + str(msg)
+        # Send message to OVS SDN controller
+        print('\t', 'Traffic type: ' + str(s_type).title())
+        print('\t', 'Delegating it to the OVS Controller')
 
+        # Send the message to create a slice
+        success, msg = self.ovs_ctl.create_slice(
+            **{'s_id': s_id,'type': s_type})
 
-    def create_core_slice(self, s_id, s_type):
-        # Send creation message
-        host, port = self.send_msg({'c_nl': {'type': s_type, 's_id': s_id}})
+        # Inform the user about the creation
+        return success, msg
 
-        # If the slice allocation failed
-        if host is None:
-            # Inform the hyperstrator about the failure
-            print('\tFailed creating a Core Slice in ' + self.name)
-            msg = {'ns_nack': port}
+    def delete_slice(self, **kwargs):
+        # Extract parameters from keyword arguments
+        s_id = kwargs.get('s_id', None)
+        # Ge the slice type
+        s_type = self.s_ids[s_id]
 
-        # Otherwise, it succeeded
-        else:
-            # Inform the hyperstrator about the success
-            print('\tSucceeded creating a Core Slice in ' + self.name)
-            msg = {'ns_ack': {'host': host, 'port': port}}
+        # Send message to OVS SDN controller
+        print('\t', 'Traffic type: ' + str(s_type).title())
+        print('\t', 'Delegating it to the OVS Controller')
 
-        return msg
+        # Send message to remove slice
+        success, msg = self.ovs_ctl.delete_slice(**{'s_id': s_id,
+                                                    'type': s_type})
 
-
-    def remove_core_slice(self, s_id, s_type):
-        # Send removal message
-        host, port = self.send_msg({'c_rl': {'type': s_type, 's_id': s_id}})
-
-        # If the slice removal failed
-        if host is None:
-            # Inform the hyperstrator about the failure
-            print('\tFailed removing a Core Slice in ' + self.name)
-            msg = {'rs_nack': port}
-
-        # Otherwise, it succeeded
-        else:
-            # Inform the hyperstrator about the success
-            print('\tSucceeded removing a Core Slice in ' + self.name)
-            msg = {'rs_ack': {'s_id': host}}
-
-        return msg
-
-
-class ovs_ctl(ctl_base):
-    name = "OVS"
-    host_key = "ovs_host"
-    port_key = "ovs_port"
-    default_host = "127.0.0.1"
-    default_port = "9000"
-    request_key = "ovs_req"
-    reply_key = "ovs_rep"
-
-
-class wired_orchestrator_server(Thread):
-
-    def __init__(self, **kwargs):
-        # Initialise the parent class
-        Thread.__init__(self)
-        # Flat to exit gracefully
-        self.shutdown_flag = Event()
-        # COntainer to hold the list of Service IDs
-        self.s_ids = {}
-        # Get the request header from keyword arguments
-        self.req_header = kwargs.get('req_header', 'sdn_req')
-        # Get the reply header from keyword arguments
-        self.rep_header = kwargs.get('rep_header', 'sdn_rep')
-
-        # OVS Controller Handler
-        self.ovs_ctl = ovs_ctl()
-
-        # Start the HS server
-        self.server_bind(**kwargs)
-
-
-    def server_bind(self, **kwargs):
-        # Default HS Server host
-        host = kwargs.get('host', '127.0.0.1')
-        # Default HS Server port
-        port = kwargs.get('port', 4000)
-
-        # Create a ZMQ context
-        self.context = zmq.Context()
-        # Specify the type of ZMQ socket
-        self.socket = self.context.socket(zmq.REP)
-        # Bind ZMQ socket to host:port
-        self.socket.bind("tcp://" + host + ":" + str(port))
-        # Timeout reception every 500 milliseconds
-        self.socket.setsockopt(zmq.RCVTIMEO, 500)
-
-    def send_msg(self, message_header, message):
-        # Send a message with a header
-        self.socket.send_json({message_header: message})
-
-
-    def run(self):
-        print('- Started Wired Orchestrator')
-        # Run while thread is active
-        while not self.shutdown_flag.is_set():
-
-            try:
-               # Wait for command
-               cmd = self.socket.recv_json()
-            # If nothing was received during the timeout
-            except zmq.Again:
-               # Try again
-               continue
-
-            # SDN request
-            sdn_r = cmd.get(self.req_header, None)
-            # If the message is valid
-            if sdn_r is not None:
-                print('- Received Message')
-                # Check wheter is it a new core service
-                ns = sdn_r.get('r_ns', None)
-
-                # If it is a new core service
-                if ns is not None:
-                    print('- Create Core Service')
-                    # This service already exists
-                    if ns['s_id'] in self.s_ids:
-                        print('\tService ID already exists.')
-                        msg = {'ns_nack': 'The service already exists: ' +
-                               ns['s_id']}
-                        # Send message
-                        self.send_msg(self.rep_header, msg)
-                        # Leave if clause
-                        continue
-                    # Otherwise, it is a new service
-                    # Append it to the list of service IDs
-                    self.s_ids[ns['s_id']] = ns.get('type', None)
-
-                    print('\tService ID:', ns['s_id'])
-
-                    # Send messate to OVS SDN Controller
-                    print('\tDelegating it to the OVS Controller')
-
-                    # Send the message to create a core slice
-                    msg = self.ovs_ctl.create_core_slice(
-                            ns['s_id'], ns['type'])
-
-                    if False:
-                        # Remove the service from the list of service IDs
-                        del self.s_ids[ns['s_id']]
-
-                    # Send message
-                    self.send_msg(self.rep_header, msg)
-
-                # If it is a remove core service
-                rs = sdn_r.get('c_rs', None)
-
-                if rs is not None:
-                    print('- Remove Core Service')
-                    # If this service doesn't exist
-                    if rs['s_id'] not in self.s_ids:
-                        print('\tService ID doesn\' exist')
-                        msg = {'ds_nack': 'The service doesn\' exist:' +
-                               rs['s_id']}
-
-                        # Send message
-                        self.send_msg(self.rep_header, msg)
-                        # Leave if clause
-                        continue
-
-                    # Send messate to OVS SDN Controller
-                    print('\tDelegating it to the OVS Controller')
-
-                    # Send message to remove core slice
-                    msg = self.ovs_ctl.remove_core_slice(
-                        rs['s_id'], self.s_ids[rs['s_id']])
-
-                    if True:
-                        # Remove the service from the list of service IDs
-                        del self.s_ids[rs['s_id']]
-
-                    # Send message
-                    self.send_msg(self.rep_header, msg)
-
-            # Failed to parse message
-            else:
-                print('- Failed to parse message')
-                print('\tMessage:', cmd)
-
-                msg = {'msg_err': "Failed to parse message:" + str(cmd)}
-                # Send message
-                self.send_msg(self.rep_header, msg)
-
-        # Terminate zmq
-        self.socket.close()
-        self.context.term()
+        # Inform the user about the removal
+        return success, msg
 
 
 if __name__ == "__main__":
@@ -267,13 +77,27 @@ if __name__ == "__main__":
     cls()
     # Handle keyboard interrupt (SIGINT)
     try:
-        # Start the Remote Unit Server
-        wired_orchestrator_thread = wired_orchestrator_server(
-            host='192.168.0.100', port=4000)
+        # Instantiate the Wired Network Orchestrator thread
+        wired_orchestrator_thread = wired_orchestrator(
+            name='SDN',
+            req_header='sdn_req',
+            rep_header='sdn_rep',
+            error_msg='msg_err',
+            create_msg='wd_cc',
+            request_msg='wd_rc',
+            update_msg='wd_uc',
+            delete_msg='wd_dc',
+            host='127.0.0.1',
+            port=2200
+        )
+
+        # Start the Wired Network Orchestrator
         wired_orchestrator_thread.start()
+        # Pause the main thread
+        signal.pause()
 
     except KeyboardInterrupt:
         # Terminate the Wired Orchestrator Server
+        print('Exiting')
         wired_orchestrator_thread.shutdown_flag.set()
         wired_orchestrator_thread.join()
-        print('Exiting')

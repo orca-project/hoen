@@ -22,7 +22,7 @@ class wireless_orchestrator_server(base_orchestrator):
             name="IMEC",
             host_key="imec_host",
             port_key="imec_port",
-            default_host="1127.0.0.1",
+            default_host="127.0.0.1",
             default_port="3100",
             request_key="imec_req",
             reply_key="imec_rep")
@@ -41,7 +41,7 @@ class wireless_orchestrator_server(base_orchestrator):
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
         s_type = kwargs.get('type', None)
-        print(s_type)
+
         # Append it to the list of service IDs
         self.s_ids[s_id] = s_type
 

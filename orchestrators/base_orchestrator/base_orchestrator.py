@@ -211,6 +211,8 @@ class base_orchestrator(Thread):
     def _parse_kwargs(self, **kwargs):
         # Get the error message header from keyword arguments
         self.error_msg = kwargs.get('error_msg', 'msg_err')
+        self.name = kwargs.get('name', '')
+        self.type = kwargs.get('type', '')
 
         # Get the request header from keyword arguments
         self.req_header = kwargs.get('req_header', 'sdr_req')
@@ -266,7 +268,7 @@ class base_orchestrator(Thread):
 
 
     def run(self):
-        print('- Started Wireless Orchestrator')
+        print('- Started ' + self.name + ' Orchestrator')
         # Run while thread is active
         while not self.shutdown_flag.is_set():
 
@@ -290,7 +292,7 @@ class base_orchestrator(Thread):
 
                 # If it is a new service
                 if create_slice is not None:
-                    print('- Create Radio Service')
+                    print('- Create '+ self.type + ' Service')
                     # This service already exists
                     if create_slice['s_id'] in self.s_ids:
                         print('\t', 'Service ID already exists.')
@@ -319,7 +321,7 @@ class base_orchestrator(Thread):
                 delete_slice = request.get(self.delete_msg, None)
 
                 if delete_slice is not None:
-                    print('- Remove Radio Service')
+                    print('- Remove '+ self.type + ' Service')
                     # If this service doesn't exist
                     if delete_slice['s_id'] not in self.s_ids:
                         print('\t', 'Service ID doesn\' exist')
@@ -331,9 +333,6 @@ class base_orchestrator(Thread):
                         # Leave if clause
                         continue
 
-                    # Remove it from the list of service IDs
-                    del self.s_ids[delete_slice['s_id']]
-
                     print('\t', 'Service ID:', delete_slice['s_id'])
 
                     # Remove a slice
@@ -343,7 +342,8 @@ class base_orchestrator(Thread):
                     self._send_msg(self.delete_ack if success else \
                                    self.delete_nack, msg)
 
-                    # Remove the service from the list of service IDs
+                    # Remove it from the list of service IDs
+                    del self.s_ids[delete_slice['s_id']]
 
 
                 # Check for unknown messages
@@ -380,9 +380,10 @@ if __name__ == "__main__":
 
     # Handle keyboard interrupt (SIGINT)
     try:
-        # Start the Remote Unit Server
-        template_orchestrator_thread = template_orchestrator(
+        # Start the Template Orchestrator
+        template_orchestrator_thread = base_orchestrator(
             name='ORC',
+            type='Generic',
             req_header='orc_req',
             rep_header='orc_rep',
             error_msg='msg_err',

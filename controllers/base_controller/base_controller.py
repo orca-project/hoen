@@ -215,7 +215,7 @@ if __name__ == "__main__":
 
     # Handle keyboard interrupt (SIGINT)
     try:
-        # Instantiate the Template Controller thread
+        # Instantiate the Base Controller
         template_controller_thread = base_controller(
             name='CTL',
             req_header='ctl_req',
