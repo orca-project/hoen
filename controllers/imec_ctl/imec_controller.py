@@ -32,11 +32,6 @@ class imec_controller(base_controller):
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
 
-        # Check for missing S_ID
-        if s_id is None:
-            # Return NACK
-            return False, 'Missing Service ID.'
-
         # TODO do something here
 
         if True:
@@ -50,11 +45,6 @@ class imec_controller(base_controller):
     def delete_slice(self, **kwargs):
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
-
-        # Check for missing S_ID
-        if s_id is None:
-            # Return NACK
-            return False, 'Missing Service ID.'
 
         # TODO do something here
 

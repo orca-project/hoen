@@ -6,8 +6,8 @@ path.append('..')
 
 # Import the Template Controller
 from base_controller.base_controller import base_controller
-# Import OS
-import os
+# Import the System and Name methods from the OS module
+from os import system, name
 # Import signal
 import signal
 
@@ -15,7 +15,7 @@ from grc_manager import grc_manager
 from route_manager import route_manager
 
 def cls():
-    os.system('cls' if os.name == 'nt' else 'clear')
+    system('cls' if name == 'nt' else 'clear')
 
 
 class tcd_controller(base_controller):
@@ -47,11 +47,6 @@ class tcd_controller(base_controller):
         tech = kwargs.get('type', 'high-throughput')
         dirx = kwargs.get('dirx', 'trx')
         s_id = kwargs.get('s_id', None)
-
-        # Check for missing S_ID
-        if s_id is None:
-            # Return NACK
-            return False, 'Missing Service ID.'
 
         # Check for invalid direction
         if dirx not in ['rx', 'tx', 'trx']:
@@ -104,11 +99,6 @@ class tcd_controller(base_controller):
     def delete_slice(self, **kwargs):
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
-
-        # Check for missing S_ID
-        if s_id is None:
-            # Return NACK
-            return False, 'Missing Service ID.'
 
         #First Step: Remove the RAT
         try:
