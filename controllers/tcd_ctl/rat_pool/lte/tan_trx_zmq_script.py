@@ -27,7 +27,7 @@ def tan_trx_zmq(**kwargs):
     source_suffix = kwargs.get('source_port_suffix', 501)
     destination_ip = kwargs.get('destination_ip', '127.0.0.1')
     destination_suffix = kwargs.get('destination_port_suffix', 201)
-    rat_id = kwargs.get('rat_id', 1)
+    rat_id = kwargs.get('rat_id', 0)
     packet_len = kwargs.get('packet_len', 84)
 
     # Calculate the source and destination ports
@@ -37,6 +37,10 @@ def tan_trx_zmq(**kwargs):
     source_address = 'tcp://' + source_ip + ':' + str(source_port)
     destination_address = 'tcp://' + destination_ip + ':' + \
         str(destination_port)
+
+
+    print(source_address)
+    print(destination_address)
 
     ##################################################
     # Blocks
@@ -130,7 +134,7 @@ def get_args():
     parser.add_argument(
         '--rat_id',
         type=int,
-        default=1,
+        default=0,
         help='RAT ID')
 
     # Parse and return CLI arguments

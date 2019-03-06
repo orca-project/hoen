@@ -143,8 +143,8 @@ class grc_manager(object):
         # Container to hold RAT configuration
         config = {}
         # Extract parameters from keyword arguments
-        config["freq"] = kwargs.get('centre_freq', 2e9)
-        config["gain"] = kwargs.get('norm_gain', 1)
+        # config["freq"] = kwargs.get('centre_freq', 2e9) # UNUSED
+        # config["gain"] = kwargs.get('norm_gain', 1) # UNUSED
         config["tech"] = kwargs.get('technology', 'lte')
         config["dirx"] = kwargs.get('direction', ' trx')
         config["s_id"] = kwargs.get('service_id', None)
@@ -215,16 +215,22 @@ class grc_manager(object):
         # Container to hold USRP configuration
         config = {}
         # Extract parameters from keyword arguments
-        config["freq"] = kwargs.get('centre_freq', 2e9)
-        config["rate"] = kwargs.get('samp_rate', 1e6)
-        config["gain"] = kwargs.get('norm_gain', 1)
         config["dirx"] = kwargs.get('direction', 'trx')
-        config["usrp"] = kwargs.get('serial', "serial=30C6272")
 
         config["ip"] = kwargs.get('ip', '127.0.0.1')
         config["source_port"] = kwargs.get('source_port', 201)
         config["destination_port"] = kwargs.get('destination_port', 501)
-        config["port_offset"] = kwargs.get('port_offset', 1000)
+        config["port_offset"] = kwargs.get('port_offset', 0)
+        config["serial"] = kwargs.get('serial', "30C6272")
+
+        config["rate_tx"] = kwargs.get('samp_rate_tx', 1e6)
+        config["rate_rx"] = kwargs.get('samp_rate_rx', 1e6)
+        config["freq_tx"] = kwargs.get('centre_freq_tx', 2e9-1e6)
+        config["freq_rx"] = kwargs.get('centre_freq_rx', 2e9+1e6)
+        config["gain_tx"] = kwargs.get('gain_tx', 1)
+        config["gain_rx"] = kwargs.get('gain_rx', 1)
+
+
 
         # If there's no serial
         if not config["usrp"]:
@@ -241,14 +247,17 @@ class grc_manager(object):
         # Construct command arguments
         cmd = [
             self.sdr_path[config["dirx"]],
-            '--freq', str(config["freq"]),
-            '--rate', str(config["rate"]),
-            '--gain', str(config["gain"]),
             '--ip', config["ip"],
             '--source_port', str(config["source_port"]),
             '--destination_port', str(config["destination_port"]),
             '--port_offset', str(config["port_offset"]),
-            '--usrp', config["usrp"]
+            '--serial', config["serial"],
+            '--samp_rate_tx', str(config["rate_tx"]),
+            '--samp_rate_rx', str(config["rate_rx"]),
+            '--centre_freq_rx', str(config["freq_rx"]),
+            '--centre_freq_tx', str(config["freq_tx"]),
+            '--gain_tx', str(config["gain_tx"]),
+            '--gain_rx', str(config["gain_rx"])
         ]
 
         try:

@@ -28,16 +28,21 @@ def zmq_usrp_both(**kwargs):
     destination_port = kwargs.get('destination_port', 501)
     port_offset = kwargs.get('port_offset', 0)
 
-    usrp_address = kwargs.get('usrp', "serial=30C6272")
-    samp_rate = kwargs.get('samp_rate', 1e6)
-    gain = kwargs.get('gain', 1)
-    centre_freq = kwargs.get('centre_freq', 2e9)
+    usrp_serial = kwargs.get('serial', "30C6296")
+    samp_rate_tx = kwargs.get('samp_rate_tx', 1e6)
+    samp_rate_rx = kwargs.get('samp_rate_rx', 1e6)
+    gain_tx = kwargs.get('gain_tx', 1)
+    gain_rx = kwargs.get('gain_rx', 1)
+    centre_freq_tx = kwargs.get('centre_freq_tx', 2e9 - 1e6)
+    centre_freq_rx = kwargs.get('centre_freq_rx', 2e9 + 1e6)
 
     source_address = 'tcp://' + ip + ':' + str(source_port + port_offset)
     destination_address = 'tcp://' + ip + ':' + str(destination_port +
                                                     port_offset)
+
     print(source_address)
     print(destination_address)
+
     ##################################################
     # Blocks
     ##################################################
@@ -47,31 +52,31 @@ def zmq_usrp_both(**kwargs):
     zeromq_pull_source_0 = zeromq.pull_source(gr.sizeof_gr_complex, 1,
                                               source_address, 100, True, -1)
     uhd_usrp_source_0 = uhd.usrp_source(
-        ",".join((usrp_address, "")),
+        ",".join(("serial=" + usrp_serial, "")),
         uhd.stream_args(
             cpu_format="fc32",
             channels=range(1),
         ),
     )
 
-    uhd_usrp_source_0.set_samp_rate(samp_rate)
-    uhd_usrp_source_0.set_center_freq(centre_freq, 0)
-    uhd_usrp_source_0.set_normalized_gain(gain, 0)
+    uhd_usrp_source_0.set_samp_rate(samp_rate_rx)
+    uhd_usrp_source_0.set_center_freq(centre_freq_rx, 0)
+    uhd_usrp_source_0.set_normalized_gain(gain_rx, 0)
     uhd_usrp_source_0.set_antenna('RX2', 0)
-    uhd_usrp_source_0.set_bandwidth(samp_rate, 0)
+    uhd_usrp_source_0.set_bandwidth(samp_rate_rx, 0)
 
     uhd_usrp_sink_0 = uhd.usrp_sink(
-        ",".join((usrp_address, "")),
+        ",".join(("serial=" + usrp_serial, "")),
         uhd.stream_args(
             cpu_format="fc32",
             channels=range(1),
         ),
     )
-    uhd_usrp_sink_0.set_samp_rate(samp_rate)
-    uhd_usrp_sink_0.set_center_freq(centre_freq, 0)
-    uhd_usrp_sink_0.set_normalized_gain(gain, 0)
+    uhd_usrp_sink_0.set_samp_rate(samp_rate_tx)
+    uhd_usrp_sink_0.set_center_freq(centre_freq_tx, 0)
+    uhd_usrp_sink_0.set_normalized_gain(gain_tx, 0)
     uhd_usrp_sink_0.set_antenna('TX/RX', 0)
-    uhd_usrp_sink_0.set_bandwidth(samp_rate, 0)
+    uhd_usrp_sink_0.set_bandwidth(samp_rate_tx, 0)
 
     ##################################################
     # Connections
@@ -100,13 +105,26 @@ def get_args():
         help='add a port offset to the source and destination ports')
 
     parser.add_argument(
-        '--usrp', type=str, default="serial=30C6272", help='USRP Address')
+        '--serial', type=str, default='30C6296', help='USRP Serial')
+
     parser.add_argument(
-        '--rate', type=float, default=1e6, help='Sampling Rate')
+        '--samp_rate_tx', type=float, default=1e6, help='TX Sampling Rate')
     parser.add_argument(
-        '--freq', type=float, default=2e9, help='Centre Frequency')
+        '--samp_rate_rx', type=float, default=1e6, help='RX Sampling Rate')
     parser.add_argument(
-        '--gain', type=float, default=1.0, help='Normalised Gain')
+        '--centre_freq_tx',
+        type=float,
+        default=2e9-1e6,
+        help='TX Centre Frequency')
+    parser.add_argument(
+        '--centre_freq_rx',
+        type=float,
+        default=2e9+1e6,
+        help='RX Centre Frequency')
+    parser.add_argument(
+        '--gain_tx', type=float, default=1.0, help='TX Normalised Gain')
+    parser.add_argument(
+        '--gain_rx', type=float, default=1.0, help='RX Normalised Gain')
 
     # Parse and return CLI arguments
     return vars(parser.parse_args())
