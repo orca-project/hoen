@@ -3,7 +3,7 @@
 ##################################################
 # GNU Radio Python Flow Graph
 # Title: Tan Trx Zmq
-# Generated: Wed Feb 13 23:06:51 2019
+# Generated: Wed Mar  6 04:33:44 2019
 ##################################################
 
 
@@ -33,7 +33,6 @@ class tan_trx_zmq(gr.top_block):
         self.destination_port = destination_port = (rat_id * 1000) + destination_suffix
         self.destination_ip = destination_ip = '127.0.0.1'
         self.source_address = source_address = 'tcp://' + source_ip + ':' + str(source_port)
-        self.packet_len = packet_len = 84
         self.destination_address = destination_address = 'tcp://' + destination_ip + ':' + str(destination_port)
 
         ##################################################
@@ -62,17 +61,15 @@ class tan_trx_zmq(gr.top_block):
         self.blocks_tuntap_pdu_0 = blocks.tuntap_pdu('tap' + str(rat_id), 1000, True)
         self.blocks_tagged_stream_to_pdu_0 = blocks.tagged_stream_to_pdu(blocks.byte_t, 'packet_len')
         self.blocks_pdu_to_tagged_stream_0 = blocks.pdu_to_tagged_stream(blocks.byte_t, 'packet_len')
-        self.blocks_multiply_const_vxx_0 = blocks.multiply_const_vcc((0.06, ))
 
         ##################################################
         # Connections
         ##################################################
         self.msg_connect((self.blocks_tagged_stream_to_pdu_0, 'pdus'), (self.blocks_tuntap_pdu_0, 'pdus'))
         self.msg_connect((self.blocks_tuntap_pdu_0, 'pdus'), (self.blocks_pdu_to_tagged_stream_0, 'pdus'))
-        self.connect((self.blocks_multiply_const_vxx_0, 0), (self.zeromq_push_sink_0, 0))
         self.connect((self.blocks_pdu_to_tagged_stream_0, 0), (self.digital_ofdm_tx_0, 0))
         self.connect((self.digital_ofdm_rx_0, 0), (self.blocks_tagged_stream_to_pdu_0, 0))
-        self.connect((self.digital_ofdm_tx_0, 0), (self.blocks_multiply_const_vxx_0, 0))
+        self.connect((self.digital_ofdm_tx_0, 0), (self.zeromq_push_sink_0, 0))
         self.connect((self.zeromq_pull_source_0_0, 0), (self.digital_ofdm_rx_0, 0))
 
     def get_source_suffix(self):
@@ -130,12 +127,6 @@ class tan_trx_zmq(gr.top_block):
 
     def set_source_address(self, source_address):
         self.source_address = source_address
-
-    def get_packet_len(self):
-        return self.packet_len
-
-    def set_packet_len(self, packet_len):
-        self.packet_len = packet_len
 
     def get_destination_address(self):
         return self.destination_address
