@@ -40,8 +40,8 @@ def zmq_usrp_both(**kwargs):
     destination_address = 'tcp://' + ip + ':' + str(destination_port +
                                                     port_offset)
 
-    print(source_address)
-    print(destination_address)
+    print(source_address, centre_freq_tx)
+    print(destination_address, centre_freq_rx)
 
     ##################################################
     # Blocks
@@ -63,7 +63,7 @@ def zmq_usrp_both(**kwargs):
     uhd_usrp_source_0.set_center_freq(centre_freq_rx, 0)
     uhd_usrp_source_0.set_normalized_gain(gain_rx, 0)
     uhd_usrp_source_0.set_antenna('RX2', 0)
-    uhd_usrp_source_0.set_bandwidth(samp_rate_rx, 0)
+    #  uhd_usrp_source_0.set_bandwidth(samp_rate_rx, 0)
 
     uhd_usrp_sink_0 = uhd.usrp_sink(
         ",".join(("serial=" + usrp_serial, "")),
@@ -76,7 +76,7 @@ def zmq_usrp_both(**kwargs):
     uhd_usrp_sink_0.set_center_freq(centre_freq_tx, 0)
     uhd_usrp_sink_0.set_normalized_gain(gain_tx, 0)
     uhd_usrp_sink_0.set_antenna('TX/RX', 0)
-    uhd_usrp_sink_0.set_bandwidth(samp_rate_tx, 0)
+    #  uhd_usrp_sink_0.set_bandwidth(samp_rate_tx, 0)
 
     ##################################################
     # Connections

@@ -11,6 +11,8 @@ from os import system, name
 # Import signal
 import signal
 
+import argparse
+
 from grc_manager import grc_manager
 from route_manager import route_manager
 
@@ -43,7 +45,8 @@ class tcd_controller(base_controller):
             samp_rate_tx=self.samp_rate_tx,
             samp_rate_rx=self.samp_rate_rx,
             gain_tx=self.gain_tx,
-            gain_rx=self.gain_rx)
+            gain_rx=self.gain_rx,
+            port_offset=1000)
 
 
     def pre_exit(self):
@@ -149,17 +152,17 @@ def get_args():
 
     # Add CLI arguments
     parser.add_argument(
-        '--centre_freq_tx', type=int, default=2e9-1e6, help='tx centre frequency')
+        '--centre_freq_tx', type=float, default=2e9-1e6, help='tx centre frequency')
     parser.add_argument(
-        '--centre_freq_rx', type=int, default=2e9+1e6, help='rx centre frequency')
+        '--centre_freq_rx', type=float, default=2e9+1e6, help='rx centre frequency')
     parser.add_argument(
-        '--samp_rate_tx', type=int, default=1e6, help='tx samp rate')
+        '--samp_rate_tx', type=float, default=1e6, help='tx samp rate')
     parser.add_argument(
-        '--samp_rate_rx', type=int, default=1e6, help='rx samp rate')
+        '--samp_rate_rx', type=float, default=1e6, help='rx samp rate')
     parser.add_argument(
-        '--gain_tx', type=int, default=1, help='tx gain')
+        '--gain_tx', type=float, default=1, help='tx gain')
     parser.add_argument(
-        '--gain_rx', type=int, default=1, help='rx gain')
+        '--gain_rx', type=float, default=1, help='rx gain')
     parser.add_argument(
         '--host', type=str, default='127.0.0.1', help='Controller Server IP')
     parser.add_argument(

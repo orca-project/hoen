@@ -19,6 +19,7 @@ class managed_process(object):
             print('\t- Wrong argument type, not a list')
             raise Exception
 
+        #  print(" ".join(cmd))
         # Create the subprocess and add session ID to the parent
         process = Popen(
             cmd, stdout=PIPE, stderr=PIPE, preexec_fn=setsid)
@@ -221,7 +222,7 @@ class grc_manager(object):
         config["source_port"] = kwargs.get('source_port', 201)
         config["destination_port"] = kwargs.get('destination_port', 501)
         config["port_offset"] = kwargs.get('port_offset', 0)
-        config["serial"] = kwargs.get('serial', "30C6272")
+        config["serial"] = kwargs.get('serial', "")
 
         config["rate_tx"] = kwargs.get('samp_rate_tx', 1e6)
         config["rate_rx"] = kwargs.get('samp_rate_rx', 1e6)
@@ -233,7 +234,7 @@ class grc_manager(object):
 
 
         # If there's no serial
-        if not config["usrp"]:
+        if not config["serial"]:
             # Get the serial of an existing USRP
             print('- Findind USRP')
             found = self._uhd_find_devices()
@@ -242,7 +243,7 @@ class grc_manager(object):
                 raise Exception('USRP not found.')
 
             else:
-                config["usrp"] = found[0]['serial']
+                config["serial"] = found[0]['serial']
 
         # Construct command arguments
         cmd = [
@@ -269,7 +270,7 @@ class grc_manager(object):
             raise Exception('Failed interfacing with the USRP.')
 
         # If succeeded, append to SDR GRC pool
-        self.sdr_pool[config["usrp"]] = {
+        self.sdr_pool[config["serial"]] = {
             'direction': config["dirx"],
             'process': process}
 

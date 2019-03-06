@@ -28,7 +28,7 @@ def tan_trx_zmq(**kwargs):
     destination_ip = kwargs.get('destination_ip', '127.0.0.1')
     destination_suffix = kwargs.get('destination_port_suffix', 201)
     rat_id = kwargs.get('rat_id', 0)
-    packet_len = kwargs.get('packet_len', 84)
+    #  packet_len = kwargs.get('packet_len', 84)
 
     # Calculate the source and destination ports
     source_port = (rat_id * 1000) + source_suffix
@@ -69,7 +69,7 @@ def tan_trx_zmq(**kwargs):
         debug_log=False,
         scramble_bits=False)
 
-    blocks_tuntap_pdu_0 = blocks.tuntap_pdu('tap' + str(rat_id), 1000, True)
+    blocks_tuntap_pdu_0 = blocks.tuntap_pdu('tap' + str(rat_id), 1000, False)
 
     blocks_tagged_stream_to_pdu_0 = blocks.tagged_stream_to_pdu(
         blocks.byte_t, 'packet_len')
