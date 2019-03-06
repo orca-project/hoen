@@ -3,7 +3,7 @@
 ##################################################
 # GNU Radio Python Flow Graph
 # Title: Zmq Usrp Both
-# Generated: Tue Feb 12 16:34:26 2019
+# Generated: Wed Mar  6 04:32:35 2019
 ##################################################
 
 
@@ -33,7 +33,8 @@ class zmq_usrp_both(gr.top_block):
         self.samp_rate = samp_rate = 1e6
         self.gain = gain = 1
         self.destination_address = destination_address = 'tcp://' + ip + ':' + str(destination_port)
-        self.centre_freq = centre_freq = 2e9
+        self.centre_freq_tx = centre_freq_tx = 2e9-1e6
+        self.centre_freq_rx = centre_freq_rx = 2e9+1e6
 
         ##################################################
         # Blocks
@@ -48,10 +49,9 @@ class zmq_usrp_both(gr.top_block):
         	),
         )
         self.uhd_usrp_source_0.set_samp_rate(samp_rate)
-        self.uhd_usrp_source_0.set_center_freq(centre_freq, 0)
+        self.uhd_usrp_source_0.set_center_freq(centre_freq_rx, 0)
         self.uhd_usrp_source_0.set_normalized_gain(gain, 0)
         self.uhd_usrp_source_0.set_antenna('RX2', 0)
-        self.uhd_usrp_source_0.set_bandwidth(samp_rate, 0)
         self.uhd_usrp_sink_0 = uhd.usrp_sink(
         	",".join((usrp_address, "")),
         	uhd.stream_args(
@@ -60,10 +60,9 @@ class zmq_usrp_both(gr.top_block):
         	),
         )
         self.uhd_usrp_sink_0.set_samp_rate(samp_rate)
-        self.uhd_usrp_sink_0.set_center_freq(centre_freq, 0)
+        self.uhd_usrp_sink_0.set_center_freq(centre_freq_tx, 0)
         self.uhd_usrp_sink_0.set_normalized_gain(gain, 0)
         self.uhd_usrp_sink_0.set_antenna('TX/RX', 0)
-        self.uhd_usrp_sink_0.set_bandwidth(samp_rate, 0)
 
         ##################################################
         # Connections
@@ -111,9 +110,7 @@ class zmq_usrp_both(gr.top_block):
     def set_samp_rate(self, samp_rate):
         self.samp_rate = samp_rate
         self.uhd_usrp_source_0.set_samp_rate(self.samp_rate)
-        self.uhd_usrp_source_0.set_bandwidth(self.samp_rate, 0)
         self.uhd_usrp_sink_0.set_samp_rate(self.samp_rate)
-        self.uhd_usrp_sink_0.set_bandwidth(self.samp_rate, 0)
 
     def get_gain(self):
         return self.gain
@@ -131,13 +128,19 @@ class zmq_usrp_both(gr.top_block):
     def set_destination_address(self, destination_address):
         self.destination_address = destination_address
 
-    def get_centre_freq(self):
-        return self.centre_freq
+    def get_centre_freq_tx(self):
+        return self.centre_freq_tx
 
-    def set_centre_freq(self, centre_freq):
-        self.centre_freq = centre_freq
-        self.uhd_usrp_source_0.set_center_freq(self.centre_freq, 0)
-        self.uhd_usrp_sink_0.set_center_freq(self.centre_freq, 0)
+    def set_centre_freq_tx(self, centre_freq_tx):
+        self.centre_freq_tx = centre_freq_tx
+        self.uhd_usrp_sink_0.set_center_freq(self.centre_freq_tx, 0)
+
+    def get_centre_freq_rx(self):
+        return self.centre_freq_rx
+
+    def set_centre_freq_rx(self, centre_freq_rx):
+        self.centre_freq_rx = centre_freq_rx
+        self.uhd_usrp_source_0.set_center_freq(self.centre_freq_rx, 0)
 
 
 def main(top_block_cls=zmq_usrp_both, options=None):

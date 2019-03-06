@@ -101,11 +101,38 @@
     </param>
     <param>
       <key>id</key>
-      <value>centre_freq</value>
+      <value>centre_freq_rx</value>
     </param>
     <param>
       <key>value</key>
-      <value>2e9</value>
+      <value>2e9+1e6</value>
+    </param>
+  </block>
+  <block>
+    <key>variable</key>
+    <param>
+      <key>comment</key>
+      <value></value>
+    </param>
+    <param>
+      <key>_enabled</key>
+      <value>True</value>
+    </param>
+    <param>
+      <key>_coordinate</key>
+      <value>(464, 508)</value>
+    </param>
+    <param>
+      <key>_rotation</key>
+      <value>0</value>
+    </param>
+    <param>
+      <key>id</key>
+      <value>centre_freq_tx</value>
+    </param>
+    <param>
+      <key>value</key>
+      <value>2e9-1e6</value>
     </param>
   </block>
   <block>
@@ -228,7 +255,7 @@
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(120, 508)</value>
+      <value>(136, 508)</value>
     </param>
     <param>
       <key>_rotation</key>
@@ -336,11 +363,11 @@
     </param>
     <param>
       <key>bw0</key>
-      <value>samp_rate</value>
+      <value>0</value>
     </param>
     <param>
       <key>center_freq0</key>
-      <value>centre_freq</value>
+      <value>centre_freq_tx</value>
     </param>
     <param>
       <key>norm_gain0</key>
@@ -1159,11 +1186,11 @@
     </param>
     <param>
       <key>bw0</key>
-      <value>samp_rate</value>
+      <value>0</value>
     </param>
     <param>
       <key>center_freq0</key>
-      <value>centre_freq</value>
+      <value>centre_freq_rx</value>
     </param>
     <param>
       <key>dc_offs_enb0</key>
