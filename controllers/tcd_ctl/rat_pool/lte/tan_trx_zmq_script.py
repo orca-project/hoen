@@ -28,6 +28,7 @@ def tan_trx_zmq(**kwargs):
     destination_ip = kwargs.get('destination_ip', '127.0.0.1')
     destination_suffix = kwargs.get('destination_port_suffix', 201)
     rat_id = kwargs.get('rat_id', 0)
+    digital_gain = kwargs.get('digital_gain', 1)
     #  packet_len = kwargs.get('packet_len', 84)
 
     # Calculate the source and destination ports
@@ -38,17 +39,16 @@ def tan_trx_zmq(**kwargs):
     destination_address = 'tcp://' + destination_ip + ':' + \
         str(destination_port)
 
-
     print(source_address)
     print(destination_address)
 
     ##################################################
     # Blocks
     ##################################################
-    zeromq_push_sink_0 = zeromq.push_sink(
-        gr.sizeof_gr_complex, 1, destination_address, 100, True, -1)
-    zeromq_pull_source_0 = zeromq.pull_source(
-        gr.sizeof_gr_complex, 1, source_address, 100, True, -1)
+    zeromq_push_sink_0 = zeromq.push_sink(gr.sizeof_gr_complex, 1,
+                                          destination_address, 100, True, -1)
+    zeromq_pull_source_0 = zeromq.pull_source(gr.sizeof_gr_complex, 1,
+                                              source_address, 100, True, -1)
 
     digital_ofdm_tx_0 = digital.ofdm_tx(
         fft_len=64,
@@ -77,7 +77,7 @@ def tan_trx_zmq(**kwargs):
     blocks_pdu_to_tagged_stream_0 = blocks.pdu_to_tagged_stream(
         blocks.byte_t, 'packet_len')
 
-    blocks_multiply_const_vxx_0 = blocks.multiply_const_vcc((0.06, ))
+    blocks_multiply_const_vxx_0 = blocks.multiply_const_vcc((digital_gain, ))
 
     ##################################################
     # Connections
@@ -86,17 +86,18 @@ def tan_trx_zmq(**kwargs):
                    (blocks_tuntap_pdu_0, 'pdus'))
 
     tb.msg_connect((blocks_tuntap_pdu_0, 'pdus'),
-                 (blocks_pdu_to_tagged_stream_0, 'pdus'))
+                   (blocks_pdu_to_tagged_stream_0, 'pdus'))
+
+    tb.connect((digital_ofdm_tx_0, 0), (blocks_multiply_const_vxx_0, 0))
 
     tb.connect((blocks_multiply_const_vxx_0, 0), (zeromq_push_sink_0, 0))
 
     tb.connect((blocks_pdu_to_tagged_stream_0, 0), (digital_ofdm_tx_0, 0))
 
+    tb.connect((zeromq_pull_source_0, 0), (digital_ofdm_rx_0, 0))
+
     tb.connect((digital_ofdm_rx_0, 0), (blocks_tagged_stream_to_pdu_0, 0))
 
-    tb.connect((digital_ofdm_tx_0, 0), (blocks_multiply_const_vxx_0, 0))
-
-    tb.connect((zeromq_pull_source_0, 0), (digital_ofdm_rx_0, 0))
 
     # Start the boombox
     tb.run()
@@ -107,10 +108,7 @@ def get_args():
     parser = argparse.ArgumentParser(description='RAT Transceiver')
     # Add CLI arguments
     parser.add_argument(
-        '--source_ip',
-        type=str,
-        default='127.0.0.1',
-        help='source IP')
+        '--source_ip', type=str, default='127.0.0.1', help='source IP')
     parser.add_argument(
         '--source_port_suffix',
         type=int,
@@ -126,16 +124,9 @@ def get_args():
         type=int,
         default=201,
         help='destination port suffix')
+    parser.add_argument('--rat_id', type=int, default=0, help='RAT ID')
     parser.add_argument(
-        '--packet_len',
-        type=int,
-        default=84,
-        help='packet length')
-    parser.add_argument(
-        '--rat_id',
-        type=int,
-        default=0,
-        help='RAT ID')
+        '--digital_gain', type=float, default=1, help='Digital Gain')
 
     # Parse and return CLI arguments
     return vars(parser.parse_args())
