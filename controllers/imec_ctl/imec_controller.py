@@ -70,7 +70,7 @@ if __name__ == "__main__":
             update_msg='wlc_urs',
             delete_msg='wlc_drs',
             host='127.0.0.1',
-            port=3200)
+            port=3100)
 
         # Start the IMEC SDR Controller Server
         imec_controller_thread.start()

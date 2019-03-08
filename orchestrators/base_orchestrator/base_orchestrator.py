@@ -39,19 +39,19 @@ class ctl_base(object):
         # Get the error message header from keyword arguments
         self.error_msg = kwargs.get("error_msg", "msg_err")
 
-        self.create_msg = kwargs.get("create_msg", "wlc_crs")
+        self.create_msg = kwargs.get("create_msg", "ctl_cs")
         self.create_ack = "_".join([self.create_msg.split('_')[-1], "ack"])
         self.create_nack = "_".join([self.create_msg.split('_')[-1], "nack"])
 
-        self.request_msg = kwargs.get("request_msg", "wlc_rrs" )
+        self.request_msg = kwargs.get("request_msg", "ctl_rs" )
         self.request_ack = "_".join([self.request_msg.split('_')[-1], "ack"])
         self.request_nack = "_".join([self.request_msg.split('_')[-1], "nack"])
 
-        self.update_msg = kwargs.get("update_msg", "wlc_urs")
+        self.update_msg = kwargs.get("update_msg", "ctl_us")
         self.update_ack = "_".join([self.update_msg.split('_')[-1], "ack"])
         self.update_nack = "_".join([self.update_msg.split('_')[-1], "nack"])
 
-        self.delete_msg = kwargs.get("delete_msg", "wlc_drs" )
+        self.delete_msg = kwargs.get("delete_msg", "ctl_ds" )
         self.delete_ack = "_".join([self.delete_msg.split('_')[-1], "ack"])
         self.delete_nack = "_".join([self.delete_msg.split('_')[-1], "nack"])
 
