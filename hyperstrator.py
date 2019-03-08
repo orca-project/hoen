@@ -387,7 +387,7 @@ class hyperstrator_server(Thread):
 
                     # Otherwise, send message to the SDN orchestrator
                     core_success, core_msg = self.sdn_orch.delete_slice(
-                        **{'s_id': delete_slice['s_id']})
+                        **{'s_id': delete_service['s_id']})
 
                     # If the core allocation failed
                     if not core_success:
