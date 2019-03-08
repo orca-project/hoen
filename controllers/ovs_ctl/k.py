@@ -100,63 +100,61 @@ class SimpleSwitch13(app_manager.RyuApp):
         # 128, OVS will send Packet-In with invalid buffer_id and
         # truncated packet data. In that case, we cannot output packets
         # correctly.  The bug has been fixed in OVS v2.1.0.
-        match = parser.OFPMatch()
-        actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
-                                          ofproto.OFPCML_NO_BUFFER)]
-        self.add_flow(datapath, 0, match, actions)
 
         self._base_start(datapath)
         
     def _base_start(self, datapath):
         dpid = datapath.id
+        ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
-
+    
         if self.dpid_to_name[dpid] == 'h00':
-            # Start outputting all packets to port 1
-            match_0 = parser.OFPMatch(in_port=(2, 3))
-            actions_0 = [parser.OFPActionOutput(1)]
-    
-            # Add the flow to the switch
-            self.add_flow(datapath, 1, match_0, actions_0)
 
-            if False: #True:
-                match_0 = parser.OFPMatch(in_port=(1))
-                actions_0 = [parser.OFPActionOutput(3)]
-    
-                # Add the flow to the switch
-                self.add_flow(datapath, 1, match_0, actions_0)
+            # Start outputting all packets to port 1
+            match = parser.OFPMatch(
+                    eth_type=0x0800,
+                    in_port=(2),
+                    #  ipv4_dst=('10.0.0.0', '255.255.0.0'),
+                    ipv4_src=('10.0.0.10', '255.255.255.255'))
+
+            actions = []
+
+            # Add the flow to the switch
+            self.add_flow(datapath, 0, match, actions)
 
         elif self.dpid_to_name[dpid] == 'h01':
-            # in to out 
-            match_1 = parser.OFPMatch(in_port=(2))
-            actions_1 = [parser.OFPActionOutput(1)]
+            # Start outputting all packets to port 1
+            match = parser.OFPMatch(
+                    eth_type=0x0800,
+                    in_port=(1),
+                    #  ipv4_dst=('10.0.0.0', '255.255.0.0'),
+                    ipv4_src=('10.0.0.10', '255.255.255.255'))
 
-            # add the flow to the switch
-            self.add_flow(datapath, 1, match_1, actions_1)
+            actions = []
 
-            # out to in
-            match_1 = parser.OFPMatch(in_port=(1))
-            actions_1 = [parser.OFPActionOutput(2)]
-
-            # add the flow to the switch
-            self.add_flow(datapath, 1, match_1, actions_1)
+            # Add the flow to the switch
+            self.add_flow(datapath, 0, match, actions)
 
 
         elif self.dpid_to_name[dpid] == 'h02':
-            # in to out 
-            actions_2 = [parser.OFPActionOutput(1)]
-            match_2 = parser.OFPMatch(in_port=(3))
+            # Start outputting all packets to port 1
+            match = parser.OFPMatch(
+                    eth_type=0x0800,
+                    in_port=(1),
+                    #  ipv4_dst=('10.0.0.0', '255.255.0.0'),
+                    ipv4_src=('10.0.0.10', '255.255.255.255'))
 
-            # add the flow to the switch
-            self.add_flow(datapath, 1, match_2, actions_2)
+            actions = []
 
-            # out to in
-            actions_2 = [parser.OFPActionOutput(3)]
-            match_2 = parser.OFPMatch(in_port=(1))
+            # Add the flow to the switch
+            self.add_flow(datapath, 0, match, actions)
 
-            # add the flow to the switch
-            self.add_flow(datapath, 1, match_2, actions_2)
+
+        match = parser.OFPMatch()
+        actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
+                                          ofproto.OFPCML_NO_BUFFER)]
+        self.add_flow(datapath, 0, match, actions)
 
         print('Configured Switch ', self.dpid_to_name[dpid])
 
@@ -165,7 +163,7 @@ class SimpleSwitch13(app_manager.RyuApp):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
-        print(match, actions)
+        #  print(match, actions)
         inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,
                                              actions)]
         if buffer_id:
@@ -201,11 +199,12 @@ class SimpleSwitch13(app_manager.RyuApp):
         dpid = datapath.id
         self.mac_to_port.setdefault(dpid, {})
 
-        #  self.logger.info("packet in %s %s %s %s", dpid, src, dst, in_port)
+        self.logger.info("packet in %s %s %s %s", dpid, src, dst, in_port)
+        return
 
         # learn a mac address to avoid FLOOD next time.
         self.mac_to_port[dpid][src] = in_port
-
+        print(self.mac_to_port)
         if dst in self.mac_to_port[dpid]:
             out_port = self.mac_to_port[dpid][dst]
         else:
