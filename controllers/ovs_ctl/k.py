@@ -44,44 +44,82 @@ class ovs_controller(base_controller):
         tech = kwargs.get('type', 'high-throughput')
         s_id = kwargs.get('s_id', None)
 
-        h00 = self.ovs.switches['h00']
-        h01 = self.ovs.switches['h01']
-        
-        for switch in [h00, h01]:
+        # Get the route depending on the traffic class
+        if tech == 'high-throughput':
+            # Route 01: High Throughput
+            route = {
+                'subnet': '1',
+                'switches': {
+                    'inbound': {
+                        'switch': self.ovs.switches['h00'],                    
+                        'in_port': 1,
+                        'out_port': 2
+                        },
+                    'outbound': {
+                        'switch': self.ovs.switches['h01'],                    
+                        'in_port': 1,
+                        'out_port': 2
+                        }
+                    }
+                }
+
+        if tech == 'low-latency':
+            # Route 02: Low Latency 
+            route = {
+                'subnet': '2',
+                'switches': [
+                    {'type': 'inbound',
+                     'datapath': self.ovs.switches['h00'],                    
+                     'in_port': 1,
+                     'out_port': 2
+                     },
+                    {'type': 'inbound',
+                     'datapath': self.ovs.switches['h01'],                    
+                     'in_port': 1,
+                     'out_port': 2
+                     }
+                    ]
+                }
+
+        # Iterate over the list of switches
+        for switch in route['switches']:
+            # Get the datapath
+            datapath = switch['datapath']
+
             # Extract the datapath parameters
-            dpid = switch.id
-            ofproto = switch.ofproto
-            parser = switch.ofproto_parser
+            dpid = datapath.id
+            ofproto = datapath.ofproto
+            parser = datapath.ofproto_parser
 
             # Start outputting all packets to port 1
             match = parser.OFPMatch(
                     eth_type=0x0800,
-                    in_port=(1),
+                    in_port=(switch['in_port']),
                     #  ipv4_dst=('10.0.0.0', '255.255.0.0'),
                     ipv4_src=('10.0.0.10', '255.255.255.0'))
 
-            for x in switch.ports:
-                print(x, switch.ports[x])
+            for x in datapath.ports:
+                print(x, datapath.ports[x])
 
-            actions = [parser.OFPActionOutput(2)]
+            actions = [parser.OFPActionOutput(switch['out_port'])]
 
             # Add the flow to the switch
-            self.ovs.add_flow(switch, 10, match, actions)
+            self.ovs.add_flow(datapath, 10, match, actions)
 
             # Start outputting all packets to port 1
             match = parser.OFPMatch(
                     eth_type=0x0800,
-                    in_port=(2),
+                    in_port=(switch['out_port']),
                     #  ipv4_dst=('10.0.0.0', '255.255.0.0'),
                     ipv4_src=('10.0.0.10', '255.255.255.0'))
 
-            for x in switch.ports:
-                print(x, switch.ports[x])
+            for x in datapath.ports:
+                print(x, datapath.ports[x])
 
-            actions = [parser.OFPActionOutput(1)]
+            actions = [parser.OFPActionOutput(switch['in_port'])]
 
             # Add the flow to the switch
-            self.ovs.add_flow(switch, 10, match, actions)
+            self.ovs.add_flow(datapath, 10, match, actions)
 
 
         # Return host and port -- TODO may drop port entirely
@@ -158,7 +196,7 @@ class ovs_ctl(app_manager.RyuApp):
         # Add the new switch to the container 
         self.switches[self.dpid_to_name[datapath.id]] = datapath
 
-        # Send proactive rules to the swtiches
+        # Send proactive rules to the switches
         self._base_start(datapath)
         
     def _base_start(self, datapath):
@@ -274,11 +312,11 @@ class ovs_ctl(app_manager.RyuApp):
         if not pkt_arp:
             return
 
-        self.logger.info("packet in %s %s %s %s",
-                self.dpid_to_name[dpid], 
-                pkt_ethernet.src, 
-                pkt_ethernet.dst,
-                in_port)
+        #  self.logger.info("packet in %s %s %s %s",
+                #  self.dpid_to_name[dpid],
+                #  pkt_ethernet.src,
+                #  pkt_ethernet.dst,
+                #  in_port)
 
         self.mac_to_port.setdefault(dpid, {})
 
