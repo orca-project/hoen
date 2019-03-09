@@ -20,6 +20,8 @@ from ryu.controller.handler import set_ev_cls
 from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
+from ryu.lib.packet import arp 
+from ryu.lib.packet import icmp
 from ryu.lib.packet import ether_types
 
 
@@ -93,6 +95,24 @@ class ovs_controller(base_controller):
         # Third step: Remove virtual RF front-end
         # TODO do something here
 
+        h00 = self.ovs.switches['h00']
+        h01 = self.ovs.switches['h01']
+        
+        for switch in [h00, h01]:
+            # Extract the datapath parameters
+            dpid = switch.id
+            ofproto = switch.ofproto
+            parser = switch.ofproto_parser
+
+            # Start outputting all packets to port 1
+            match = parser.OFPMatch(
+                    eth_type=0x0800,
+                    #  ipv4_dst=('10.0.0.0', '255.255.0.0'),
+                    ipv4_src=('10.0.0.10', '255.255.255.0'))
+
+
+            # Add the flow to the switch
+            self.ovs.del_flow(switch, match)
 
         # Return host and port -- TODO may drop port entirely
         return True, {'s_id': kwargs['s_id']}
@@ -187,9 +207,18 @@ class ovs_ctl(app_manager.RyuApp):
             # Add the flow to the switch
             self.add_flow(datapath, 0, match, actions)
 
+        # Match all
+        match = parser.OFPMatch({})
+        
+        # Delete all the existing flows
+        self.del_flow(datapath, match)
+
         match = parser.OFPMatch()
+        # Send and ask what to do to the controller
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
                                           ofproto.OFPCML_NO_BUFFER)]
+
+        # Add the controller flow to the switch
         self.add_flow(datapath, 0, match, actions)
 
         # Output info message
@@ -199,7 +228,6 @@ class ovs_ctl(app_manager.RyuApp):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
-        #  print(match, actions)
         inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,
                                              actions)]
         if buffer_id:
@@ -211,42 +239,59 @@ class ovs_ctl(app_manager.RyuApp):
                                     match=match, instructions=inst)
         datapath.send_msg(mod)
 
+    def del_flow(self, datapath, match):
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+
+        mod = parser.OFPFlowMod(
+                datapath=datapath,
+                match=match,
+                out_port=ofproto.OFPP_ANY,
+                out_group=ofproto.OFPG_ANY,
+                command=ofproto.OFPFC_DELETE
+            )
+
+        datapath.send_msg(mod)
+
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
-        # If you hit this you might want to increase
-        # the "miss_send_length" of your switch
-        if ev.msg.msg_len < ev.msg.total_len:
-            self.logger.debug("packet truncated: only %s of %s bytes",
-                              ev.msg.msg_len, ev.msg.total_len)
         msg = ev.msg
-        datapath = msg.datapath
-        ofproto = datapath.ofproto
+        datapath = msg.datapath 
         in_port = msg.match['in_port']
 
-        pkt = packet.Packet(msg.data)
-        eth = pkt.get_protocols(ethernet.ethernet)[0]
-
-        if eth.ethertype == ether_types.ETH_TYPE_LLDP:
-            # ignore lldp packet
-            return
-        dst = eth.dst
-        src = eth.src
-
         dpid = datapath.id
+        ofproto = datapath.ofproto
+
+        pkt = packet.Packet(data=msg.data)
+
+        pkt_ethernet = pkt.get_protocol(ethernet.ethernet)
+        if not pkt_ethernet:
+            return
+
+        pkt_arp = pkt.get_protocol(arp.arp)
+        pkt_icmp = pkt.get_protocol(icmp.icmp)
+
+        if not pkt_arp:
+            return
+
+        self.logger.info("packet in %s %s %s %s",
+                self.dpid_to_name[dpid], 
+                pkt_ethernet.src, 
+                pkt_ethernet.dst,
+                in_port)
+
         self.mac_to_port.setdefault(dpid, {})
 
-        self.logger.info("packet in %s %s %s %s", dpid, src, dst, in_port)
-        return
-
         # learn a mac address to avoid FLOOD next time.
-        self.mac_to_port[dpid][src] = in_port
-        print(self.mac_to_port)
-        if dst in self.mac_to_port[dpid]:
-            out_port = self.mac_to_port[dpid][dst]
+        self.mac_to_port[dpid][pkt_ethernet.src] = in_port
+
+        if pkt_ethernet.dst in self.mac_to_port[dpid]:
+            out_port = self.mac_to_port[dpid][pkt_ethernet.dst]
         else:
             out_port = ofproto.OFPP_FLOOD
 
-        self.provision_paths(msg, in_port, src, out_port, dst)
+        self.provision_paths(
+                msg, in_port, pkt_ethernet.src, out_port, pkt_ethernet.dst)
 
     def provision_paths(self, msg, in_port, src, out_port, dst):
         parser = msg.datapath.ofproto_parser
@@ -257,7 +302,12 @@ class ovs_ctl(app_manager.RyuApp):
 
         # install a flow to avoid packet_in next time
         if out_port != ofproto.OFPP_FLOOD:
-            match = parser.OFPMatch(in_port=in_port, eth_dst=dst, eth_src=src)
+            match = parser.OFPMatch(
+                    eth_type=0x0806, # 0x0806 = ARP packet
+                    in_port=in_port,
+                    eth_dst=dst,
+                    eth_src=src)
+
             # verify if we have a valid buffer_id, if yes avoid to send both
             # flow_mod & packet_out
             if msg.buffer_id != ofproto.OFP_NO_BUFFER:
