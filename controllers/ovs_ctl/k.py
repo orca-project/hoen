@@ -29,6 +29,8 @@ class ovs_controller(base_controller):
         # TODO Override this method at will
         print('- Starting OVS Controller')
 
+        self.ovs = kwargs.get('ovs')
+
     def pre_exit(self):
      # Terminate the OVS SDR Controller Server
         self.shutdown_flag.set()
@@ -39,6 +41,46 @@ class ovs_controller(base_controller):
         # Extract parameters from keyword arguments
         tech = kwargs.get('type', 'high-throughput')
         s_id = kwargs.get('s_id', None)
+
+        h00 = self.ovs.switches['h00']
+        h01 = self.ovs.switches['h01']
+        
+        for switch in [h00, h01]:
+            # Extract the datapath parameters
+            dpid = switch.id
+            ofproto = switch.ofproto
+            parser = switch.ofproto_parser
+
+            # Start outputting all packets to port 1
+            match = parser.OFPMatch(
+                    eth_type=0x0800,
+                    in_port=(1),
+                    #  ipv4_dst=('10.0.0.0', '255.255.0.0'),
+                    ipv4_src=('10.0.0.10', '255.255.255.0'))
+
+            for x in switch.ports:
+                print(x, switch.ports[x])
+
+            actions = [parser.OFPActionOutput(2)]
+
+            # Add the flow to the switch
+            self.ovs.add_flow(switch, 10, match, actions)
+
+            # Start outputting all packets to port 1
+            match = parser.OFPMatch(
+                    eth_type=0x0800,
+                    in_port=(2),
+                    #  ipv4_dst=('10.0.0.0', '255.255.0.0'),
+                    ipv4_src=('10.0.0.10', '255.255.255.0'))
+
+            for x in switch.ports:
+                print(x, switch.ports[x])
+
+            actions = [parser.OFPActionOutput(1)]
+
+            # Add the flow to the switch
+            self.ovs.add_flow(switch, 10, match, actions)
+
 
         # Return host and port -- TODO may drop port entirely
         return True, {'host': 'sdijsd'}
@@ -56,12 +98,13 @@ class ovs_controller(base_controller):
         return True, {'s_id': kwargs['s_id']}
 
 
-class SimpleSwitch13(app_manager.RyuApp):
+class ovs_ctl(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
 
     def __init__(self, *args, **kwargs):
-        super(SimpleSwitch13, self).__init__(*args, **kwargs)
+        super(ovs_ctl, self).__init__(*args, **kwargs)
         self.mac_to_port = {}
+        self.switches = {}
 
         self.dpid_to_name = {
             95536754289: 'h00',
@@ -79,37 +122,32 @@ class SimpleSwitch13(app_manager.RyuApp):
             update_msg='wdc_urs',
             delete_msg='wdc_drs',
             host=kwargs.get('host', '127.0.0.1'),
-            port=kwargs.get('port', 3300)
+            port=kwargs.get('port', 3300),
+            ovs=self
         )
 
         # Start the OVS SDR Controller Server
         self.ovs_controller_hub = hub.spawn(self.ovs_controller_thread.run)
 
-        print('done')
+        print('\t', 'Started Controller')
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
+        # Get the new switch
         datapath = ev.msg.datapath
-        ofproto = datapath.ofproto
-        parser = datapath.ofproto_parser
+        # Add the new switch to the container 
+        self.switches[self.dpid_to_name[datapath.id]] = datapath
 
-        # install table-miss flow entry
-        #
-        # We specify NO BUFFER to max_len of the output action due to
-        # OVS bug. At this moment, if we specify a lesser number, e.g.,
-        # 128, OVS will send Packet-In with invalid buffer_id and
-        # truncated packet data. In that case, we cannot output packets
-        # correctly.  The bug has been fixed in OVS v2.1.0.
-
+        # Send proactive rules to the swtiches
         self._base_start(datapath)
         
     def _base_start(self, datapath):
+        # Extract the datapath parameters
         dpid = datapath.id
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
-    
-        if self.dpid_to_name[dpid] == 'h00':
+        if False and self.dpid_to_name[dpid] == 'h00':
 
             # Start outputting all packets to port 1
             match = parser.OFPMatch(
@@ -123,7 +161,7 @@ class SimpleSwitch13(app_manager.RyuApp):
             # Add the flow to the switch
             self.add_flow(datapath, 0, match, actions)
 
-        elif self.dpid_to_name[dpid] == 'h01':
+        elif False and self.dpid_to_name[dpid] == 'h01':
             # Start outputting all packets to port 1
             match = parser.OFPMatch(
                     eth_type=0x0800,
@@ -136,8 +174,7 @@ class SimpleSwitch13(app_manager.RyuApp):
             # Add the flow to the switch
             self.add_flow(datapath, 0, match, actions)
 
-
-        elif self.dpid_to_name[dpid] == 'h02':
+        elif False and self.dpid_to_name[dpid] == 'h02':
             # Start outputting all packets to port 1
             match = parser.OFPMatch(
                     eth_type=0x0800,
@@ -149,15 +186,14 @@ class SimpleSwitch13(app_manager.RyuApp):
 
             # Add the flow to the switch
             self.add_flow(datapath, 0, match, actions)
-
 
         match = parser.OFPMatch()
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
                                           ofproto.OFPCML_NO_BUFFER)]
         self.add_flow(datapath, 0, match, actions)
 
+        # Output info message
         print('Configured Switch ', self.dpid_to_name[dpid])
-
 
     def add_flow(self, datapath, priority, match, actions, buffer_id=None):
         ofproto = datapath.ofproto
