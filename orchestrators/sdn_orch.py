@@ -53,7 +53,10 @@ class wired_orchestrator(base_orchestrator):
 
         # Send the message to create a slice
         success, msg = self.ovs_ctl.create_slice(
-            **{'s_id': s_id,'type': s_type})
+                **{'s_id': s_id,
+                    'type': s_type,
+                    'destination': kwargs.get('destination')
+                    })
 
         # Inform the user about the creation
         return success, msg

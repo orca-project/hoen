@@ -333,8 +333,8 @@ class hyperstrator_server(Thread):
                     core_success, core_msg = self.sdn_orch.create_slice(
                         **{'type': create_service['type'],
                             's_id': s_id,
-                            'destination': radio_msg['host'],
-                            'source': '127.0.0.1'})
+                            'destination': radio_msg['host']
+                            })
 
                     # If the core allocation failed
                     if not core_success:

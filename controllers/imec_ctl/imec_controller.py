@@ -36,7 +36,7 @@ class imec_controller(base_controller):
 
         if True:
             # Return host
-            return True, {'host': '127.0.0.1'}
+            return True, {'host': '10.2.7.1'}
 
         if False:
             return False, "<Reason for failing>"
