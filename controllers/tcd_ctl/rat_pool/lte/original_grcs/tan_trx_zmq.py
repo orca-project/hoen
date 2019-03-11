@@ -3,7 +3,7 @@
 ##################################################
 # GNU Radio Python Flow Graph
 # Title: Tan Trx Zmq
-# Generated: Wed Mar  6 04:33:44 2019
+# Generated: Mon Mar 11 13:20:21 2019
 ##################################################
 
 
@@ -11,10 +11,11 @@ from gnuradio import blocks
 from gnuradio import digital
 from gnuradio import eng_notation
 from gnuradio import gr
-from gnuradio import zeromq
 from gnuradio.eng_option import eng_option
 from gnuradio.filter import firdes
 from optparse import OptionParser
+import hydra
+import threading
 
 
 class tan_trx_zmq(gr.top_block):
@@ -25,21 +26,23 @@ class tan_trx_zmq(gr.top_block):
         ##################################################
         # Variables
         ##################################################
-        self.source_suffix = source_suffix = 501
+        self.xvl_port = xvl_port = 5000
+        self.xvl_host = xvl_host = '127.0.0.1'
+        self.tx_offset = tx_offset = -1e6
+        self.samp_rate = samp_rate = 1e6
+        self.rx_offset = rx_offset = +1e6
         self.rat_id = rat_id = 2
-        self.destination_suffix = destination_suffix = 201
-        self.source_port = source_port = (rat_id * 1000) + source_suffix
-        self.source_ip = source_ip = '127.0.0.1'
-        self.destination_port = destination_port = (rat_id * 1000) + destination_suffix
-        self.destination_ip = destination_ip = '127.0.0.1'
-        self.source_address = source_address = 'tcp://' + source_ip + ':' + str(source_port)
-        self.destination_address = destination_address = 'tcp://' + destination_ip + ':' + str(destination_port)
+        self.payload_size = payload_size = 1000
+        self.centre_frequency = centre_frequency = 3.75e9
 
         ##################################################
         # Blocks
         ##################################################
-        self.zeromq_push_sink_0 = zeromq.push_sink(gr.sizeof_gr_complex, 1, destination_address, 100, True, -1)
-        self.zeromq_pull_source_0_0 = zeromq.pull_source(gr.sizeof_gr_complex, 1, source_address, 100, True, -1)
+        self.hydra_gr_sink_0 = hydra.hydra_gr_client_sink(rat_id, xvl_host, xvl_port)
+        self.hydra_gr_sink_0.start_client(centre_frequency + tx_offset, samp_rate, payload_size)
+        self.hydra_gr__source_0_0 = hydra.hydra_gr_client_source(rat_id, xvl_host, xvl_host, xvl_port)
+        self.hydra_gr__source_0_0.start_client(centre_frequency + rx_offset, samp_rate, payload_size)
+
         self.digital_ofdm_tx_0 = digital.ofdm_tx(
         	  fft_len=64, cp_len=16,
         	  packet_length_tag_key='packet_len',
@@ -69,70 +72,56 @@ class tan_trx_zmq(gr.top_block):
         self.msg_connect((self.blocks_tuntap_pdu_0, 'pdus'), (self.blocks_pdu_to_tagged_stream_0, 'pdus'))
         self.connect((self.blocks_pdu_to_tagged_stream_0, 0), (self.digital_ofdm_tx_0, 0))
         self.connect((self.digital_ofdm_rx_0, 0), (self.blocks_tagged_stream_to_pdu_0, 0))
-        self.connect((self.digital_ofdm_tx_0, 0), (self.zeromq_push_sink_0, 0))
-        self.connect((self.zeromq_pull_source_0_0, 0), (self.digital_ofdm_rx_0, 0))
+        self.connect((self.digital_ofdm_tx_0, 0), (self.hydra_gr_sink_0, 0))
+        self.connect((self.hydra_gr__source_0_0, 0), (self.digital_ofdm_rx_0, 0))
 
-    def get_source_suffix(self):
-        return self.source_suffix
+    def get_xvl_port(self):
+        return self.xvl_port
 
-    def set_source_suffix(self, source_suffix):
-        self.source_suffix = source_suffix
-        self.set_source_port((self.rat_id * 1000) + self.source_suffix)
+    def set_xvl_port(self, xvl_port):
+        self.xvl_port = xvl_port
+
+    def get_xvl_host(self):
+        return self.xvl_host
+
+    def set_xvl_host(self, xvl_host):
+        self.xvl_host = xvl_host
+
+    def get_tx_offset(self):
+        return self.tx_offset
+
+    def set_tx_offset(self, tx_offset):
+        self.tx_offset = tx_offset
+
+    def get_samp_rate(self):
+        return self.samp_rate
+
+    def set_samp_rate(self, samp_rate):
+        self.samp_rate = samp_rate
+
+    def get_rx_offset(self):
+        return self.rx_offset
+
+    def set_rx_offset(self, rx_offset):
+        self.rx_offset = rx_offset
 
     def get_rat_id(self):
         return self.rat_id
 
     def set_rat_id(self, rat_id):
         self.rat_id = rat_id
-        self.set_source_port((self.rat_id * 1000) + self.source_suffix)
-        self.set_destination_port((self.rat_id * 1000) + self.destination_suffix)
 
-    def get_destination_suffix(self):
-        return self.destination_suffix
+    def get_payload_size(self):
+        return self.payload_size
 
-    def set_destination_suffix(self, destination_suffix):
-        self.destination_suffix = destination_suffix
-        self.set_destination_port((self.rat_id * 1000) + self.destination_suffix)
+    def set_payload_size(self, payload_size):
+        self.payload_size = payload_size
 
-    def get_source_port(self):
-        return self.source_port
+    def get_centre_frequency(self):
+        return self.centre_frequency
 
-    def set_source_port(self, source_port):
-        self.source_port = source_port
-        self.set_source_address('tcp://' + self.source_ip + ':' + str(self.source_port))
-
-    def get_source_ip(self):
-        return self.source_ip
-
-    def set_source_ip(self, source_ip):
-        self.source_ip = source_ip
-        self.set_source_address('tcp://' + self.source_ip + ':' + str(self.source_port))
-
-    def get_destination_port(self):
-        return self.destination_port
-
-    def set_destination_port(self, destination_port):
-        self.destination_port = destination_port
-        self.set_destination_address('tcp://' + self.destination_ip + ':' + str(self.destination_port))
-
-    def get_destination_ip(self):
-        return self.destination_ip
-
-    def set_destination_ip(self, destination_ip):
-        self.destination_ip = destination_ip
-        self.set_destination_address('tcp://' + self.destination_ip + ':' + str(self.destination_port))
-
-    def get_source_address(self):
-        return self.source_address
-
-    def set_source_address(self, source_address):
-        self.source_address = source_address
-
-    def get_destination_address(self):
-        return self.destination_address
-
-    def set_destination_address(self, destination_address):
-        self.destination_address = destination_address
+    def set_centre_frequency(self, centre_frequency):
+        self.centre_frequency = centre_frequency
 
 
 def main(top_block_cls=tan_trx_zmq, options=None):

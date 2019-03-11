@@ -93,7 +93,7 @@
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(320, 660)</value>
+      <value>(32, 124)</value>
     </param>
     <param>
       <key>_rotation</key>
@@ -101,11 +101,11 @@
     </param>
     <param>
       <key>id</key>
-      <value>destination_address</value>
+      <value>centre_frequency</value>
     </param>
     <param>
       <key>value</key>
-      <value>'tcp://' + destination_ip + ':' + str(destination_port)</value>
+      <value>3.75e9</value>
     </param>
   </block>
   <block>
@@ -120,7 +120,7 @@
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(392, 12)</value>
+      <value>(472, 12)</value>
     </param>
     <param>
       <key>_rotation</key>
@@ -128,11 +128,11 @@
     </param>
     <param>
       <key>id</key>
-      <value>destination_ip</value>
+      <value>payload_size</value>
     </param>
     <param>
       <key>value</key>
-      <value>'127.0.0.1'</value>
+      <value>1000</value>
     </param>
   </block>
   <block>
@@ -147,61 +147,7 @@
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(176, 660)</value>
-    </param>
-    <param>
-      <key>_rotation</key>
-      <value>0</value>
-    </param>
-    <param>
-      <key>id</key>
-      <value>destination_port</value>
-    </param>
-    <param>
-      <key>value</key>
-      <value>(rat_id * 1000) + destination_suffix</value>
-    </param>
-  </block>
-  <block>
-    <key>variable</key>
-    <param>
-      <key>comment</key>
-      <value></value>
-    </param>
-    <param>
-      <key>_enabled</key>
-      <value>True</value>
-    </param>
-    <param>
-      <key>_coordinate</key>
-      <value>(24, 660)</value>
-    </param>
-    <param>
-      <key>_rotation</key>
-      <value>0</value>
-    </param>
-    <param>
-      <key>id</key>
-      <value>destination_suffix</value>
-    </param>
-    <param>
-      <key>value</key>
-      <value>201</value>
-    </param>
-  </block>
-  <block>
-    <key>variable</key>
-    <param>
-      <key>comment</key>
-      <value></value>
-    </param>
-    <param>
-      <key>_enabled</key>
-      <value>True</value>
-    </param>
-    <param>
-      <key>_coordinate</key>
-      <value>(184, 12)</value>
+      <value>(200, 12)</value>
     </param>
     <param>
       <key>_rotation</key>
@@ -228,7 +174,7 @@
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(248, 124)</value>
+      <value>(280, 124)</value>
     </param>
     <param>
       <key>_rotation</key>
@@ -236,11 +182,65 @@
     </param>
     <param>
       <key>id</key>
-      <value>source_address</value>
+      <value>rx_offset</value>
     </param>
     <param>
       <key>value</key>
-      <value>'tcp://' + source_ip + ':' + str(source_port)</value>
+      <value>+1e6</value>
+    </param>
+  </block>
+  <block>
+    <key>variable</key>
+    <param>
+      <key>comment</key>
+      <value></value>
+    </param>
+    <param>
+      <key>_enabled</key>
+      <value>True</value>
+    </param>
+    <param>
+      <key>_coordinate</key>
+      <value>(384, 124)</value>
+    </param>
+    <param>
+      <key>_rotation</key>
+      <value>0</value>
+    </param>
+    <param>
+      <key>id</key>
+      <value>samp_rate</value>
+    </param>
+    <param>
+      <key>value</key>
+      <value>1e6</value>
+    </param>
+  </block>
+  <block>
+    <key>variable</key>
+    <param>
+      <key>comment</key>
+      <value></value>
+    </param>
+    <param>
+      <key>_enabled</key>
+      <value>True</value>
+    </param>
+    <param>
+      <key>_coordinate</key>
+      <value>(176, 124)</value>
+    </param>
+    <param>
+      <key>_rotation</key>
+      <value>0</value>
+    </param>
+    <param>
+      <key>id</key>
+      <value>tx_offset</value>
+    </param>
+    <param>
+      <key>value</key>
+      <value>-1e6</value>
     </param>
   </block>
   <block>
@@ -263,7 +263,7 @@
     </param>
     <param>
       <key>id</key>
-      <value>source_ip</value>
+      <value>xvl_host</value>
     </param>
     <param>
       <key>value</key>
@@ -282,7 +282,7 @@
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(144, 124)</value>
+      <value>(392, 12)</value>
     </param>
     <param>
       <key>_rotation</key>
@@ -290,38 +290,11 @@
     </param>
     <param>
       <key>id</key>
-      <value>source_port</value>
+      <value>xvl_port</value>
     </param>
     <param>
       <key>value</key>
-      <value>(rat_id * 1000) + source_suffix</value>
-    </param>
-  </block>
-  <block>
-    <key>variable</key>
-    <param>
-      <key>comment</key>
-      <value></value>
-    </param>
-    <param>
-      <key>_enabled</key>
-      <value>True</value>
-    </param>
-    <param>
-      <key>_coordinate</key>
-      <value>(32, 124)</value>
-    </param>
-    <param>
-      <key>_rotation</key>
-      <value>0</value>
-    </param>
-    <param>
-      <key>id</key>
-      <value>source_suffix</value>
-    </param>
-    <param>
-      <key>value</key>
-      <value>501</value>
+      <value>5000</value>
     </param>
   </block>
   <block>
@@ -648,14 +621,18 @@
     </param>
   </block>
   <block>
-    <key>zeromq_pull_source</key>
-    <param>
-      <key>address</key>
-      <value>source_address</value>
-    </param>
+    <key>hydra_gr__source</key>
     <param>
       <key>alias</key>
       <value></value>
+    </param>
+    <param>
+      <key>center_frequency</key>
+      <value>centre_frequency + rx_offset</value>
+    </param>
+    <param>
+      <key>c_host</key>
+      <value>xvl_host</value>
     </param>
     <param>
       <key>comment</key>
@@ -671,23 +648,15 @@
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(24, 228)</value>
+      <value>(32, 204)</value>
     </param>
     <param>
       <key>_rotation</key>
       <value>0</value>
     </param>
     <param>
-      <key>hwm</key>
-      <value>-1</value>
-    </param>
-    <param>
       <key>id</key>
-      <value>zeromq_pull_source_0_0</value>
-    </param>
-    <param>
-      <key>type</key>
-      <value>complex</value>
+      <value>hydra_gr__source_0_0</value>
     </param>
     <param>
       <key>maxoutbuf</key>
@@ -698,27 +667,35 @@
       <value>0</value>
     </param>
     <param>
-      <key>pass_tags</key>
-      <value>True</value>
+      <key>payload</key>
+      <value>payload_size</value>
     </param>
     <param>
-      <key>timeout</key>
-      <value>100</value>
+      <key>port</key>
+      <value>xvl_port</value>
     </param>
     <param>
-      <key>vlen</key>
-      <value>1</value>
+      <key>samp_rate</key>
+      <value>samp_rate</value>
+    </param>
+    <param>
+      <key>u_id</key>
+      <value>rat_id</value>
     </param>
   </block>
   <block>
-    <key>zeromq_push_sink</key>
-    <param>
-      <key>address</key>
-      <value>destination_address</value>
-    </param>
+    <key>hydra_gr_sink</key>
     <param>
       <key>alias</key>
       <value></value>
+    </param>
+    <param>
+      <key>center_frequency</key>
+      <value>centre_frequency + tx_offset</value>
+    </param>
+    <param>
+      <key>host</key>
+      <value>xvl_host</value>
     </param>
     <param>
       <key>comment</key>
@@ -730,39 +707,35 @@
     </param>
     <param>
       <key>_enabled</key>
-      <value>True</value>
+      <value>1</value>
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(672, 532)</value>
+      <value>(528, 508)</value>
     </param>
     <param>
       <key>_rotation</key>
       <value>0</value>
     </param>
     <param>
-      <key>hwm</key>
-      <value>-1</value>
-    </param>
-    <param>
       <key>id</key>
-      <value>zeromq_push_sink_0</value>
+      <value>hydra_gr_sink_0</value>
     </param>
     <param>
-      <key>type</key>
-      <value>complex</value>
+      <key>payload</key>
+      <value>payload_size</value>
     </param>
     <param>
-      <key>pass_tags</key>
-      <value>True</value>
+      <key>port</key>
+      <value>xvl_port</value>
     </param>
     <param>
-      <key>timeout</key>
-      <value>100</value>
+      <key>samp_rate</key>
+      <value>samp_rate</value>
     </param>
     <param>
-      <key>vlen</key>
-      <value>1</value>
+      <key>u_id</key>
+      <value>rat_id</value>
     </param>
   </block>
   <connection>
@@ -791,12 +764,12 @@
   </connection>
   <connection>
     <source_block_id>digital_ofdm_tx_0</source_block_id>
-    <sink_block_id>zeromq_push_sink_0</sink_block_id>
+    <sink_block_id>hydra_gr_sink_0</sink_block_id>
     <source_key>0</source_key>
     <sink_key>0</sink_key>
   </connection>
   <connection>
-    <source_block_id>zeromq_pull_source_0_0</source_block_id>
+    <source_block_id>hydra_gr__source_0_0</source_block_id>
     <sink_block_id>digital_ofdm_rx_0</sink_block_id>
     <source_key>0</source_key>
     <sink_key>0</sink_key>
