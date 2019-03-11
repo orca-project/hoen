@@ -19,10 +19,12 @@ class managed_process(object):
             print('\t- Wrong argument type, not a list')
             raise Exception
 
-        #  print(" ".join(cmd))
+        print(" ".join(cmd))
+        print(cmd)
+
+        return
         # Create the subprocess and add session ID to the parent
-        process = Popen(
-            cmd, stdout=PIPE, stderr=PIPE, preexec_fn=setsid)
+        process = Popen(cmd, stdout=PIPE, stderr=PIPE, preexec_fn=setsid)
 
         # Check if it abruptly exited
         if not process.poll() is None:
@@ -33,12 +35,10 @@ class managed_process(object):
         self.process = process
         self.p_id = getpgid(process.pid)
 
-
     # Stop the process group
     def halt(self, **kwargs):
         # Kill the process and all it's child processes
-        killpg(self.p_id, signal.SIGKILL)
-
+        killpg(self.p_id, signal.SIGTERM)
 
     # Called upon garbage collection
     def __del__(self):
@@ -47,57 +47,59 @@ class managed_process(object):
 
 
 class grc_manager(object):
-
     def __init__(self, **kwargs):
         # Extract parameters from keyword arguments
-        sdr_pool_path = kwargs.get('sdr_path', 'sdr_pool/')
+        #  sdr_pool_path = kwargs.get('sdr_path', 'sdr_pool/')
         rat_pool_path = kwargs.get('rat_path', 'rat_pool/')
 
-        # SDR backend parameters
-        sdr_tx = kwargs.get('tx', 'zmq_tx_usrp_script.py')
-        sdr_rx = kwargs.get('rx', 'zmq_rx_usrp_script.py')
-        sdr_trx = kwargs.get('trx', 'zmq_trx_usrp_script.py')
+        #  SDR backend parameters
+        #  sdr_tx = kwargs.get('tx', 'zmq_tx_usrp_script.py')
+        #  sdr_rx = kwargs.get('rx', 'zmq_rx_usrp_script.py')
+        #  sdr_trx = kwargs.get('trx', 'zmq_trx_usrp_script.py')
 
-        rat_tx = kwargs.get('rat_tx', 'tan_tx_zmq.py')
-        rat_rx = kwargs.get('rat_rx', 'tan_rx_zmq.py')
-        rat_trx = kwargs.get('rat_trx', 'tan_trx_zmq_script.py')
+        tuntap_rat = 'tan_trx_xvl.py'
+        self.rat_path = path.abspath(path.join(rat_pool_path, tuntap_rat))
 
-        # RAT frontend parameters
-        lte = kwargs.get('lte', 'lte')
-        iot = kwargs.get('iot', 'iot')
+        #  rat_tx = kwargs.get('rat_tx', 'tan_tx_zmq.py')
+        #  rat_rx = kwargs.get('rat_rx', 'tan_rx_zmq.py')
+        #  rat_trx = kwargs.get('rat_trx', 'tan_trx_zmq_script.py')
 
-        # Calculate the absolute path to the RAT scripts
-        self.rat_path = {
-            'lte': {
-                'tx': path.abspath(path.join(rat_pool_path, lte, rat_tx)),
-                'rx': path.abspath(path.join(rat_pool_path, lte, rat_rx)),
-                'trx': path.abspath(path.join(rat_pool_path, lte, rat_trx)),
-            },
-            'iot': {
-                'tx': path.abspath(path.join(rat_pool_path, iot, rat_tx)),
-                'rx': path.abspath(path.join(rat_pool_path, iot, rat_rx)),
-                'trx': path.abspath(path.join(rat_pool_path, iot, rat_trx)),
-            }
-        }
+        #  RAT frontend parameters
+        #  lte = kwargs.get('lte', 'lte')
+        #  iot = kwargs.get('iot', 'iot')
+
+        #  Calculate the absolute path to the RAT scripts
+        #  self.rat_path = {
+        #  'lte': {
+        #  'tx': path.abspath(path.join(rat_pool_path, lte, rat_tx)),
+        #  'rx': path.abspath(path.join(rat_pool_path, lte, rat_rx)),
+        #  'trx': path.abspath(path.join(rat_pool_path, lte, rat_trx)),
+        #  },
+        #  'iot': {
+        #  'tx': path.abspath(path.join(rat_pool_path, iot, rat_tx)),
+        #  'rx': path.abspath(path.join(rat_pool_path, iot, rat_rx)),
+        #  'trx': path.abspath(path.join(rat_pool_path, iot, rat_trx)),
+        #  }
+        #  }
 
         # Container to hold the RAT GRC processes
         self.rat_pool = {}
+
         # TODO find a better way to deal with the counter
-        self.rat_counter = 1
+        self.rat_counter = {1: False, 2: False}  #, 3: False, 4: False}
 
         # Calculate the absolute path to the SDR scripts
-        self.sdr_path = {
-            'tx': path.abspath(path.join(sdr_pool_path, sdr_tx)),
-            'rx': path.abspath(path.join(sdr_pool_path, sdr_rx)),
-            'trx': path.abspath(path.join(sdr_pool_path, sdr_trx))
-        }
+        #  self.sdr_path = {
+        #  'tx': path.abspath(path.join(sdr_pool_path, sdr_tx)),
+        #  'rx': path.abspath(path.join(sdr_pool_path, sdr_rx)),
+        #  'trx': path.abspath(path.join(sdr_pool_path, sdr_trx))
+        #  }
 
         # Container to hold the SDR GRC processes
-        self.sdr_pool = {}
+        #  self.sdr_pool = {}
 
         # Current operation mode
-        self.operation_mode = ''
-
+        #  self.operation_mode = ''
 
     def _uhd_find_devices(self):
         # Try to locate uhd_find_devices binary
@@ -130,15 +132,13 @@ class grc_manager(object):
 
         return usrp_dict
 
-
     def _update_mode(self):
         # Create a set of the direction of the current SDRs
         temp = set((self.sdr_pool[sdr]['direction'] for sdr in self.sdr_pool))
         # Check if operating as a transceiver
-        temp = set(('trx',)) if temp.issuperset(set(('rx','tx'))) else temp
+        temp = set(('trx', )) if temp.issuperset(set(('rx', 'tx'))) else temp
         # Update the operation mode
         self.operation_mode = temp.pop() if temp else ''
-
 
     def create_rat(self, **kwargs):
         # Container to hold RAT configuration
@@ -146,42 +146,71 @@ class grc_manager(object):
         # Extract parameters from keyword arguments
         # config["freq"] = kwargs.get('centre_freq', 2e9) # UNUSED
         # config["gain"] = kwargs.get('norm_gain', 1) # UNUSED
-        config["tech"] = kwargs.get('technology', 'lte')
-        config["dirx"] = kwargs.get('direction', ' trx')
-        config["s_id"] = kwargs.get('service_id', None)
+        tech = kwargs.get('technology', 'lte')
+        dirx = kwargs.get('direction', ' trx')
+        s_id = kwargs.get('service_id', None)
 
-        config["source_ip"] = kwargs.get(
-            'source_ip', '127.0.0.1')
-        config["source_port_suffix"] = kwargs.get(
-            'source_port_suffix', 501)
-        config["destination_ip"] = kwargs.get(
-            'destination_ip', '127.0.0.1')
-        config["destination_port_suffix"] = kwargs.get(
-            'destination_port_suffix', 201)
-        config["packet_len"] = kwargs.get(
-            'packet_len', 84)
+        #  config["source_ip"] = kwargs.get(
+        #  'source_ip', '127.0.0.1')
+        #  config["source_port_suffix"] = kwargs.get(
+        #  'source_port_suffix', 501)
+        #  config["destination_ip"] = kwargs.get(
+        #  'destination_ip', '127.0.0.1')
+        #  config["destination_port_suffix"] = kwargs.get(
+        #  'destination_port_suffix', 201)
+        #  config["packet_len"] = kwargs.get(
+        #  'packet_len', 84)
 
         # Sanitize input
-        if config["s_id"] is None:
+        if s_id is None:
             raise Exception('Missing Service ID')
 
         # Check if the underlying USRP uses a supported operation mode
-        if (config['dirx'] != self.operation_mode) or \
-                (self.operation_mode != 'trx'):
-            raise Exception('Invalid operation mode: ' + str(config['dirx']))
+        #  if (config['dirx'] != self.operation_mode) or \
+        #  (self.operation_mode != 'trx'):
+        #  raise Exception('Invalid operation mode: ' + str(config['dirx']))
+
+        # Check if we have free space left
+        free_space = False
+        for x in self.rat_counter:
+            # If a slot is free
+            if not self.rat_counter[x]:
+                # Toggle the free space flag
+                free_space = True
+                break
+
+        if not free_space:
+            raise Exception('No bandwidth left to allocate the virtual radio')
 
         # Hold the RAT ID
-        rat_id = self.rat_counter
+        rat_id = x
+
+        # System centre freq
+        centre_freq = 3.75e9
+        # Desired GB
+        guard_band = 0.5e6
+        # Desired Samp rate per channel
+        samp_rate = 2e6
+        # Offset between channels
+        dist = 0.5 * (guard_band + samp_rate)
+        # Total BW
+        vr_bw = dist * 2
+        # Bandwidth of the RF front-end
+        rr_bw = 10e6
+        # Centre the virtua; radio at the right place
+        vr_cf = centre_freq - (0.5 * rr_bw) + (rat_id - 0.5) * vr_bw
+
+        print('rr_cf', centre_freq)
+        print('rr_bw', rr_bw)
+        print('beggining', centre_freq - 0.5 * rr_bw)
 
         # Construct command arguments
         cmd = [
-            self.rat_path[config["tech"]][config["dirx"]],
-            '--source_ip', config['source_ip'],
-            '--source_port_suffix', str(config['source_port_suffix']),
-            '--destination_ip', config['destination_ip'],
-            '--destination_port_suffix', str(config['destination_port_suffix']),
-            '--packet_len', str(config['packet_len']),
-            '--rat_id', str(rat_id)
+            self.rat_path, '--tx_offset', ' -' + str(dist), '--rx_offset',
+            ' +' + str(dist), '--samp_rate',
+            str(samp_rate), '--centre_frequency',
+            str(vr_cf), '--rat_id',
+            str(rat_id)
         ]
 
         # Create process
@@ -193,22 +222,24 @@ class grc_manager(object):
             print(e)
             raise Exception('Failed Creating Radio Stack.')
 
-        # If succeeded, append to RAT pool
-        self.rat_pool[config["s_id"]] = {
-            'tech': config["tech"],
-            'rat_id': rat_id,
-            'process': process}
+        # Get hold of it
+        self.rat_counter[rat_id] = True
 
-        # Increment the RAT counter
-        self.rat_counter += 1
+        # If succeeded, append to RAT pool
+        self.rat_pool[s_id] = {
+            'tech': tech,
+            'rat_id': rat_id,
+            'process': process
+        }
 
         print('- Created RAT')
-        for item in config:
-            print('\t-' + item + ": " + str(config[item]))
+        print('\t', 'Service ID:', s_id)
+        print('\t', 'RAT ID:', rat_id)
+        print('\t', 'Centre Frequency:', vr_cf)
+        print('\t', 'Bandwidth:', vr_bw)
+        print('\t', 'TX Channel:', vr_cf - dist)
+        print('\t', 'RX Channel:', vr_cf + dist)
 
-
-        #Also print the RAT ID
-        print('\t-RAT ID: ' + str(rat_id))
         # Return the RAT ID
         return rat_id
 
@@ -226,12 +257,10 @@ class grc_manager(object):
 
         config["rate_tx"] = kwargs.get('samp_rate_tx', 1e6)
         config["rate_rx"] = kwargs.get('samp_rate_rx', 1e6)
-        config["freq_tx"] = kwargs.get('centre_freq_tx', 2e9-1e6)
-        config["freq_rx"] = kwargs.get('centre_freq_rx', 2e9+1e6)
+        config["freq_tx"] = kwargs.get('centre_freq_tx', 2e9 - 1e6)
+        config["freq_rx"] = kwargs.get('centre_freq_rx', 2e9 + 1e6)
         config["gain_tx"] = kwargs.get('gain_tx', 1)
         config["gain_rx"] = kwargs.get('gain_rx', 1)
-
-
 
         # If there's no serial
         if not config["serial"]:
@@ -247,18 +276,18 @@ class grc_manager(object):
 
         # Construct command arguments
         cmd = [
-            self.sdr_path[config["dirx"]],
-            '--ip', config["ip"],
-            '--source_port', str(config["source_port"]),
-            '--destination_port', str(config["destination_port"]),
-            '--port_offset', str(config["port_offset"]),
-            '--serial', config["serial"],
-            '--samp_rate_tx', str(config["rate_tx"]),
-            '--samp_rate_rx', str(config["rate_rx"]),
-            '--centre_freq_rx', str(config["freq_rx"]),
-            '--centre_freq_tx', str(config["freq_tx"]),
-            '--gain_tx', str(config["gain_tx"]),
-            '--gain_rx', str(config["gain_rx"])
+            self.sdr_path[config["dirx"]], '--ip', config["ip"],
+            '--source_port',
+            str(config["source_port"]), '--destination_port',
+            str(config["destination_port"]), '--port_offset',
+            str(config["port_offset"]), '--serial', config["serial"],
+            '--samp_rate_tx',
+            str(config["rate_tx"]), '--samp_rate_rx',
+            str(config["rate_rx"]), '--centre_freq_rx',
+            str(config["freq_rx"]), '--centre_freq_tx',
+            str(config["freq_tx"]), '--gain_tx',
+            str(config["gain_tx"]), '--gain_rx',
+            str(config["gain_rx"])
         ]
 
         try:
@@ -272,7 +301,8 @@ class grc_manager(object):
         # If succeeded, append to SDR GRC pool
         self.sdr_pool[config["serial"]] = {
             'direction': config["dirx"],
-            'process': process}
+            'process': process
+        }
 
         # Update the operation mode
         self._update_mode()
@@ -280,7 +310,6 @@ class grc_manager(object):
         print('- Created SDR')
         for item in config:
             print('\t-' + item + ": " + str(config[item]))
-
 
     def remove_rat(self, **kwargs):
         # Extract parameters from keyword arguments
@@ -295,6 +324,9 @@ class grc_manager(object):
                 self.rat_pool[service_id]['process'].halt()
                 print('\t- Removed RAT: ' + service_id)
 
+                # Clear the RAT counter
+                self.rat_counter[self.rat_pool[service_id]['rat_id']] = False
+
                 # If there's no specific Service ID
                 if not s_id:
                     # Remove it from the SDR pool
@@ -304,7 +336,6 @@ class grc_manager(object):
                 else:
                     # Remove the RAT and return its RAT ID
                     return self.rat_pool.pop(service_id)['rat_id']
-
 
     def remove_sdr(self, **kwargs):
         # Extract parameters from keyword arguments

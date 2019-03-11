@@ -18,6 +18,8 @@ import hydra
 import threading
 
 
+import signal
+
 def tan_trx_zmq(**kwargs):
     # Top block instance
     tb = gr.top_block()
@@ -40,10 +42,11 @@ def tan_trx_zmq(**kwargs):
 
     hydra_gr_sink_0.start_client(centre_frequency + tx_offset, samp_rate,
                                  payload_size)
-
+    print('tx', centre_frequency + tx_offset)
     hydra_gr__source_0_0 = hydra.hydra_gr_client_source(
         rat_id, xvl_host, xvl_host, xvl_port)
 
+    print('rx', centre_frequency + rx_offset)
     hydra_gr__source_0_0.start_client(centre_frequency + rx_offset, samp_rate,
                                       payload_size)
 
