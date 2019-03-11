@@ -364,6 +364,24 @@ class hyperstrator_server(Thread):
                     else:
                         print('\t', 'Skipping core')
 
+                    # Otherwise, the radio allocation succeeded
+                    print('\t', 'Succeeded creating a Radio Service')
+
+                    # Otherwise, send message to the SDN orchestrator
+                    core_success, core_msg = self.sdn_orch.create_slice(
+                        **{'type': create_service['type'],
+                            's_id': s_id,
+                            'destination': radio_msg['host']
+                            })
+
+                    # If the core allocation failed
+                    if not core_success:
+                        print('\t', 'Failed creating Core Slice')
+                        # Inform the user about the failure
+                        self.send_msg(self.create_nack, core_msg)
+                        # Finish here
+                        continue
+
                     # Append it to the list of service IDs
                     self.s_ids.append(s_id)
 
@@ -416,7 +434,7 @@ class hyperstrator_server(Thread):
                         print('\t', 'Skipping radio')
 
                     if self.do_core:
-                        print('\t', 'Send message to SNR orchestrator')
+                        print('\t', 'Send message to SDN orchestrator')
 
                         # Otherwise, send message to the SDN orchestrator
                         core_success, core_msg = self.sdn_orch.delete_slice(
@@ -432,6 +450,21 @@ class hyperstrator_server(Thread):
 
                     else:
                         print('\t', 'Skipping core')
+
+                    # Otherwise, the radio allocation succeeded
+                    print('\t', 'Succeeded removing a Radio Service')
+
+                    # Otherwise, send message to the SDN orchestrator
+                    core_success, core_msg = self.sdn_orch.delete_slice(
+                        **{'s_id': delete_service['s_id']})
+
+                    # If the core allocation failed
+                    if not core_success:
+                        print('\t', 'Failed removing Core Slice')
+                        # Inform the user about the failure
+                        self.send_msg(self.delete_nack, core_msg)
+                        # Finish here
+                        continue
 
                     # Remove it to the list of service IDs
                     self.s_ids.remove(delete_service['s_id'])

@@ -36,7 +36,7 @@ class imec_controller(base_controller):
 
         if True:
             # Return host
-            return True, {'host': '127.0.0.1'}
+            return True, {'host': '10.2.7.1'}
 
         if False:
             return False, "<Reason for failing>"
@@ -70,7 +70,7 @@ if __name__ == "__main__":
             update_msg='wlc_urs',
             delete_msg='wlc_drs',
             host='127.0.0.1',
-            port=3200)
+            port=3100)
 
         # Start the IMEC SDR Controller Server
         imec_controller_thread.start()

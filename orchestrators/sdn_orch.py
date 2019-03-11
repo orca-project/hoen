@@ -25,7 +25,11 @@ class wired_orchestrator(base_orchestrator):
             default_host="127.0.0.1",
             default_port="3300",
             request_key="ovs_req",
-            reply_key="ovs_rep")
+            reply_key="ovs_rep",
+            create_msg='wdc_crs',
+            request_msg='wdc_rrs',
+            update_msg='wdc_urs',
+            delete_msg='wdc_drs')
 
 
     def create_slice(self, **kwargs):
@@ -49,7 +53,10 @@ class wired_orchestrator(base_orchestrator):
 
         # Send the message to create a slice
         success, msg = self.ovs_ctl.create_slice(
-            **{'s_id': s_id,'type': s_type})
+                **{'s_id': s_id,
+                    'type': s_type,
+                    'destination': kwargs.get('destination')
+                    })
 
         # Inform the user about the creation
         return success, msg
