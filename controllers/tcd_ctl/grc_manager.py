@@ -22,7 +22,6 @@ class managed_process(object):
         print(" ".join(cmd))
         print(cmd)
 
-        return
         # Create the subprocess and add session ID to the parent
         process = Popen(cmd, stdout=PIPE, stderr=PIPE, preexec_fn=setsid)
 
@@ -38,7 +37,7 @@ class managed_process(object):
     # Stop the process group
     def halt(self, **kwargs):
         # Kill the process and all it's child processes
-        killpg(self.p_id, signal.SIGTERM)
+        killpg(self.p_id, signal.SIGINT)
 
     # Called upon garbage collection
     def __del__(self):
