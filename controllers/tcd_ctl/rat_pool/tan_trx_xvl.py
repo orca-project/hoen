@@ -32,9 +32,10 @@ class tan_trx_zmq(object):
         self.tx_offset = kwargs.get('tx_offset', -1e6)
         self.rx_offset = kwargs.get('rx_offset', +1e6)
         self.samp_rate = kwargs.get('samp_rate', 1e6)
-        self.centre_frequency = kwargs.get('centre_freq', 3.75e9)
+        self.centre_frequency = kwargs.get('centre_frequency', 3.75e9)
         self.rat_id = kwargs.get('rat_id', 1)
         self.payload_size = kwargs.get('payload_size', 1000)
+        self.digital_gain = kwargs.get('digital_gain', 0.06)
 
     def run(self):
         ##################################################
@@ -78,13 +79,16 @@ class tan_trx_zmq(object):
             scramble_bits=False)
 
         self.blocks_tuntap_pdu_0 = blocks.tuntap_pdu('tap' + str(self.rat_id),
-                                                     1000, True)
+                                                     1000, False)
 
         self.blocks_tagged_stream_to_pdu_0 = blocks.tagged_stream_to_pdu(
             blocks.byte_t, 'packet_len')
 
         self.blocks_pdu_to_tagged_stream_0 = blocks.pdu_to_tagged_stream(
             blocks.byte_t, 'packet_len')
+
+        self.blocks_multiply_const_vxx_0 = blocks.multiply_const_vcc(
+            (self.digital_gain, ))
 
         ##################################################
         # Connections
@@ -101,7 +105,9 @@ class tan_trx_zmq(object):
         self.tb.connect((self.digital_ofdm_rx_0, 0),
                         (self.blocks_tagged_stream_to_pdu_0, 0))
 
-        self.tb.connect((self.digital_ofdm_tx_0, 0), (self.hydra_gr_sink_0, 0))
+        self.tb.connect((self.digital_ofdm_tx_0, 0), (self.blocks_multiply_const_vxx_0, 0))
+
+        self.tb.connect((self.blocks_multiply_const_vxx_0, 0), ((self.hydra_gr_sink_0, 0))
 
         self.tb.connect((self.hydra_gr_source_0_0, 0),
                         (self.digital_ofdm_rx_0, 0))
@@ -115,7 +121,6 @@ class tan_trx_zmq(object):
 
         del self.hydra_gr_sink_0
         del self.hydra_gr_source_0_0
-
 
 
 def get_args():
@@ -140,6 +145,8 @@ def get_args():
         '--rat_id', type=int, default=1, help='Virtual Radio ID')
     parser.add_argument(
         '--payload_size', type=int, default=1000, help='Payload Size')
+    parser.add_argument(
+        '--digital_gain', type=float, default=0.06, help='Digital Gain')
 
     # Parse and return CLI arguments
     return vars(parser.parse_args())

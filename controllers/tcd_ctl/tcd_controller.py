@@ -91,10 +91,10 @@ class tcd_controller(base_controller):
 
             virtual_radio.vfe.rx_port = virtual_radio.vfe.request_rx_resources(
                 centre_freq=(vr_cf + dist), bandwidth=samp_rate)
-            
-            print('VR', virtual_radio.rat_id,
-                  'TX Port', virtual_radio.vfe.tx_port,
-                  'RX Port', virtual_radio.vfe.rx_port)
+
+            print('VR', virtual_radio.rat_id)
+            print('TX', vr_cf - dist, 'Port', virtual_radio.vfe.tx_port)
+            print('RX', vr_cf + dist, 'Port', virtual_radio.vfe.rx_port)
 
             if not virtual_radio.vfe.tx_port or not virtual_radio.vfe.rx_port:
                 print('Could not allocate VR')
