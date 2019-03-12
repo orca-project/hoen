@@ -24,16 +24,13 @@ def tan_trx_zmq(**kwargs):
     # Variables
     ##################################################
     source_ip = kwargs.get('source_ip', '127.0.0.1')
-    source_suffix = kwargs.get('source_port_suffix', 501)
+    source_port = kwargs.get('source_port', 500)
     destination_ip = kwargs.get('destination_ip', '127.0.0.1')
-    destination_suffix = kwargs.get('destination_port_suffix', 201)
+    destination_port = kwargs.get('destination_port', 200)
     rat_id = kwargs.get('rat_id', 0)
-    digital_gain = kwargs.get('digital_gain', 1)
+    digital_gain = kwargs.get('digital_gain', 0.06)
     #  packet_len = kwargs.get('packet_len', 84)
 
-    # Calculate the source and destination ports
-    source_port = (rat_id * 1000) + source_suffix
-    destination_port = (rat_id * 1000) + destination_suffix
     # Form the source and destination addresses
     source_address = 'tcp://' + source_ip + ':' + str(source_port)
     destination_address = 'tcp://' + destination_ip + ':' + \
@@ -98,7 +95,6 @@ def tan_trx_zmq(**kwargs):
 
     tb.connect((digital_ofdm_rx_0, 0), (blocks_tagged_stream_to_pdu_0, 0))
 
-
     # Start the boombox
     tb.run()
 
@@ -110,23 +106,17 @@ def get_args():
     parser.add_argument(
         '--source_ip', type=str, default='127.0.0.1', help='source IP')
     parser.add_argument(
-        '--source_port_suffix',
-        type=int,
-        default=501,
-        help='source port suffix')
+        '--source_port', type=int, default=500, help='source port')
     parser.add_argument(
         '--destination_ip',
         type=str,
         default='127.0.0.1',
         help='destination IP')
     parser.add_argument(
-        '--destination_port_suffix',
-        type=int,
-        default=201,
-        help='destination port suffix')
+        '--destination_port', type=int, default=200, help='destination port')
     parser.add_argument('--rat_id', type=int, default=0, help='RAT ID')
     parser.add_argument(
-        '--digital_gain', type=float, default=1, help='Digital Gain')
+        '--digital_gain', type=float, default=0.06, help='Digital Gain')
 
     # Parse and return CLI arguments
     return vars(parser.parse_args())
