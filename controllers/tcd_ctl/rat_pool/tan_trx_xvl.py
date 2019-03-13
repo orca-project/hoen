@@ -107,7 +107,7 @@ class tan_trx_zmq(object):
 
         self.tb.connect((self.digital_ofdm_tx_0, 0), (self.blocks_multiply_const_vxx_0, 0))
 
-        self.tb.connect((self.blocks_multiply_const_vxx_0, 0), ((self.hydra_gr_sink_0, 0))
+        self.tb.connect((self.blocks_multiply_const_vxx_0, 0), (self.hydra_gr_sink_0, 0))
 
         self.tb.connect((self.hydra_gr_source_0_0, 0),
                         (self.digital_ofdm_rx_0, 0))
