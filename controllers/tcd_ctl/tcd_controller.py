@@ -17,7 +17,7 @@ from os import setsid, getpgid
 
 from grc_manager import grc_manager
 from route_manager import route_manager
-from xvl_manager import xvl_client
+#  from xvl_manager import xvl_client
 
 
 def cls():
@@ -28,7 +28,7 @@ class vr(object):
     def __init__(self, **kwargs):
         self.free = True
         self.s_id = kwargs.get('s_id', '')
-        self.vfe = kwargs.get('vfe', None)
+        #  self.vfe = kwargs.get('vfe', None)
         self.grc = kwargs.get('grc', None)
         self.host = kwargs.get('host', None)
         self.rat_id = kwargs.get('rat_id', 0)
@@ -61,7 +61,7 @@ class tcd_controller(base_controller):
             vr(rat_id=x) for x in range(1, self.max_vrs + 1)
         ]
 
-        self.fallback()
+        #  self.fallback()
 
     def fallback(self):
         # System centre freq
@@ -139,8 +139,9 @@ class tcd_controller(base_controller):
             grc = self.grc_manager.create_rat(
                 service_id=s_id,
                 rat_id=virtual_radio.rat_id,
-                tx_port=virtual_radio.vfe.tx_port,
-                rx_port=virtual_radio.vfe.rx_port)
+                #  tx_port=virtual_radio.vfe.tx_port,
+                #  rx_port=virtual_radio.vfe.rx_port
+                )
 
         # If failed creating software radio
         except Exception as e:
@@ -150,8 +151,8 @@ class tcd_controller(base_controller):
 
         virtual_radio.grc = grc
 
-        print('\t', 'TX Port', virtual_radio.vfe.tx_port)
-        print('\t', 'RX Port', virtual_radio.vfe.tx_port)
+        #  print('\t', 'TX Port', virtual_radio.vfe.tx_port)
+        #  print('\t', 'RX Port', virtual_radio.vfe.tx_port)
 
         # Third step: Configure routes
         try:
