@@ -1,0 +1,66 @@
+Joint demo
+==========
+
+SDR
+---
+/root/d.sh
+
+./sdr-ad-hoc-join.sh sdr0 11 192.168.13.20 2A:E1:77:xx:xx:xx
+
+# ping Wi-Fi dongle
+ping 192.168.13.15 -i 0.1
+
+# Add default routing for eth0 to send back (to sdr_orch) packets outside our subnet (10.2.0.0/16)
+ip route add default dev eth0
+
+# Start imec controller after gateway is added to monster laptop
+cd /root/y2sc3/controllers
+./imec_controller.py
+
+
+Laptop
+------
+./sdr-ad-hoc-up.sh wlx00c0ca84636a 11 192.168.13.15
+
+# Put SDR as defualt gateway to laptop
+sudo route add -net 10.2.0.0 netmask 255.255.0.0 gw 192.168.13.20 dev wlx00c0ca84636a
+sudo route add -net 10.0.0.0 netmask 255.255.0.0 gw 192.168.13.20 dev wlx00c0ca84636a
+sudo route add -net 10.97.0.0 netmask 255.255.0.0 gw 192.168.13.20 dev wlx00c0ca84636a
+
+Solo demo
+=========
+
+dongle
+------
+Wait dongle Wi-Fi to get started and retreive the ad-hoc slice ID
+
+
+SDR
+---
+./sdr-ad-hoc-join.sh sdr0 11 192.168.13.20 02:11:87:xx:xx:xx
+./sdr-ad-hoc-join.sh sdr0 11 192.168.13.20 xx:xx:xx:xx:xx:xx
+
+# ping Wi-Fi dongle
+ping 192.168.13.13 -i 0.1
+
+# Ping iphone
+ping 192.168.13.25 -i 0.1
+
+# Change Wi-FI dongle to low latency mode
+iw/iw dev sdr0 set addr0 4cf855aa
+iw/iw dev sdr0 set addr0 ca84636a
+
+# Change iphone to low duty cycle mode
+iw/iw dev sdr0 set addr1 33044abf
+
+
+Laptop
+------
+
+connect to ORCA network
+
+# After ping test, start vlc demo
+nice -n 1 vlc udp://@:1234
+
+
+
