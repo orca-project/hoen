@@ -11,6 +11,7 @@ from os import system, name
 # Import the Pause method from the Signal module
 from signal import pause
 
+import time
 
 # Clear terminal screen
 def cls():
@@ -141,8 +142,7 @@ class orch_base(object):
         # Otherwise, it succeeded
         else:
             # Inform the hyperstrator about the success
-            print('\t', 'Succeeded requesting a ' + self.type + \
-                  ' Slice in ' + self.name)
+            print('\t', 'Succeeded requesting a ' + self.type + ' Slice in ' + self.name)
             return True, msg
 
         return msg
@@ -211,7 +211,7 @@ class hyperstrator_server(Thread):
             name="Wired Network",
             host_key="sdn_host",
             port_key="sdn_port",
-            default_host="127.0.0.1",
+            default_host="10.0.0.2",
             default_port="2200",
             create_msg="wd_cc",
             request_msg="wd_rc",
@@ -225,7 +225,7 @@ class hyperstrator_server(Thread):
             name="Wireless Network",
             host_key="sdr_host",
             port_key="sdr_port",
-            default_host="127.0.0.1",
+            default_host="10.0.0.1",
             default_port="2100",
             create_msg="wl_cr",
             request_msg="wl_rr",
@@ -274,7 +274,7 @@ class hyperstrator_server(Thread):
     # Bind server to socket
     def _server_bind(self, **kwargs):
         # Default HS Server host
-        host = kwargs.get('host', '127.0.0.1')
+        host = kwargs.get('host', '0.0.0.0')
         # Default HS Server port
         port = kwargs.get('port', 1000)
 
@@ -306,6 +306,7 @@ class hyperstrator_server(Thread):
 
             # Received a command
             else:
+                st = time.time()
                 # Service request, new service
                 create_service = request.get(self.create_msg, None)
 
@@ -331,6 +332,7 @@ class hyperstrator_server(Thread):
                             print('\t', 'Failed creating Radio Slice')
                             # Inform the user about the failure
                             self.send_msg(self.create_nack, radio_msg)
+                            print('failed radio', (time.time() - st)*1000, 'ms')
                             # Finish here
                             continue
 
@@ -341,7 +343,9 @@ class hyperstrator_server(Thread):
                     else:
                         print('\t', 'Skipping radio')
                         # Use a fake host IP
-                        radio_message = {'host': '10.1.1.1'}
+                        radio_msg = {'host': '10.1.0.1' if \
+                                create_service['type'] == 'high-throughput' else \
+                                '10.2.0.1'}
 
                     if self.do_core:
                         print('\t', 'Send message to SDN orchestrator')
@@ -358,6 +362,7 @@ class hyperstrator_server(Thread):
                             print('\t', 'Failed creating Core Slice')
                             # Inform the user about the failure
                             self.send_msg(self.create_nack, core_msg)
+                            print('failed core', (time.time() - st)*1000, 'ms')
                             # Finish here
                             continue
 
@@ -367,12 +372,16 @@ class hyperstrator_server(Thread):
                     # Append it to the list of service IDs
                     self.s_ids.append(s_id)
 
+                    
                     # Inform the user about the configuration success
                     # TODO the host and port should come from the SDN orch.
                     self.send_msg(self.create_ack, {
                         's_id': s_id,
                         'host': radio_msg['host']
                     })
+
+
+                    print('success', (time.time() - st)*1000, 'ms')
 
                 # Service rerquest, remove service
                 delete_service = request.get(self.delete_msg, None)
@@ -420,7 +429,7 @@ class hyperstrator_server(Thread):
 
                         # Otherwise, send message to the SDN orchestrator
                         core_success, core_msg = self.sdn_orch.delete_slice(
-                            **{'s_id': delete_slice['s_id']})
+                            **{'s_id': delete_service['s_id']})
 
                         # If the core allocation failed
                         if not core_success:
@@ -470,7 +479,7 @@ if __name__ == "__main__":
     try:
         # Instantiate the Hyperstrator Server
         hyperstrator_thread = hyperstrator_server(
-            host='127.0.0.1',
+            host='10.0.0.3',
             port=1100,
             error_msg='msg_err',
             create_msg='sr_cs',
@@ -479,7 +488,7 @@ if __name__ == "__main__":
             remove_radio='wl_dr',
             create_core='wd_cc',
             remove_core='wd_rc',
-            do_core=False)
+            do_radio=False)
         # Start the Hyperstrator Thread
         hyperstrator_thread.start()
         # Pause the main thread

@@ -141,8 +141,7 @@ class ctl_base(object):
         # Otherwise, it succeeded
         else:
             # Inform the hyperstrator about the success
-            print('\t', 'Succeeded requesting a ' + self.type + \
-                  ' Slice in ' + self.name)
+            print('\t', 'Succeeded requesting a ' + self.type + ' Slice in ' + self.name)
             return True, msg
 
         return msg
@@ -292,7 +291,7 @@ class base_orchestrator(Thread):
 
                 # If it is a new service
                 if create_slice is not None:
-                    print('- Create '+ self.type + ' Service')
+                    print('- Create ' + self.type + ' Service')
                     # This service already exists
                     if create_slice['s_id'] in self.s_ids:
                         print('\t', 'Service ID already exists.')
@@ -321,7 +320,7 @@ class base_orchestrator(Thread):
                 delete_slice = request.get(self.delete_msg, None)
 
                 if delete_slice is not None:
-                    print('- Remove '+ self.type + ' Service')
+                    print('- Remove ' + self.type + ' Service')
                     # If this service doesn't exist
                     if delete_slice['s_id'] not in self.s_ids:
                         print('\t', 'Service ID doesn\' exist')

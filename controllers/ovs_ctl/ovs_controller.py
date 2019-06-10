@@ -1,3 +1,4 @@
+#!/usr/local/bin/ryu-manager
 # Hack to load parent module
 from sys import path
 
@@ -9,6 +10,8 @@ from os import system, name
 import signal
 
 import argparse
+
+import time
 
 from ryu.lib import hub
 hub.patch()
@@ -47,16 +50,19 @@ class ovs_controller(base_controller):
         self.join()
 
     def create_slice(self, **kwargs):
+        single = time.time()
         # Extract parameters from keyword arguments
         tech = kwargs.get('type', 'high-throughput')
         s_id = kwargs.get('s_id', None)
         destination = kwargs.get('destination', None)
-
+        #  print(destination)
         # Check for validity of the slice ID
         if s_id in self.slice_list:
+            print('did not work, took',  + (time.time() - single)*1000, 'ms')
             return False, 'Slice ID already exists'
         # Check for validity of the destination
         if not destination:
+            print('dit work, took',  + (time.time() - single)*1000, 'ms')
             return False, 'Missing destation'
 
         # Get the third octet, to denote the slice
@@ -65,26 +71,27 @@ class ovs_controller(base_controller):
         # Add the slice to the slice list
         self.slice_list[s_id] = {
                 'type': tech,
-                'subnet': slice_subnet}
+                'subnet': slice_subnet,
+                'destination': destination}
 
         # Get the route depending on the traffic class
         if tech == 'high-throughput':
             # Route 01: High Throughput
             route = {
                 'subnet': '1',
-                'switches': {
-                    'inbound': {
-                        'switch': self.ovs.switches['h00'],                    
-                        'in_port': 1,
-                        'out_port': 2
-                        },
-                    'outbound': {
-                        'switch': self.ovs.switches['h01'],                    
-                        'in_port': 1,
-                        'out_port': 2
-                        }
-                    }
-                }
+                 'switches': [
+                    {'type': 'inbound',
+                     'datapath': self.ovs.switches['h00'],                    
+                     'in_port': 1,
+                     'out_port': 2
+                     },
+                    {'type': 'outbound',
+                     'datapath': self.ovs.switches['h01'],                    
+                     'in_port': 1,
+                     'out_port': 2
+                     }
+                    ]
+                 }
             print('\t', 'Setting High-Throughput Route')
 
 
@@ -125,7 +132,7 @@ class ovs_controller(base_controller):
                     #   '10.%s.%s.0' % (route['subnet'], slice_subnet), 
                     #   '255.255.255.0'),
                     ipv4_dst=(
-                        '10.%s.%s.0' % (route['subnet'], slice_subnet), 
+                        '10.%s.%s.0' % (route['subnet'], slice_subnet),
                         '255.255.255.0'),
                 )
 
@@ -157,6 +164,8 @@ class ovs_controller(base_controller):
         #  print('10.%s.%s.0' % (route['subnet'], slice_subnet))
 
         # Return host and port -- TODO may drop port entirely
+
+        print('worked, took',  + (time.time() - single)*1000, 'ms')
         return True, {'host': destination}
 
 
@@ -171,11 +180,12 @@ class ovs_controller(base_controller):
         # Getthe slice to the slice list
         tech = self.slice_list[s_id]['type']
         slice_subnet = self.slice_list[s_id]['subnet']
+        destination = self.slice_list[s_id]['destination']
 
         # Get the route depending on the traffic class
         if tech == 'high-throughput':
             # Route 01: High Throughput 
-            switches = [self.ovs.switch['h00'], self.ovs.switches['h01']]
+            switches = [self.ovs.switches['h00'], self.ovs.switches['h01']]
             route_subnet = 1
 
         if tech == 'low-latency':
@@ -196,7 +206,7 @@ class ovs_controller(base_controller):
                      #  '10.%s.%s.0' % (route_subnet, slice_subnet),
                      #  '255.255.255.0'),
                     ipv4_dst=(
-                        '10.%s.%s.0' % (route_subnet, slice_subnet),
+                     '10.%s.%s.0' % (route_subnet, slice_subnet),
                         '255.255.255.0'),
                     )
 
@@ -229,9 +239,12 @@ class ovs_ctl(app_manager.RyuApp):
         self.switches = {}
 
         self.dpid_to_name = {
-            95536754289: 'h00',
-            95535344413: 'h01',
-            95542363502: 'h02'
+            #  95536754289: 'h00',
+            #  95535344413: 'h01',
+            #  95542363502: 'h02'
+            95534111059: 'h00',
+            95538556217: 'h01',
+            95533205304: 'h02'
         }
 
         #  Instantiate the OVS SDR Controller
@@ -243,7 +256,7 @@ class ovs_ctl(app_manager.RyuApp):
             request_msg='wdc_rrs',
             update_msg='wdc_urs',
             delete_msg='wdc_drs',
-            host=kwargs.get('host', '127.0.0.1'),
+            host=kwargs.get('host', '10.0.0.5'),
             port=kwargs.get('port', 3300),
             ovs=self
         )
@@ -251,15 +264,26 @@ class ovs_ctl(app_manager.RyuApp):
         # Start the OVS SDR Controller Server
         self.ovs_controller_hub = hub.spawn(self.ovs_controller_thread.run)
 
+        self.count = 3
+        self.st = time.time()
+
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
+        single = time.time()
         # Get the new switch
         datapath = ev.msg.datapath
         # Add the new switch to the container 
         self.switches[self.dpid_to_name[datapath.id]] = datapath
-
         # Send proactive rules to the switches
         self._base_start(datapath)
+
+        self.count-= 1
+
+        print('took',  + (time.time() - single)*1000, 'ms')
+
+        if (not self.count):
+            print('total:', (time.time()-self.st)*1000, 'ms') 
+
         
     def _base_start(self, datapath):
         # Extract the datapath parameters
@@ -287,7 +311,7 @@ class ovs_ctl(app_manager.RyuApp):
     def add_flow(self, datapath, priority, match, actions, buffer_id=None):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
-
+        #  print(match)
         inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,
                                              actions)]
         if buffer_id:
@@ -331,14 +355,15 @@ class ovs_ctl(app_manager.RyuApp):
         pkt_arp = pkt.get_protocol(arp.arp)
         pkt_icmp = pkt.get_protocol(icmp.icmp)
 
+        #  self.logger.info("packet in %s %s %s %s",
+        #  self.dpid_to_name[dpid],
+        #  pkt_ethernet.src,
+        #  pkt_ethernet.dst,
+        #  in_port)
+
         if not pkt_arp:
             return
 
-        #  self.logger.info("packet in %s %s %s %s",
-                #  self.dpid_to_name[dpid],
-                #  pkt_ethernet.src,
-                #  pkt_ethernet.dst,
-                #  in_port)
 
         self.mac_to_port.setdefault(dpid, {})
 

@@ -37,7 +37,7 @@ class managed_process(object):
     # Stop the process group
     def halt(self, **kwargs):
         # Kill the process and all it's child processes
-        kill(self.p_id, signal.SIGKILL)
+        kill(self.p_id, signal.SIGTERM)
         self.process.communicate()
 
 class grc_manager(object):
@@ -46,7 +46,8 @@ class grc_manager(object):
         #  sdr_pool_path = kwargs.get('sdr_path', 'sdr_pool/')
         rat_pool_path = kwargs.get('rat_path', 'rat_pool/')
 
-        tuntap_rat = 'tan_trx_zmq.py'
+        #  tuntap_rat = 'tan_trx_zmq.py'
+        tuntap_rat = 'enb_hydra.py'
         self.rat_path = path.abspath(path.join(rat_pool_path, tuntap_rat))
 
         # Container to hold the RAT GRC processes
@@ -60,16 +61,16 @@ class grc_manager(object):
         # config["gain"] = kwargs.get('norm_gain', 1) # UNUSED
         tech = kwargs.get('technology', 'lte')
         rat_id = kwargs.get('rat_id', 0)
-        tx_port = kwargs.get('tx_port', 200)
-        rx_port = kwargs.get('rx_port', 500)
+        #  tx_port = kwargs.get('tx_port', 200)
+        #  rx_port = kwargs.get('rx_port', 500)
         dirx = kwargs.get('direction', ' trx')
         s_id = kwargs.get('service_id', None)
 
-        if tx_port in [1, '1']:
-            tx_port = 6200
+        #  if tx_port in [1, '1']:
+            #  tx_port = 6200
 
-        if rx_port in [1, '1']:
-            rx_port = 6500
+        #  if rx_port in [1, '1']:
+            #  rx_port = 6500
 
         # Sanitize input
         if s_id is None:
@@ -82,10 +83,10 @@ class grc_manager(object):
             #  '--rx_offset', ' +' + str(dist),
             #  '--samp_rate',  str(samp_rate),
             #  '--centre_frequency', str(vr_cf),
-            '--destination_port',
-            str(tx_port),
-            '--source_port',
-            str(rx_port),
+            #  '--destination_port',
+            #  str(tx_port),
+            #  '--source_port',
+            #  str(rx_port),
             '--rat_id',
             str(rat_id)
         ]
