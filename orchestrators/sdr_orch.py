@@ -10,6 +10,7 @@ from base_orchestrator.base_orchestrator import base_orchestrator, ctl_base
 from os import system, name
 # Import signal
 import signal
+import time 
 
 def cls():
     system('cls' if name=='nt' else 'clear')
@@ -26,8 +27,8 @@ class wireless_orchestrator_server(base_orchestrator):
             request_msg='wlc_rrs',
             update_msg='wlc_urs',
             delete_msg='wlc_drs',
-            default_host="127.0.0.1",
-            default_port="3100",
+            default_host="10.2.0.1",
+            default_port="6000",
             request_key="imec_req",
             reply_key="imec_rep")
 
@@ -40,12 +41,13 @@ class wireless_orchestrator_server(base_orchestrator):
             request_msg='wlc_rrs',
             update_msg='wlc_urs',
             delete_msg='wlc_drs',
-            default_host="127.0.0.1",
+            default_host="10.1.0.1",
             default_port="3200",
             request_key="tcd_req",
             reply_key="tcd_rep")
 
     def create_slice(self, **kwargs):
+        st = time.time()
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
         s_type = kwargs.get('type', None)
@@ -74,8 +76,12 @@ class wireless_orchestrator_server(base_orchestrator):
 
             # Send the message to create a slice
             success, msg = self.imec_ctl.create_slice(
-                **{'s_id': s_id, 's_type': s_type})
+              **{'s_id': s_id, 's_type': s_type})
+            #  success = True
+            #  msg = {'host': '10.1.1.1'}
 
+
+            print('returned', (time.time()-st)*1000, 'ms')
             # Inform the user about the creation
             return success, msg
 
