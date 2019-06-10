@@ -32,7 +32,7 @@ def parse_cli_args():
 
 def establish_connection(**kwargs):
     # Default RU Server host
-    host = kwargs.get('host', '127.0.0.1')
+    host = kwargs.get('host', '10.0.0.3')
     # Default RU Server port
     port = kwargs.get('port', 1100)
 
