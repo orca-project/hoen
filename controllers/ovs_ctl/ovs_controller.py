@@ -1,3 +1,4 @@
+#!/usr/local/bin/ryu-manager
 # Hack to load parent module
 from sys import path
 
