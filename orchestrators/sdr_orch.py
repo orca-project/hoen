@@ -138,7 +138,7 @@ if __name__ == "__main__":
             request_msg='wl_rr',
             update_msg='wl_ur',
             delete_msg='wl_dr',
-            host='127.0.0.1',
+            host='10.0.0.2',
             port=2100
         )
 

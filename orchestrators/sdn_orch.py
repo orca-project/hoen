@@ -10,6 +10,7 @@ from base_orchestrator.base_orchestrator import base_orchestrator, ctl_base
 from os import system, name
 # Import signal
 import signal
+import time 
 
 def cls():
     system('cls' if name=='nt' else 'clear')
@@ -22,7 +23,7 @@ class wired_orchestrator(base_orchestrator):
             name="OVS",
             host_key="ovs_host",
             port_key="ovs_port",
-            default_host="127.0.0.1",
+            default_host="10.0.0.5",
             default_port="3300",
             request_key="ovs_req",
             reply_key="ovs_rep",
@@ -33,6 +34,7 @@ class wired_orchestrator(base_orchestrator):
 
 
     def create_slice(self, **kwargs):
+        st = time.time()
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
         s_type = kwargs.get('type', None)
@@ -43,6 +45,8 @@ class wired_orchestrator(base_orchestrator):
         if s_type not in ["high-throughput", "low-latency"]:
             # Send error message
             msg = 'Could not identify the traffic type:' + str(s_type)
+
+            print('failed', (time.time()-st)*1000, 'ms')
             # Inform the user about the creation
             return False, msg
 
@@ -58,6 +62,7 @@ class wired_orchestrator(base_orchestrator):
                     'destination': kwargs.get('destination')
                     })
 
+        print('success', (time.time()-st)*1000, 'ms')
         # Inform the user about the creation
         return success, msg
 
@@ -94,7 +99,7 @@ if __name__ == "__main__":
             request_msg='wd_rc',
             update_msg='wd_uc',
             delete_msg='wd_dc',
-            host='127.0.0.1',
+            host='10.0.0.2',
             port=2200
         )
 
