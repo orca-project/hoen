@@ -55,6 +55,10 @@ class ctl_base(object):
         self.delete_ack = "_".join([self.delete_msg.split('_')[-1], "ack"])
         self.delete_nack = "_".join([self.delete_msg.split('_')[-1], "nack"])
 
+        self.topology_msg = kwargs.get("topology_msg", "ctl_ts")
+        self.topology_ack = "_".join([self.topology_msg.split('_')[-1], "ack"])
+        self.topology_nack = "_".join([self.topology_msg.split('_')[-1], "nack"])
+
     def _server_connect(self, **kwargs):
         # Default Server host
         host = kwargs.get(self.host_key, self.default_host)
@@ -184,6 +188,26 @@ class ctl_base(object):
             # Inform the hyperstrator about the success
             print('\t', 'Succeeded removing a ' + self.type + ' Slice in ' + \
                   self.name)
+            return True, msg
+
+        return msg
+
+    def get_topology(self, **kwargs):
+        # Send request message
+        success, msg = self._send_msg(
+            self.topology_ack, self.topology_nack, **{self.topology_msg: kwargs})
+
+        # If the slice request failed
+        if not success:
+            # Inform the hyperstrator about the failure
+            print('\t', 'Failed requesting a ' + self.type + ' topology in ' + \
+                  self.name)
+            return False, msg
+
+        # Otherwise, it succeeded
+        else:
+            # Inform the hyperstrator about the success
+            print('\t', 'Succeeded requesting a ' + self.type + ' topology in ' + self.name)
             return True, msg
 
         return msg

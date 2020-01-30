@@ -63,6 +63,11 @@ class base_controller(object):
         # Get the create service not acknowledgment from keyword arguments
         self.delete_nack = "_".join([self.delete_msg.split('_')[-1], "nack"])
 
+        # Get the topology message from keyword arguments
+        self.topology_msg = kwargs.get('topology_msg', 'ct_ts')
+        self.topology_ack = "_".join([self.topology_msg.split('_')[-1], "ack"])
+        self.topology_nack = "_".join([self.topology_msg.split('_')[-1], "nack"])
+
 
     def _post_init(self, **kwargs):
         # Must overside this method
@@ -106,7 +111,9 @@ class base_controller(object):
         # Must overside this method
         pass
 
-
+    def get_topology(self, **kwargs):
+        # Must overside this method
+        pass
 
     def run(self):
         print('- Started ' + self.name + ' Controller')
@@ -178,11 +185,23 @@ class base_controller(object):
                     self._send_msg(self.delete_ack if success else \
                                    self.delete_nack, msg)
 
+                # Check whether it is a topology check
+                get_topology = request.get(self.topology_msg, None)
+
+                # If we must retrieve the network topology
+                if get_topology is not None:
+                    print('- Get Topology')
+                    success, msg = self.get_topology(**get_topology)
+                    # Send message
+                    self._send_msg(self.topology_ack if success else \
+                                   self.topology_nack, msg)
+
                 # Check for unknown messages
                 unknown_msg = [x for x in request if x not in [self.create_msg,
                                                                self.request_msg,
                                                                self.update_msg,
-                                                               self.delete_msg]]
+                                                               self.delete_msg,
+                                                               self.topology_msg]]
                 # If there is at least an existing unknown message
                 if unknown_msg:
                     print('- Unknown message')

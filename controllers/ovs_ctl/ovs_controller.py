@@ -27,6 +27,8 @@ from ryu.lib.packet import arp
 from ryu.lib.packet import icmp
 from ryu.lib.packet import ether_types
 
+from collections import defaultdict
+
 def cls():
     system('cls' if name == 'nt' else 'clear')
 
@@ -49,182 +51,107 @@ class ovs_controller(base_controller):
         # Join thread
         self.join()
 
+    def get_topology(self, **kwargs):
+        return True, {'topology': self.ovs.topology}
+
     def create_slice(self, **kwargs):
         single = time.time()
+
         # Extract parameters from keyword arguments
-        tech = kwargs.get('type', 'high-throughput')
         s_id = kwargs.get('s_id', None)
-        destination = kwargs.get('destination', None)
-        #  print(destination)
+        route = kwargs.get('route', None)
+
         # Check for validity of the slice ID
         if s_id in self.slice_list:
             print('did not work, took',  + (time.time() - single)*1000, 'ms')
             return False, 'Slice ID already exists'
-        # Check for validity of the destination
-        if not destination:
-            print('dit work, took',  + (time.time() - single)*1000, 'ms')
-            return False, 'Missing destation'
-
-        # Get the third octet, to denote the slice
-        slice_subnet = destination.split('.')[2]
+        # Check for validity of the route
+        if not route:
+            print('did not work, took',  + (time.time() - single)*1000, 'ms')
+            return False, 'Missing route'
 
         # Add the slice to the slice list
         self.slice_list[s_id] = {
-                'type': tech,
-                'subnet': slice_subnet,
-                'destination': destination}
-
-        # Get the route depending on the traffic class
-        if tech == 'high-throughput':
-            # Route 01: High Throughput
-            route = {
-                'subnet': '1',
-                 'switches': [
-                    {'type': 'inbound',
-                     'datapath': self.ovs.switches['h00'],                    
-                     'in_port': 1,
-                     'out_port': 2
-                     },
-                    {'type': 'outbound',
-                     'datapath': self.ovs.switches['h01'],                    
-                     'in_port': 1,
-                     'out_port': 2
-                     }
-                    ]
-                 }
-            print('\t', 'Setting High-Throughput Route')
-
-
-        if tech == 'low-latency':
-            # Route 02: Low Latency 
-            route = {
-                'subnet': '2',
-                'switches': [
-                    {'type': 'inbound',
-                     'datapath': self.ovs.switches['h00'],                    
-                     'in_port': 1,
-                     'out_port': 3
-                     },
-                    {'type': 'inbound',
-                     'datapath': self.ovs.switches['h02'],                    
-                     'in_port': 1,
-                     'out_port': 3
-                     }
-                    ]
-                }
-            print('\t', 'Setting Low-Latency Route')
+                'route': route }
 
         # Iterate over the list of switches
         for switch in route['switches']:
             # Get the datapath
-            datapath = switch['datapath']
-
+            datapath = self.ovs.switches[switch['node']]
             # Extract the datapath parameters
             dpid = datapath.id
             ofproto = datapath.ofproto
             parser = datapath.ofproto_parser
 
-            # Start outputting all packets to port 1
+            # ip_src, ip_dst, s, p_in, p_out)
+            # Creating ingress match and actions which will be send to ovs-switch
             match = parser.OFPMatch(
-                    eth_type=0x0800,
+                    eth_type=switch['eth_type'],
                     in_port=(switch['in_port']),
-                    #  ipv4_src=(
-                    #   '10.%s.%s.0' % (route['subnet'], slice_subnet), 
-                    #   '255.255.255.0'),
-                    ipv4_dst=(
-                        '10.%s.%s.0' % (route['subnet'], slice_subnet),
-                        '255.255.255.0'),
+                    ipv4_src=(route['ipv4_src'], route['ipv4_src_netmask']),
+                    ipv4_dst=(route['ipv4_dst'], route['ipv4_dst_netmask'])
                 )
-
-            #  for x in datapath.ports:
-                #  print(x, datapath.ports[x])
-
             actions = [parser.OFPActionOutput(switch['out_port'])]
 
             # Add the flow to the switch
             self.ovs.add_flow(datapath, 10, match, actions)
 
-            # Start outputting all packets to port 1
+            # Creating egress match and actions which will be send to ovs-switch
             match = parser.OFPMatch(
-                    eth_type=0x0800,
+                    eth_type=switch['eth_type'],
                     in_port=(switch['out_port']),
-                    ipv4_src=(
-                     '10.%s.%s.0' % (route['subnet'], slice_subnet),
-                     '255.255.255.0'),
-                    #  ipv4_dst=(
-                        #  '10.%s.%s.0' % (route['subnet'], slice_subnet),
-                        #  '255.255.255.0'),
-                    )
-
+                    ipv4_src=(route['ipv4_dst'], route['ipv4_dst_netmask']),
+                    ipv4_dst=(route['ipv4_src'], route['ipv4_src_netmask'])
+                )
             actions = [parser.OFPActionOutput(switch['in_port'])]
 
             # Add the flow to the switch
             self.ovs.add_flow(datapath, 10, match, actions)
 
-        #  print('10.%s.%s.0' % (route['subnet'], slice_subnet))
-
-        # Return host and port -- TODO may drop port entirely
-
         print('worked, took',  + (time.time() - single)*1000, 'ms')
-        return True, {'host': destination}
+        return True, {'host': route['ipv4_dst']}
 
 
     def delete_slice(self, **kwargs):
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
+        route = kwargs.get('route', None)
 
         # Check for validity of the slice ID
         if s_id not in self.slice_list:
             return False, 'Slice ID does not exist'
 
-        # Getthe slice to the slice list
-        tech = self.slice_list[s_id]['type']
-        slice_subnet = self.slice_list[s_id]['subnet']
-        destination = self.slice_list[s_id]['destination']
-
-        # Get the route depending on the traffic class
-        if tech == 'high-throughput':
-            # Route 01: High Throughput 
-            switches = [self.ovs.switches['h00'], self.ovs.switches['h01']]
-            route_subnet = 1
-
-        if tech == 'low-latency':
-            # Route 02: Low Latency 
-            switches = [self.ovs.switches['h00'], self.ovs.switches['h02']]
-            route_subnet = 2
+        # Check for validity of the route supposed to be deleted
+        if not route:
+            print('error: route not received, took',  + (time.time() - single)*1000, 'ms')
+            return False, 'Missing route'
+        
 
         # For each switch in the route
-        for switch in switches:
+        for switch in route['switches']:
             # Extract the datapath parameters
-            dpid = switch.id
-            ofproto = switch.ofproto
-            parser = switch.ofproto_parser
+            datapath = self.ovs.switches[switch['node']]
+            dpid = datapath.id
+            ofproto = datapath.ofproto
+            parser = datapath.ofproto_parser
 
             match = parser.OFPMatch(
-                    eth_type=0x0800,
-                    #  ipv4_src=(
-                     #  '10.%s.%s.0' % (route_subnet, slice_subnet),
-                     #  '255.255.255.0'),
-                    ipv4_dst=(
-                     '10.%s.%s.0' % (route_subnet, slice_subnet),
-                        '255.255.255.0'),
-                    )
+                    eth_type=switch['eth_type'],
+                    ipv4_src=(route['ipv4_src'], route['ipv4_src_netmask']),
+                    ipv4_dst=(route['ipv4_dst'], route['ipv4_dst_netmask'])
+                )
 
             # Add the flow to the switch
-            self.ovs.del_flow(switch, match)
+            self.ovs.del_flow(datapath, match)
 
             match = parser.OFPMatch(
-                    eth_type=0x0800,
-                    ipv4_src=(
-                     '10.%s.%s.0' % (route_subnet, slice_subnet),
-                     '255.255.255.0'),
-                    #  ipv4_dst=(
-                        #  '10.%s.%s.0' % (route_subnet, slice_subnet),
-                        #  '255.255.255.0'),
-                    )
+                    eth_type=switch['eth_type'],
+                    ipv4_src=(route['ipv4_dst'], route['ipv4_dst_netmask']),
+                    ipv4_dst=(route['ipv4_src'], route['ipv4_src_netmask'])
+                )
 
             # Add the flow to the switch
-            self.ovs.del_flow(switch, match)
+            self.ovs.del_flow(datapath, match)
 
         # Return host and port -- TODO may drop port entirely
         return True, {'s_id': s_id}
@@ -242,10 +169,24 @@ class ovs_ctl(app_manager.RyuApp):
             #  95536754289: 'h00',
             #  95535344413: 'h01',
             #  95542363502: 'h02'
-            95534111059: 'h00',
-            95538556217: 'h01',
-            95533205304: 'h02'
+            #95534111059: 'h00',
+            #95538556217: 'h01',
+            #95533205304: 'h02'
+            95532435104: 'h00',
+            95533179799: 'h01',
+            95536715226: 'h02',
+            24997437351237: 'h03'
         }
+
+        self.topology = defaultdict(dict)
+        self.topology['h00']['h01'] = 2
+        self.topology['h01']['h00'] = 1
+        self.topology['h00']['h02'] = 3
+        self.topology['h02']['h00'] = 1
+        self.topology['h00']['h03'] = 4
+        self.topology['h03']['h00'] = 1
+        self.topology['h02']['h03'] = 4
+        self.topology['h03']['h02'] = 3
 
         #  Instantiate the OVS SDR Controller
         self.ovs_controller_thread = ovs_controller(
@@ -256,6 +197,7 @@ class ovs_ctl(app_manager.RyuApp):
             request_msg='wdc_rrs',
             update_msg='wdc_urs',
             delete_msg='wdc_drs',
+            topology_msg='wdc_trs',
             host=kwargs.get('host', '10.0.0.5'),
             port=kwargs.get('port', 3300),
             ovs=self
@@ -264,7 +206,7 @@ class ovs_ctl(app_manager.RyuApp):
         # Start the OVS SDR Controller Server
         self.ovs_controller_hub = hub.spawn(self.ovs_controller_thread.run)
 
-        self.count = 3
+        self.count = 4
         self.st = time.time()
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)

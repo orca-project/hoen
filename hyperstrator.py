@@ -327,6 +327,7 @@ class hyperstrator_server(Thread):
                                 's_id': s_id
                             })
 
+
                         # If the radio allocation failed
                         if not radio_success:
                             print('\t', 'Failed creating Radio Slice')
@@ -354,7 +355,9 @@ class hyperstrator_server(Thread):
                             **{
                                 'type': create_service['type'],
                                 's_id': s_id,
-                                'destination': radio_msg['host']
+                                'destination': radio_msg['host'],
+                                'source': create_service['address'],
+                                'qos': create_service['qos']
                             })
 
                         # If the core allocation failed
