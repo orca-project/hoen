@@ -8,48 +8,58 @@ import argparse
 def parse_cli_args():
     # Instantiate ArgumentParser object
     parser = argparse.ArgumentParser(description='Manage E2E Services')
-    # Add a conflicting argument group
-    group = parser.add_mutually_exclusive_group(required=True)
+    # Create subparsers
+    subparsers = parser.add_subparsers(help='Sub-command Help')
+
+    # Create parser for the creation of slices
+    parser_a = subparsers.add_parser(
+        'create',
+        help='Create E2E Network Slice',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
     # Add CLI arguments
-    group.add_argument(
-    '-a', '--address',
-    metavar='IPV4_SOURCE_ADDRESS',
-    type=str,
-    help='create a slicing with this source address')
-    group.add_argument(
-        '-s', '--service-id',
+    parser_a.add_argument(
+        '-s', '--source',
+        metavar='IPV4_SOURCE_ADDRESS',
+        type=str,
+        default='127.0.0.1',
+        #  required=True, # I wonder whether this arguments must be required
+        help='Source Address')
+    parser_a.add_argument(
+        '-t', '--throughput',
+        type=float,
+        default=1.0,
+        help='Required throughput [Mbps]')
+    parser_a.add_argument(
+        '-l', '--latency',
+        type=float,
+        default=10.0,
+        help='Required latency [ms]')
+
+    # Create parser for the removal of slices
+    parser_b = subparsers.add_parser('remove', help='Remove E2E Network Slice')
+    # Add CLI arguments
+    parser_b.add_argument(
+        '-i', '--service-id',
         metavar='S_ID',
-        help='remove a service based on its S_ID')
-    parser.add_argument(
-        '-q', '--qos',
-        nargs='+',
-        metavar=('KEY=VALUE'),
-        help='require a QoS-based slicing. Current supported keys are latency (ms) and throughput (Mb), e.g. --qos latency=1 throughput=1')
+        type=str,
+        help='Remove service based on the S_ID')
 
     # Parse CLI arguments
     arg_dict = vars(parser.parse_args())
-
-    # Generate QoS dictionary 
-    if arg_dict.get('qos') is not None:
-        qos = {}
-        for param in arg_dict.get('qos'):   
-            if "=" in param:
-                key_value = param.split('=')
-                qos[key_value[0]] = float(key_value[1])
-        arg_dict['qos'] = qos
 
     return arg_dict
 
 
 def establish_connection(**kwargs):
     # Default RU Server host
-    host = kwargs.get('host', '10.0.0.3')
+    host = kwargs.get('host', '127.0.0.1')
     # Default RU Server port
     port = kwargs.get('port', 1100)
 
     # Create a ZMQ context
     context = zmq.Context()
-    #  Specity the type of ZMQ socket
+    #  Specify the type of ZMQ socket
     socket = context.socket(zmq.REQ)
     # Connect ZMQ socket to host:port
     socket.connect("tcp://" + host + ":" + str(port))
@@ -58,21 +68,19 @@ def establish_connection(**kwargs):
 
 
 def service_request(socket, **kwargs):
-
+    # Service Request - Create Slice
     create_msg = 'sr_cs'
     create_ack = 'cs_ack'
     create_nack = 'cs_nack'
 
-    # TODO: we need to remove traffic_type from here. I let it just to test the changes in the wired orch...
-    traffic_type = 'low-latency'
-    #traffic_type = 'high-throughput'
-    
     # Send service request message to the hyperstrator
-    socket.send_json({create_msg: {'address': kwargs['address'], 
-                                  'qos': kwargs['qos'],
-                                  'type': traffic_type
-                                  }})
-    
+    socket.send_json({
+        create_msg: {'source': kwargs['source'],
+                     #  'destination': kwargs['destination'],
+                     'requirements': {'throughout': kwargs['throughput'],
+                                      'latency': kwargs['latency']}
+                     }})
+
     # Receive acknowledgment
     rep = socket.recv_json()
 
@@ -84,7 +92,7 @@ def service_request(socket, **kwargs):
         print('- Created Service:')
         # Print information
         print('\tService ID:', ack['s_id'], '\n',
-              '\tHost:', ack['host'])
+              '\tDestination:', ack['destination'])
 
         # Exit gracefully
         exit(0)
@@ -108,7 +116,7 @@ def service_request(socket, **kwargs):
 
 
 def service_release(socket, **kwargs):
-
+    # Service Request - Delete Slice
     delete_msg = "sr_ds"
     delete_ack = "ds_ack"
     delete_nack = "ds_nack"
@@ -153,7 +161,7 @@ if __name__ == "__main__":
     socket = establish_connection()
 
     # If not passing a service ID
-    if kwargs['service_id'] is None:
+    if 'service_id' not in kwargs:
         # Request new E2E service
         service_request(socket, **kwargs)
     # Otherwise

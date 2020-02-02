@@ -10,7 +10,7 @@ from base_orchestrator.base_orchestrator import base_orchestrator, ctl_base
 from os import system, name
 # Import signal
 import signal
-import time 
+import time
 
 # Import SONAr services
 from services.ndb import ndb
@@ -72,16 +72,15 @@ class wired_orchestrator(base_orchestrator):
         st = time.time()
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
-        s_type = kwargs.get('type', None)
         source = kwargs.get('source', None)
         destination = kwargs.get('destination', None)
-        qos = kwargs.get('qos', None)
+        qos = kwargs.get('requirements', None)
 
         # Append it to the list of service IDs
-        self.s_ids[s_id] = s_type
+        self.s_ids[s_id] = qos
 
         # Get network topology
-        (topo_success, topo_msg) = self.ovs_ctl.get_topology()    
+        (topo_success, topo_msg) = self.ovs_ctl.get_topology()
         if not topo_success:
             # Send error message
             msg = '[ERROR]: Could not retrieve the network topology from ovs controller'
@@ -107,7 +106,6 @@ class wired_orchestrator(base_orchestrator):
         # Send the message to create a slice
         success, msg = self.ovs_ctl.create_slice(
                 **{'s_id': s_id,
-                    #'type': s_type,
                     'destination': kwargs.get('destination'),
                     'route': route
                     })
@@ -132,7 +130,6 @@ class wired_orchestrator(base_orchestrator):
 
         # Send message to remove slice
         success, msg = self.ovs_ctl.delete_slice(**{'s_id': s_id,
-                                                    #'type': s_type,
                                                     'route': route})
 
         if success:
@@ -163,11 +160,11 @@ class wired_orchestrator(base_orchestrator):
         print('\t', 'Path to be applied: ', path)
         (ipv4_src, ipv4_src_netmask) = self.convert_cidr_to_netmask(src)
         (ipv4_dst, ipv4_dst_netmask) = self.convert_cidr_to_netmask(dst)
-        
+
         first_port = src_network.get('port')
         last_port = dst_network.get('port')
         switches = engine.generate_match_switches(topology, path, first_port, last_port)
-        
+
         route = {
             'ipv4_src': ipv4_src,
             'ipv4_src_netmask': ipv4_src_netmask,
