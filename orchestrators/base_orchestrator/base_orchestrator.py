@@ -1,0 +1,411 @@
+#!/usr/bin/env python3
+
+# Import the ZMQ module
+import zmq
+# Import the Thread and Lock objects from the threading module
+from threading import Thread, Lock, Event
+# Import the Time and Sleep methods from the time module
+from time import time, sleep
+# Import the System and Name methods from the OS module
+from os import system, name
+
+import signal
+
+def cls():
+    system('cls' if name=='nt' else 'clear')
+
+
+class ctl_base(object):
+
+    def __init__(self, **kwargs):
+        # Extract parameters from keyword arguments
+        self.name = kwargs.get('name', '')
+        self.type = kwargs.get('type', '')
+        self.host_key = kwargs.get("host_key", "")
+        self.port_key = kwargs.get("port_key", "")
+        self.default_host = kwargs.get("default_host", "127.0.0.1")
+        self.default_port = kwargs.get("default_port", "1600")
+        self.request_key = kwargs.get("request_key", "")
+        self.reply_key = kwargs.get("reply_key", "")
+
+        # parse keyword arguments
+        self._parse_kwargs(**kwargs)
+        # Connect to the server
+        self._server_connect(**kwargs)
+
+
+    # Extract message headers from keyword arguments
+    def _parse_kwargs(self, **kwargs):
+        # Get the error message header from keyword arguments
+        self.error_msg = kwargs.get("error_msg", "msg_err")
+
+        self.create_msg = kwargs.get("create_msg", "ctl_cs")
+        self.create_ack = "_".join([self.create_msg.split('_')[-1], "ack"])
+        self.create_nack = "_".join([self.create_msg.split('_')[-1], "nack"])
+
+        self.request_msg = kwargs.get("request_msg", "ctl_rs" )
+        self.request_ack = "_".join([self.request_msg.split('_')[-1], "ack"])
+        self.request_nack = "_".join([self.request_msg.split('_')[-1], "nack"])
+
+        self.update_msg = kwargs.get("update_msg", "ctl_us")
+        self.update_ack = "_".join([self.update_msg.split('_')[-1], "ack"])
+        self.update_nack = "_".join([self.update_msg.split('_')[-1], "nack"])
+
+        self.delete_msg = kwargs.get("delete_msg", "ctl_ds" )
+        self.delete_ack = "_".join([self.delete_msg.split('_')[-1], "ack"])
+        self.delete_nack = "_".join([self.delete_msg.split('_')[-1], "nack"])
+
+    def _server_connect(self, **kwargs):
+        # Default Server host
+        host = kwargs.get(self.host_key, self.default_host)
+        # Default Server port
+        port = kwargs.get(self.port_key, self.default_port)
+        # Create a ZMQ context
+
+        self.context = zmq.Context()
+        #  Specify the type of ZMQ socket
+        self.socket = self.context.socket(zmq.REQ)
+        # Connect ZMQ socket to host:port
+        self.socket.connect("tcp://" + host + ":" + str(port))
+        # Timeout reception every 5 seconds
+        self.socket.setsockopt(zmq.RCVTIMEO, 10000)
+        # # Allow multiple requests and replies
+        self.socket.setsockopt(zmq.REQ_RELAXED, 1)
+        # # Add IDs to ZMQ messages
+        self.socket.setsockopt(zmq.REQ_CORRELATE, 1)
+
+
+    def _send_msg(self, ack, nack, **kwargs):
+        # Send request to the orchestrator
+        self.socket.send_json({self.request_key: kwargs})
+
+        try:
+            # Wait for command
+            msg = self.socket.recv_json().get(self.reply_key, None)
+
+        # If nothing was received during the timeout
+        except zmq.Again:
+            # Try again
+            return False, "Connection timeout to " + self.name + " Orchestrator"
+
+        # If the message is not valid
+        if msg is None:
+            # Return proper error
+            return False, "Received invalid message: " + str(msg)
+        # The orchestrator couldn't decode message
+        elif self.error_msg in msg:
+            # Return message and error code
+            return False, msg[self.error_msg]
+        # If the request succeeded
+        elif ack in msg:
+            # Return host and port
+            return True, msg[ack]
+        # If the create slice request failed
+        elif nack in msg:
+            # Return the failure message
+            return False, msg[nack]
+        else:
+            return False, "Missing ACK or NACK: " + str(msg)
+
+    def create_slice(self, **kwargs):
+        # Send Creation message
+        success, msg = self._send_msg(
+            self.create_ack, self.create_nack, **{self.create_msg: kwargs})
+
+        # If the slice allocation failed
+        if not success:
+            # Inform the hyperstrator about the failure
+            print('\t', 'Failed creating a ' + self.type + ' Slice in ' + \
+                  self.name)
+            return False, msg
+
+        # Otherwise, it succeeded
+        else:
+            # Inform the hyperstrator about the success
+            print('\t', 'Succeeded creating a ' + self.type + ' Slice in ' + \
+                  self.name)
+            return True, msg
+
+    def request_slice(self, **kwargs):
+        # Send request message
+        success, msg = self._send_msg(
+            self.request_ack, self.request_nack, **{self.request_msg: kwargs})
+
+        # If the slice request failed
+        if not success:
+            # Inform the hyperstrator about the failure
+            print('\t', 'Failed requesting a ' + self.type + ' Slice in ' + \
+                  self.name)
+            return False, msg
+
+        # Otherwise, it succeeded
+        else:
+            # Inform the hyperstrator about the success
+            print('\t', 'Succeeded requesting a ' + self.type + ' Slice in ' + self.name)
+            return True, msg
+
+        return msg
+
+    def update_slice(self):
+        # Send update message
+        success, msg = self._send_msg(
+            self.update_ack, self.update_nack, **{self.update_msg: kwargs})
+
+        # If the slice update failed
+        if not success:
+            # Inform the hyperstrator about the failure
+            print('\t', 'Failed updating a ' + self.type + ' Slice in ' + \
+                  self.name)
+            return False, msg
+
+        # Otherwise, it succeeded
+        else:
+            # Inform the hyperstrator about the success
+            print('\t', 'Succeeded updating a ' + self.type + ' Slice in ' + \
+                  self.name)
+            return True, msg
+
+        return msg
+
+    def delete_slice(self, **kwargs):
+        # Send removal message
+        success, msg = self._send_msg(
+            self.delete_ack, self.delete_nack, **{self.delete_msg: kwargs})
+
+        # If the slice removal failed
+        if not success:
+            # Inform the hyperstrator about the failure
+            print('\t', 'Failed removing a ' + self.type + ' Slice in ' + \
+                  self.name)
+            return False, msg
+
+        # Otherwise, it succeeded
+        else:
+            # Inform the hyperstrator about the success
+            print('\t', 'Succeeded removing a ' + self.type + ' Slice in ' + \
+                  self.name)
+            return True, msg
+
+        return msg
+
+class base_orchestrator(Thread):
+
+    def __init__(self, **kwargs):
+        # Initialise the parent class
+        Thread.__init__(self)
+        # Flat to exit gracefully
+        self.shutdown_flag = Event()
+        # Container to hold the list of Service IDs
+        self.s_ids = {}
+
+        # Parse keyword arguments
+        self._parse_kwargs(**kwargs)
+        # Start the HS server
+        self._server_bind(**kwargs)
+
+        # Run post initialization operations
+        self.post_init(**kwargs)
+
+    # Make printing easier. TODO: Implement real logging
+    def _log(self, *args, head=False):
+        print("-" if head else '\t' ,*args)
+
+    # Extract message headers from keyword arguments
+    def _parse_kwargs(self, **kwargs):
+        # Get the error message header from keyword arguments
+        self.error_msg = kwargs.get('error_msg', 'msg_err')
+        self.name = kwargs.get('name', '')
+        self.type = kwargs.get('type', '')
+
+        # Get the request header from keyword arguments
+        self.req_header = kwargs.get('req_header', 'sdr_req')
+        # Get the reply header from keyword arguments
+        self.rep_header = kwargs.get('rep_header', 'sdr_rep')
+
+        # Get the create service message from keyword arguments
+        self.create_msg = kwargs.get('create_msg', 'wl_cr')
+         # Get the create service acknowledgment from keyword arguments
+        self.create_ack = "_".join([self.create_msg.split('_')[-1], "ack"])
+        # Get the create service not acknowledgment from keyword arguments
+        self.create_nack = "_".join([self.create_msg.split('_')[-1], "nack"])
+
+        # Get the request service message from keyword arguments
+        self.request_msg = kwargs.get('request_msg', 'wl_rr')
+         # Get the create service acknowledgment from keyword arguments
+        self.request_ack = "_".join([self.request_msg.split('_')[-1], "ack"])
+        # Get the create service not acknowledgment from keyword arguments
+        self.request_nack = "_".join([self.request_msg.split('_')[-1], "nack"])
+
+        self.update_msg = kwargs.get('update_msg', 'wl_ur')
+         # Get the create service acknowledgment from keyword arguments
+        self.update_ack = "_".join([self.update_msg.split('_')[-1], "ack"])
+        # Get the create service not acknowledgment from keyword arguments
+        self.update_nack = "_".join([self.update_msg.split('_')[-1], "nack"])
+
+        self.delete_msg = kwargs.get('delete_msg', 'wl_dr')
+         # Get the create service acknowledgment from keyword arguments
+        self.delete_ack = "_".join([self.delete_msg.split('_')[-1], "ack"])
+        # Get the create service not acknowledgment from keyword arguments
+        self.delete_nack = "_".join([self.delete_msg.split('_')[-1], "nack"])
+
+
+    def _server_bind(self, **kwargs):
+        # Default HS Server host
+        host = kwargs.get('host', '127.0.0.1')
+        # Default HS Server port
+        port = kwargs.get('port', 4000)
+
+        # Create a ZMQ context
+        self.context = zmq.Context()
+        # Specify the type of ZMQ socket
+        self.socket = self.context.socket(zmq.REP)
+        # Bind ZMQ socket to host:port
+        self.socket.bind("tcp://" + host + ":" + str(port))
+        # Timeout reception every 500 milliseconds
+        self.socket.setsockopt(zmq.RCVTIMEO, 500)
+
+
+    def _send_msg(self, message_type, message):
+        # Send a message with a header
+        self.socket.send_json({self.rep_header: {message_type: message}})
+
+
+    def run(self):
+        print('- Started ' + self.name + ' Orchestrator')
+        # Run while thread is active
+        while not self.shutdown_flag.is_set():
+            # Wait for command
+            try:
+                cmd = self.socket.recv_json()
+            # If nothing was received during the timeout
+            except zmq.Again:
+                # Try again
+                continue
+
+            # Request
+            request = cmd.get(self.req_header, None)
+
+            # If the message is valid
+            if request is not None:
+                print('- Received Message')
+                # Check whether is it a new service
+                create_slice = request.get(self.create_msg, None)
+
+                # If it is a new service
+                if create_slice is not None:
+                    print('- Create ' + self.type + ' Service')
+                    # This service already exists
+                    if create_slice['s_id'] in self.s_ids:
+                        print('\t', 'Service ID already exists.')
+                        msg = 'The service already exists: ' + \
+                            create_slice['s_id']
+                        # Send message
+                        self._send_msg(self.create_nack, msg)
+                        # Leave if clause
+                        continue
+
+                    # Otherwise, it is a new service
+                    # Append it to the list of service IDs
+                    self.s_ids[create_slice['s_id']] = create_slice.get('type',
+                                                                        None)
+
+                    print('\t', 'Service ID:', create_slice['s_id'])
+
+                    # Create new slice
+                    success, msg = self.create_slice(**create_slice)
+
+                    # Send message
+                    self._send_msg(self.create_ack if success else \
+                                   self.create_nack, msg)
+
+                # If it is a remove service
+                delete_slice = request.get(self.delete_msg, None)
+
+                if delete_slice is not None:
+                    print('- Remove ' + self.type + ' Service')
+                    # If this service doesn't exist
+                    if delete_slice['s_id'] not in self.s_ids:
+                        print('\t', 'Service ID doesn\' exist')
+                        msg = 'The service does not exist:' + \
+                            delete_slice['s_id']
+
+                        # Send message
+                        self._send_msg(self.delete_nack, msg)
+                        # Leave if clause
+                        continue
+
+                    print('\t', 'Service ID:', delete_slice['s_id'])
+
+                    # Remove a slice
+                    success, msg = self.delete_slice(**delete_slice)
+
+                    # Send message
+                    self._send_msg(self.delete_ack if success else \
+                                   self.delete_nack, msg)
+
+                    # Remove it from the list of service IDs
+                    del self.s_ids[delete_slice['s_id']]
+
+
+                # Check for unknown messages
+                unknown_msg = [x for x in request if x not in [self.create_msg,
+                                                               self.request_msg,
+                                                               self.update_msg,
+                                                               self.delete_msg]]
+                # If there is at least an existing unknown message
+                if unknown_msg:
+                    print('- Unknown message')
+                    print('\t', 'Message:', unknown_msg[0])
+
+                    msg = "Unknown message: " + str(unknown_msg[0])
+                    # Send message
+                    self._send_msg(self.error_msg, msg)
+
+            # Failed to parse message
+            else:
+                print('- Failed to parse message')
+                print('\t', 'Message:', cmd)
+
+                msg = "Failed to parse message: " + str(cmd)
+                # Send message
+                self._send_msg(self.error_msg, msg)
+
+        # Terminate zmq
+        self.socket.close()
+        self.context.term()
+
+    # Method for stopping the server thread nicely
+    def safe_shutdown(self):
+        print("Exiting")
+        self.shutdown_flag.set()
+        self.join()
+
+
+if __name__ == "__main__":
+    # clear screen
+    cls()
+
+    # Handle keyboard interrupt (SIGINT)
+    try:
+        # Start the Template Orchestrator
+        template_orchestrator_thread = base_orchestrator(
+            name='ORC',
+            type='Generic',
+            req_header='orc_req',
+            rep_header='orc_rep',
+            error_msg='msg_err',
+            create_msg='oc_cs',
+            request_msg='oc_rs',
+            update_msg='oc_us',
+            delete_msg='oc_ds',
+            host='127.0.0.1',
+            port=2000)
+
+        # Start the Template Orchestrator Thread
+        template_orchestrator_thread.start()
+        # Pause the main thread
+        signal.pause()
+
+    except KeyboardInterrupt:
+        # Terminate the Template Orchestrator Server
+        template_orchestrator_thread.safe_shutdown()
