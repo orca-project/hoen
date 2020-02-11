@@ -20,9 +20,6 @@ os.environ["PYLXD_WARNINGS"] = "none"
 class lxd_controller(base_controller):
 
     def post_init(self, **kwargs):
-        # Log statup message
-        self._log('Starting LXD Controller', head=True)
-
         # Instantiate the LXD client
         self.lxd_client = Client()
 
@@ -87,6 +84,10 @@ class lxd_controller(base_controller):
                 {'name':  "id-" + s_id,
                  'source': {'type': 'image', 'alias': s_distro}},
                 wait=True)
+
+            # Start the container
+            container.start(wait=True)
+
         # In case of issues
         except Exception as e:
             # Log event and return
