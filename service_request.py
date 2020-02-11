@@ -9,7 +9,10 @@ def parse_cli_args():
     # Instantiate ArgumentParser object
     parser = argparse.ArgumentParser(description='Manage E2E Services')
     # Create subparsers
-    subparsers = parser.add_subparsers(help='Sub-command Help')
+    subparsers = parser.add_subparsers(help='Sub-command Help',
+                                       dest='subcommand')
+    # Require subcommands
+    subparsers.required = True
 
     # Create parser for the creation of slices
     parser_a = subparsers.add_parser(
@@ -43,6 +46,7 @@ def parse_cli_args():
         '-i', '--service-id',
         metavar='S_ID',
         type=str,
+        required=True,
         help='Remove service based on the S_ID')
 
     # Parse CLI arguments

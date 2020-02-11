@@ -323,12 +323,19 @@ class base_orchestrator(Thread):
 
                 if delete_slice is not None:
                     print('- Remove ' + self.type + ' Service')
+                    # If missing the slice ID:
+                    if delete_slice['s_id'] is None:
+                        self._log("Missing Service ID.")
+                        # Send message
+                        self._send_msg(self.delete_nack, "Missing Service ID")
+                        # Leave if clause
+                        continue
+
                     # If this service doesn't exist
-                    if delete_slice['s_id'] not in self.s_ids:
+                    elif delete_slice['s_id'] not in self.s_ids:
                         print('\t', 'Service ID doesn\' exist')
                         msg = 'The service does not exist:' + \
                             delete_slice['s_id']
-
                         # Send message
                         self._send_msg(self.delete_nack, msg)
                         # Leave if clause

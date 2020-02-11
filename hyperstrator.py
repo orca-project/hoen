@@ -357,14 +357,21 @@ class hyperstrator_server(Thread):
                 # If the flag exists
                 if delete_service is not None:
                     self._log('Delete Service Request', head=True)
+                    # If missing the slice ID:
+                    if delete_service['s_id'] is None:
+                        self._log("Missing Service ID.")
+                        # Send message
+                        self.send_msg(self.delete_nack, "Missing Service ID")
+                        # Leave if clause
+                        continue
+
                     # If this service doesn't exist
-                    if delete_service['s_id'] not in self.s_ids:
+                    elif delete_service['s_id'] not in self.s_ids:
                         self._log('Service ID does not exist')
                         # Send message
                         self.send_msg(self.delete_nack,
                                       'The service does not exist: ' + \
-                                      delete_service.get('s_id', "No ID"))
-
+                                      delete_service['s_id'])
                         # Leave if clause
                         continue
 
