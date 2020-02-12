@@ -78,9 +78,10 @@ class lxd_controller(base_controller):
             return False, 'Slice ID already exists'
 
         # Try to get an available interface
+        index = 0
         available = ""
         # Iterate over the interface list
-        for interface in self.interface_list:
+        for index, interface in enumerate(self.interface_list):
             if self.interface_list[interface]['available']:
                 # Use the first available interface and break the loop
                 available = interface
@@ -95,6 +96,7 @@ class lxd_controller(base_controller):
             return False, 'Not enough resources!'
 
         print(available)
+
         #  Check if container already exist
         #  if self.get_slice(name) is not None:
             #  self.log('Container', name, 'already exists!')
@@ -109,11 +111,21 @@ class lxd_controller(base_controller):
             # Create a new container with the specified configuration
             container = self.lxd_client.containers.create(
                 {'name':  "id-" + s_id,
-                 'source': {'type': 'image', 'alias': s_distro}},
-                wait=True)
+                 'source': {'type': 'image', 'alias': s_distro},
+                 'devices': {"oth0": {"type": "nic",
+                                      "nictype": "physical",
+                                      "parent": available,
+                                      "name": "oth0"}}
+                 },
+                 wait=True)
 
             # Start the container
             container.start(wait=True)
+
+            container.execute(
+                    ["ip", "addr", "add", "10.0.{0}.1/24".format(index), "dev", "oth0"])
+
+            self._log("Configured IP:", "10.0.{0}.1/24".format(index))
 
         # In case of issues
         except Exception as e:

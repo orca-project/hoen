@@ -71,7 +71,7 @@ class ctl_base(object):
         # Connect ZMQ socket to host:port
         self.socket.connect("tcp://" + host + ":" + str(port))
         # Timeout reception every 5 seconds
-        self.socket.setsockopt(zmq.RCVTIMEO, 10000)
+        self.socket.setsockopt(zmq.RCVTIMEO, RECV_DELAY)
         # # Allow multiple requests and replies
         self.socket.setsockopt(zmq.REQ_RELAXED, 1)
         # # Add IDs to ZMQ messages
