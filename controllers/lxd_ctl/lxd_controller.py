@@ -13,7 +13,12 @@ import os
 import signal
 # Import the Time method from the time module
 from time import time
+# Import the net_if_address from the ps_util module
+from psutil import net_if_addrs
+# Import the Client class from the pylxd module
 from pylxd import Client
+
+# Supress pylxd warnings
 os.environ["PYLXD_WARNINGS"] = "none"
 
 
@@ -22,6 +27,10 @@ class lxd_controller(base_controller):
     def post_init(self, **kwargs):
         # Instantiate the LXD client
         self.lxd_client = Client()
+
+
+        self.interface_list = {x: {"available": True} for x in \
+                net_if_addrs().keys() if x.startswith('enp')}
 
     def prepare_distro_image(self, image_name="ubuntu-19.04"):
         # Keep track of time spent here
@@ -37,7 +46,7 @@ class lxd_controller(base_controller):
 
         # Check if the image is stored in the local repository
         if image_name not in \
-                [x.aliases[0]['name'] for x in self.lxd_client.images.all()]:
+                [x.aliases[0]['name'] for x in self.lxd_client.images.all() if x.aliases]:
             self._log("Downloading ", image_name)
 
             # Try to get the new image
@@ -64,10 +73,28 @@ class lxd_controller(base_controller):
 
        # Check for validity of the slice ID
         if s_id in self.slice_list:
-            self._log('Creation did not work!", "Took',
+            self._log('Creation did not work!', 'Took',
                       (time() - st)*1000, 'ms')
             return False, 'Slice ID already exists'
 
+        # Try to get an available interface
+        available = ""
+        # Iterate over the interface list
+        for interface in self.interface_list:
+            if self.interface_list[interface]['available']:
+                # Use the first available interface and break the loop
+                available = interface
+                self.interface_list[interface]['available'] = False
+                break
+
+        # If there are no interfaces available
+        if not available:
+            # Log event and return message
+            self._log('Not enough resources!', 'Took',
+                      (time() - st)*1000, 'ms')
+            return False, 'Not enough resources!'
+
+        print(available)
         #  Check if container already exist
         #  if self.get_slice(name) is not None:
             #  self.log('Container', name, 'already exists!')
@@ -90,13 +117,16 @@ class lxd_controller(base_controller):
 
         # In case of issues
         except Exception as e:
+            # Release resources
+            self.interface_list[interface]['available'] = True
             # Log event and return
             self._log(str(e))
             return False, str(e)
+
         # In case it worked out fine
         else:
             # Append it to the service list
-            self.slice_list[s_id] = container
+            self.slice_list[s_id] = {"container": container, "interface": available}
             # Log event and return
             self._log("Created container!", "Took:", (time()-st)*1000, "ms")
             return True, {'s_id': s_id, "source": "something here"} #TODO!
@@ -109,7 +139,7 @@ class lxd_controller(base_controller):
 
        # Check for validity of the slice ID
         if s_id not in self.slice_list:
-            self._log('Request worked!", "Took', (time() - st)*1000, 'ms')
+            self._log('Request worked!', 'Took', (time() - st)*1000, 'ms')
             return True, {"s_id": s_id,
                           "info": 'There is no slice with this ID'}
 
@@ -121,7 +151,10 @@ class lxd_controller(base_controller):
                     container.config['image.version']
                 # Log event and return
                 self._log("Found container!", "Took:", (time()-st)*1000, "ms")
-                return True, {"s_id": s_id, "info": {"distro": distro}}
+                return True, {"s_id": s_id, 
+                        "info": {"distro": distro,
+                                 "interface": self.slice_list[s_id]['interface']
+                                 }}
 
         # In case the records are outdated
         return False, "Container missing."
@@ -135,7 +168,7 @@ class lxd_controller(base_controller):
        # Check for validity of the slice ID
         if s_id not in self.slice_list:
             # Log event and return
-            self._log('Delete did not work!", "Took',
+            self._log('Delete did not work!', 'Took',
                       (time() - st)*1000, 'ms')
             return False, 'There is no slice with this ID'
 
@@ -169,6 +202,8 @@ class lxd_controller(base_controller):
             return False, str(e)
         # In case it worked out fine
         else:
+            # Release resources 
+            self.interface_list[self.slice_list[s_id]["interface"]]["available"] = True
             # Remove container from list
             self.slice_list.pop(s_id)
             # Log event and return

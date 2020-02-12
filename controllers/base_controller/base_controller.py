@@ -7,6 +7,9 @@ from threading import Thread, Lock, Event
 # Import the Pause method of the Signal module
 from signal import pause
 
+# Received delay of 10 sec
+RECV_DELAY = 10*1000
+
 class base_controller(Thread):
 
     def __init__(self, **kwargs):
@@ -89,7 +92,7 @@ class base_controller(Thread):
         # Bind ZMQ socket to host:port
         self.socket.bind("tcp://" + host + ":" + str(port))
         # Timeout reception every 500 milliseconds
-        self.socket.setsockopt(zmq.RCVTIMEO, 500)
+        self.socket.setsockopt(zmq.RCVTIMEO, RECV_DELAY)
 
 
     def _send_msg(self, message_type, message):

@@ -9,6 +9,9 @@ from time import time, sleep
 # Import the System and Name methods from the OS module
 from os import system, name
 
+# Received delay of 10 sec
+RECV_DELAY = 30*1000
+
 import signal
 
 def cls():
@@ -116,7 +119,7 @@ class ctl_base(object):
         if not success:
             # Inform the hyperstrator about the failure
             print('\t', 'Failed creating a ' + self.type + ' Slice in ' + \
-                  self.name)
+                    self.name, "Reason:", msg)
             return False, msg
 
         # Otherwise, it succeeded
@@ -135,7 +138,7 @@ class ctl_base(object):
         if not success:
             # Inform the hyperstrator about the failure
             print('\t', 'Failed requesting a ' + self.type + ' Slice in ' + \
-                  self.name)
+                  self.name, "Reason:", msg)
             return False, msg
 
         # Otherwise, it succeeded
@@ -155,7 +158,7 @@ class ctl_base(object):
         if not success:
             # Inform the hyperstrator about the failure
             print('\t', 'Failed updating a ' + self.type + ' Slice in ' + \
-                  self.name)
+                  self.name, "Reason:", msg)
             return False, msg
 
         # Otherwise, it succeeded
@@ -176,7 +179,7 @@ class ctl_base(object):
         if not success:
             # Inform the hyperstrator about the failure
             print('\t', 'Failed removing a ' + self.type + ' Slice in ' + \
-                  self.name)
+                  self.name, "Reason:", msg)
             return False, msg
 
         # Otherwise, it succeeded
@@ -262,7 +265,7 @@ class base_orchestrator(Thread):
         # Bind ZMQ socket to host:port
         self.socket.bind("tcp://" + host + ":" + str(port))
         # Timeout reception every 500 milliseconds
-        self.socket.setsockopt(zmq.RCVTIMEO, 500)
+        self.socket.setsockopt(zmq.RCVTIMEO, RECV_DELAY)
 
 
     def _send_msg(self, message_type, message):

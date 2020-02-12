@@ -13,6 +13,9 @@ from signal import pause
 # Import the Time method from the Time module
 from time import time
 
+# Received delay of 10 sec
+RECV_DELAY = 10*1000
+
 # Clear terminal screen
 def cls():
     # Perform action based on the current platform
@@ -276,7 +279,7 @@ class hyperstrator_server(Thread):
         # Bind ZMQ socket to host:port
         self.socket.bind("tcp://" + host + ":" + str(port))
         # Timeout reception every 500 milliseconds
-        self.socket.setsockopt(zmq.RCVTIMEO, 5000)
+        self.socket.setsockopt(zmq.RCVTIMEO, RECV_DELAY)
 
     def send_msg(self, message_type, message):
         # Send a message with a header
