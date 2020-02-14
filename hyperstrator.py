@@ -319,7 +319,8 @@ class hyperstrator_server(Thread):
                         core_success, core_msg = self.cn_orch.create_slice(
                             **{
                                 's_id': s_id,
-                                'requirements': create_service['requirements']
+                                'requirements': create_service['requirements'],
+                                'distribution': create_service['distribution']
                             })
 
                         # If the core allocation failed

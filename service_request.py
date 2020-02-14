@@ -22,10 +22,10 @@ def parse_cli_args():
 
     # Add CLI arguments
     parser_a.add_argument(
-        '-s', '--source',
-        metavar='IPV4_SOURCE_ADDRESS',
+        '-d', '--distro',
+        metavar='Type of Linux Distribution',
         type=str,
-        default='127.0.0.1',
+        default='ubuntu-19.04-plain',
         #  required=True, # I wonder whether this arguments must be required
         help='Source Address')
     parser_a.add_argument(
@@ -79,8 +79,7 @@ def service_request(socket, **kwargs):
 
     # Send service request message to the hyperstrator
     socket.send_json({
-        create_msg: {'source': kwargs['source'],
-                     #  'destination': kwargs['destination'],
+        create_msg: {'distribution': kwargs['distro'],
                      'requirements': {'throughout': kwargs['throughput'],
                                       'latency': kwargs['latency']}
                      }})

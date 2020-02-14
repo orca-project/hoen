@@ -67,7 +67,7 @@ class lxd_controller(base_controller):
         st = time()
        # Extract parameters from keyword arguments
         s_id = str(kwargs.get('s_id', None))
-        s_distro = kwargs.get('s_distro', "ubuntu-19.04")
+        s_distro = kwargs.get('distribution', "ubuntu-19.04")
         i_cpu = kwargs.get('i_cpu', 1)
         f_ram = kwargs.get('s_ram', 1.0)
 

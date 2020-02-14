@@ -36,18 +36,21 @@ class core_network_orchestrator(base_orchestrator):
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
         # Get the slice requirements
-        s_req = kwargs.get('s_req', None)
+        s_req = kwargs.get('requirements', None)
+        # Get the slice distribution 
+        s_dis = kwargs.get('distribution', "ubuntu-19.10-plain")
 
         # Append it to the list of service IDs
-        self.s_ids[s_id] = s_req
+        self.s_ids[s_id] = {"requirements": s_req,
+                            "distribution": s_dis}
 
         # Send message to LXD CN controller
-        print('\t', 'Requirements: ' + str(s_req))
-        print('\t', 'Delegating it to the LXD Controller')
+        self._log("Distribution:", s_dis, 'Requirements:', str(s_req))
+        self._log('Delegating it to the LXD Controller')
 
         # Send the message to create a slice
         success, msg = self.lxd_ctl.create_slice(
-                **{'s_id': s_id, 's_distro': "ubuntu-19.10" })
+                **{'s_id': s_id, 'distribution': s_dis })
 
         # Inform the user about the creation
         return success, msg
@@ -56,15 +59,17 @@ class core_network_orchestrator(base_orchestrator):
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
         # Get the slice requirements
-        s_req = self.s_ids[s_id]
+        s_req = self.s_ids[s_id]['requirements']
+        # Get the slice distribution
+        s_dis = self.s_ids[s_id]['distribution']
 
         # Send message to LXD SDN controller
-        print('\t', 'Requirements: ' + str(s_req))
-        print('\t', 'Delegating it to the LXD Controller')
+        self._log("Distribution:", s_dis, 'Requirements:', str(s_req))
+        self._log('Delegating it to the LXD Controller')
 
         # Send message to remove slice
-        success, msg = self.lxd_ctl.delete_slice(**{'s_id': s_id,
-                                                    's_req': s_req})
+        success, msg = self.lxd_ctl.delete_slice(
+                **{'s_id': s_id, 'ditribution': s_dis})
 
         # Inform the user about the removal
         return success, msg
