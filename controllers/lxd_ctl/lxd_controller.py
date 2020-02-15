@@ -39,10 +39,17 @@ class lxd_controller(base_controller):
         #  image_server = "https://images.linuxcontainers.org"
         image_server = "https://cloud-images.ubuntu.com/releases/"
 
-        # Check if we have the right type of distributions
-        if image_name.split('-')[0].lower() != 'ubuntu':
-            raise ValueError('Only supports Ubuntu distributions:', image_name)
+        # Split the name for later use
+        name_split = image_name.split('-')
+        # If missing the type of image, use vanilla
+        if len(name_split) == 2:
+            # And update the name & split
+            image_name += "-plain"
+            name_split += ["plain"]
 
+        # Check if we have the right type of distributions
+        if name_split[0].lower() != 'ubuntu':
+            raise ValueError('Only supports Ubuntu distributions:', image_name)
 
         # Check if the image is stored in the local repository
         if image_name not in \
@@ -50,22 +57,23 @@ class lxd_controller(base_controller):
             self._log("Downloading ", image_name)
 
             # If using a custom image #TODO
-            if  image_name.split('-')[2].lower() != "plain":
+            if  name_split[2].lower() != "plain":
                 raise ValueError('Not dealing with custom images at the moment:', image_name)
 
             # Get vanilla image
             else:
                 # Try to get the new image
                 image = self.lxd_client.images.create_from_simplestreams(
-                    image_server, image_name.split('-')[1])
+                    image_server, name_split[1])
 
             # Check whether we have an alias for it already
             if 'name' not in image.aliases:
                 # If not, add the alias
                 image.add_alias(name=image_name, description="")
 
-        # Log event
+        # Log event and return possible new name
         self._log("Base image ready!", (time()-st)*1000, "ms")
+        return image_name
 
 
     def create_slice(self, **kwargs):
@@ -109,11 +117,11 @@ class lxd_controller(base_controller):
         #  else:
 
         try:
-            # Prepare image of the chosen distribution
-            self.prepare_distro_image(s_distro)
+            #  Prepare image of the chosen distribution
+            s_distro = self.prepare_distro_image(s_distro)
 
         except Exception as e:
-            # Log event and return
+            #  Log event and return
             self._log("Could not prepare base image:", str(e))
             return False, str(e)
 

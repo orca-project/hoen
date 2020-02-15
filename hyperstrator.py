@@ -14,7 +14,7 @@ from signal import pause
 from time import time
 
 # Received delay of 10 sec
-RECV_DELAY = 10*1000
+RECV_DELAY = 30*1000
 
 # Clear terminal screen
 def cls():
