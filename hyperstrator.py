@@ -345,9 +345,7 @@ class hyperstrator_server(Thread):
                     # Append it to the list of service IDs
                     self.s_ids.append(s_id)
 
-
                     # Inform the user about the configuration success
-                    # TODO Destination and po
                     self.send_msg(self.create_ack, {
                         's_id': s_id,
                         'source': core_msg['source']

@@ -32,7 +32,7 @@ class lxd_controller(base_controller):
         self.interface_list = {x: {"available": True} for x in \
                 net_if_addrs().keys() if x.startswith('enp')}
 
-    def prepare_distro_image(self, image_name="ubuntu-19.04"):
+    def prepare_distro_image(self, image_name="ubuntu-19.04-plain"):
         # Keep track of time spent here
         st = time()
         # Image server locations
@@ -49,9 +49,15 @@ class lxd_controller(base_controller):
                 [x.aliases[0]['name'] for x in self.lxd_client.images.all() if x.aliases]:
             self._log("Downloading ", image_name)
 
-            # Try to get the new image
-            image = self.lxd_client.images.create_from_simplestreams(
-                image_server, image_name.split('-')[1])
+            # If using a custom image #TODO
+            if  image_name.split('-')[2].lower() != "plain":
+                raise ValueError('Not dealing with custom images at the moment:', image_name)
+
+            # Get vanilla image
+            else:
+                # Try to get the new image
+                image = self.lxd_client.images.create_from_simplestreams(
+                    image_server, image_name.split('-')[1])
 
             # Check whether we have an alias for it already
             if 'name' not in image.aliases:
@@ -67,7 +73,8 @@ class lxd_controller(base_controller):
         st = time()
        # Extract parameters from keyword arguments
         s_id = str(kwargs.get('s_id', None))
-        s_distro = kwargs.get('distribution', "ubuntu-19.04")
+        s_distro = kwargs.get('s_distro', "ubuntu-19.04-plain")
+        # TODO: Ideally the CN orchestrator would specify the resources
         i_cpu = kwargs.get('i_cpu', 1)
         f_ram = kwargs.get('s_ram', 1.0)
 
@@ -79,23 +86,21 @@ class lxd_controller(base_controller):
 
         # Try to get an available interface
         index = 0
-        available = ""
+        available_interface = ""
         # Iterate over the interface list
         for index, interface in enumerate(self.interface_list):
             if self.interface_list[interface]['available']:
                 # Use the first available interface and break the loop
-                available = interface
+                available_interface = interface
                 self.interface_list[interface]['available'] = False
                 break
 
         # If there are no interfaces available
-        if not available:
+        if not available_interface:
             # Log event and return message
             self._log('Not enough resources!', 'Took',
                       (time() - st)*1000, 'ms')
             return False, 'Not enough resources!'
-
-        print(available)
 
         #  Check if container already exist
         #  if self.get_slice(name) is not None:
@@ -103,8 +108,14 @@ class lxd_controller(base_controller):
         #  If not, lets create it
         #  else:
 
-        # Prepare image of the chosen distribution
-        self.prepare_distro_image(s_distro)
+        try:
+            # Prepare image of the chosen distribution
+            self.prepare_distro_image(s_distro)
+
+        except Exception as e:
+            # Log event and return
+            self._log("Could not prepare base image:", str(e))
+            return False, str(e)
 
         # Try to create a new container
         try:
@@ -114,7 +125,7 @@ class lxd_controller(base_controller):
                  'source': {'type': 'image', 'alias': s_distro},
                  'devices': {"oth0": {"type": "nic",
                                       "nictype": "physical",
-                                      "parent": available,
+                                      "parent": available_interface,
                                       "name": "oth0"}}
                  },
                  wait=True)
@@ -122,10 +133,12 @@ class lxd_controller(base_controller):
             # Start the container
             container.start(wait=True)
 
+            # Set the interface's IP
+            interface_ip = "10.0.{0}.1/24".format(index)
             container.execute(
-                    ["ip", "addr", "add", "10.0.{0}.1/24".format(index), "dev", "oth0"])
-
-            self._log("Configured IP:", "10.0.{0}.1/24".format(index))
+                    ["ip", "addr", "add", interface_ip, "dev", "oth0"])
+            # And log event
+            self._log("Configured IP:", interface_ip)
 
         # In case of issues
         except Exception as e:
@@ -138,10 +151,12 @@ class lxd_controller(base_controller):
         # In case it worked out fine
         else:
             # Append it to the service list
-            self.slice_list[s_id] = {"container": container, "interface": available}
+            self.slice_list[s_id] = { 
+                    "container": container,  
+                    "interface": available_interface}
             # Log event and return
             self._log("Created container!", "Took:", (time()-st)*1000, "ms")
-            return True, {'s_id': s_id, "source": "something here"} #TODO!
+            return True, {'s_id': s_id, "source": interface_ip}
 
     def request_slice(self, **kwargs):
          # Keep track of time spent here
@@ -151,7 +166,7 @@ class lxd_controller(base_controller):
 
        # Check for validity of the slice ID
         if s_id not in self.slice_list:
-            self._log('Request worked!', 'Took', (time() - st)*1000, 'ms')
+            self._log('Request did not work!', 'Took', (time() - st)*1000, 'ms')
             return True, {"s_id": s_id,
                           "info": 'There is no slice with this ID'}
 
@@ -159,12 +174,12 @@ class lxd_controller(base_controller):
         for container in self.lxd_client.containers.all():
             if "id-" + s_id == container.name:
                 # Get info about the OS. #TODO CPU & RAM, maybe?
-                distro = container.config["image.os"]+ "-" + \
+                s_distro = container.config["image.os"]+ "-" + \
                     container.config['image.version']
                 # Log event and return
                 self._log("Found container!", "Took:", (time()-st)*1000, "ms")
                 return True, {"s_id": s_id, 
-                        "info": {"distro": distro,
+                        "info": {"s_distro": s_distro,
                                  "interface": self.slice_list[s_id]['interface']
                                  }}
 

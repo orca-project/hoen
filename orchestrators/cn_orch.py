@@ -50,7 +50,7 @@ class core_network_orchestrator(base_orchestrator):
 
         # Send the message to create a slice
         success, msg = self.lxd_ctl.create_slice(
-                **{'s_id': s_id, 'distribution': s_dis })
+                **{'s_id': s_id, 's_distro': s_dis })
 
         # Inform the user about the creation
         return success, msg
