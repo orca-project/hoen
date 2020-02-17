@@ -50,7 +50,9 @@ class base_controller(Thread):
          # Get the create service acknowledgment from keyword arguments
         self.create_ack = "_".join([self.create_msg.split('_')[-1], "ack"])
         # Get the create service not acknowledgment from keyword arguments
-        self.create_nack = "_".join([self.create_msg.split('_')[-1], "nack"])
+          def get_topology(self, **kwargs):
+        # Must overside this method
+        pass  self.create_nack = "_".join([self.create_msg.split('_')[-1], "nack"])
 
         # Get the request service message from keyword arguments
         self.request_msg = kwargs.get('request_msg', 'ct_rs')
@@ -73,6 +75,10 @@ class base_controller(Thread):
         # Get the create service not acknowledgment from keyword arguments
         self.delete_nack = "_".join([self.delete_msg.split('_')[-1], "nack"])
 
+        # Get the topology message from keyword arguments
+        self.topology_msg = kwargs.get('topology_msg', 'ct_ts')
+        self.topology_ack = "_".join([self.topology_msg.split('_')[-1], "ack"])
+        self.topology_nack = "_".join([self.topology_msg.split('_')[-1], "nack"])
 
     def _post_init(self, **kwargs):
         # Must overside this method
@@ -116,7 +122,9 @@ class base_controller(Thread):
         # Must overside this method
         pass
 
-
+    def get_topology(self, **kwargs):
+        # Must overside this method
+        pass
 
     def run(self):
         self._log('Started ' + self.name + ' Controller', head=True)
@@ -188,11 +196,24 @@ class base_controller(Thread):
                     self._send_msg(self.delete_ack if success else \
                                    self.delete_nack, msg)
 
+                # Check whether it is a topology check
+                get_topology = request.get(self.topology_msg, None)
+
+                # If we must retrieve the network topology
+                if get_topology is not None:
+                    self._log('Get Topology', head=True)
+
+                    success, msg = self.get_topology(**get_topology)
+                    # Send message
+                    self._send_msg(self.topology_ack if success else \
+                                   self.topology_nack, msg)
+
                 # Check for unknown messages
                 unknown_msg = [x for x in request if x not in [self.create_msg,
                                                                self.request_msg,
                                                                self.update_msg,
-                                                               self.delete_msg]]
+                                                               self.delete_msg,
+                                                               self.topology_msg]]
                 # If there is at least an existing unknown message
                 if unknown_msg:
                     self._log('Unknown message', head=True)

@@ -1,5 +1,7 @@
 #!/usr/local/bin/ryu-manager
 
+from eventlet.green import zmq
+
 # Hack to load parent module
 from sys import path
 path.append('..')
@@ -36,15 +38,10 @@ def cls():
 class ovs_controller(base_controller):
 
     def post_init(self, **kwargs):
-        # TODO Override this method at will
-        self._log('Starting OVS Controller', head=True)
-
-        self.ovs = kwargs.get('ovs')
-
+        # Clear screen
         cls()
 
-        # Hold information about the slices
-        self.slice_list = {}
+        self.ovs = kwargs.get('ovs')
 
     def get_topology(self, **kwargs):
         return True, {'topology': self.ovs.topology}
