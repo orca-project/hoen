@@ -20,6 +20,7 @@ from pylxd import Client
 
 # Supress pylxd warnings
 os.environ["PYLXD_WARNINGS"] = "none"
+from threading import Thread
 
 
 class lxd_controller(base_controller):
@@ -83,8 +84,8 @@ class lxd_controller(base_controller):
         s_id = str(kwargs.get('s_id', None))
         s_distro = kwargs.get('s_distro', "ubuntu-19.04-plain")
         # TODO: Ideally the CN orchestrator would specify the resources
-        i_cpu = kwargs.get('i_cpu', 1)
-        f_ram = kwargs.get('s_ram', 1.0)
+        s_cpu = str(kwargs.get('s_cpu', 1))
+        s_ram = str(int(kwargs.get('s_ram', 1.0)))
 
        # Check for validity of the slice ID
         if s_id in self.slice_list:
@@ -130,6 +131,10 @@ class lxd_controller(base_controller):
             # Create a new container with the specified configuration
             container = self.lxd_client.containers.create(
                 {'name':  "id-" + s_id,
+                 'config': {
+                   'limits.cpu': s_cpu,
+                   'limits.memory': s_ram + "GB"
+                 },
                  'source': {'type': 'image', 'alias': s_distro},
                  'devices': {"oth0": {"type": "nic",
                                       "nictype": "physical",
@@ -145,8 +150,14 @@ class lxd_controller(base_controller):
             interface_ip = "10.0.{0}.1/24".format(index)
             container.execute(
                     ["ip", "addr", "add", interface_ip, "dev", "oth0"])
-            # And log event
+
             self._log("Configured IP:", interface_ip)
+
+            # TODO: Dirty awful way, hate it. It should be a docker.
+            Thread(target=container.execute,
+                   args=(['python3', '-m', 'http.server'],)).start()
+
+            self._log("Return!")
 
         # In case of issues
         except Exception as e:

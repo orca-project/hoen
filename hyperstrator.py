@@ -526,7 +526,7 @@ if __name__ == "__main__":
             create_msg='sr_cs',
             remove_msg='sr_rs',
             do_radio=False,
-            do_transport=True,
+            do_transport=False,
             do_core=True)
         # Start the Hyperstrator Thread
         hyperstrator_thread.start()
