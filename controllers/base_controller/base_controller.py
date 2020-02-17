@@ -134,16 +134,16 @@ class base_controller(Thread):
             request = cmd.get(self.req_header, None)
             # If the message is valid
             if request is not None:
-                print('- Received Message')
+                self._log('Received Message', head=True)
                 # Check wheter is it a new slice
                 create_slice = request.get(self.create_msg, None)
 
                 # If we must create a new slice
                 if create_slice is not None:
-                    print('- Create Slice')
+                    self._log('Create Slice', head=True)
                     # This service already exists
                     if create_slice['s_id'] in self.s_ids:
-                        print('\tService ID already exists.')
+                        self._log('Service ID already exists.')
                         msg = 'The Slice already exists: ' + \
                             create_slice['s_id']
                         # Send message
@@ -153,7 +153,7 @@ class base_controller(Thread):
 
                     # Append it to the list of service IDs
                     self.s_ids.append(create_slice['s_id'])
-                    print('\t', 'Service ID:', create_slice['s_id'])
+                    self._log('Service ID:', create_slice['s_id'])
 
                     # Create new slice
                     success, msg = self.create_slice(**create_slice)
@@ -166,7 +166,7 @@ class base_controller(Thread):
 
                 # If we must delete a slice
                 if delete_slice is not None:
-                    print('- Delete Slice')
+                    self._log('Delete Slice', head=True)
                     # This service doesn't exist
                     if delete_slice['s_id'] not in self.s_ids:
                         msg = 'The slice does not exist:' + \
@@ -179,7 +179,7 @@ class base_controller(Thread):
 
                     # Remove it from the list of service IDs
                     self.s_ids.remove(delete_slice['s_id'])
-                    print('\t', 'Service ID:', delete_slice['s_id'])
+                    self._log('Service ID:', delete_slice['s_id'])
 
                     # Remove a slice
                     success, msg = self.delete_slice(**delete_slice)
@@ -195,8 +195,8 @@ class base_controller(Thread):
                                                                self.delete_msg]]
                 # If there is at least an existing unknown message
                 if unknown_msg:
-                    print('- Unknown message')
-                    print('\t', 'Message:', unknown_msg[0])
+                    self._log('Unknown message', head=True)
+                    self._log('Message:', unknown_msg[0])
 
                     msg = "Unknown message: " + str(unknown_msg[0])
                     # Send message
@@ -204,8 +204,8 @@ class base_controller(Thread):
 
             # Failed to parse message
             else:
-                print('- Failed to parse message')
-                print('\t', 'Message:', request)
+                self._log('Failed to parse message', head=True)
+                self._log('Message:', request)
 
                 msg = "Failed to parse message: " + str(request)
                 # Send message
@@ -217,7 +217,7 @@ class base_controller(Thread):
 
     # Method for stopping the server thread nicely
     def safe_shutdown(self):
-        print("Exiting")
+        self._log("Exiting")
         self.shutdown_flag.set()
         self.join()
 

@@ -37,7 +37,7 @@ class core_network_orchestrator(base_orchestrator):
         s_id = kwargs.get('s_id', None)
         # Get the slice requirements
         s_req = kwargs.get('requirements', None)
-        # Get the slice distribution 
+        # Get the slice distribution
         s_dis = kwargs.get('distribution', "ubuntu-19.10-plain")
 
         # Append it to the list of service IDs
@@ -91,7 +91,7 @@ if __name__ == "__main__":
             update_msg='cn_uc',
             delete_msg='cn_dc',
             host='127.0.0.1',
-            port=2200)
+            port=2300)
 
         # Start the Core Network Orchestrator
         core_network_orchestrator_thread.start()

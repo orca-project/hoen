@@ -228,7 +228,7 @@ class hyperstrator_server(Thread):
              name="Transport Network",
              host_key="tn_host",
              port_key="tn_port",
-             default_host="10.0.0.2",
+             default_host="127.0.0.1",
              default_port="2200",
              create_msg="tn_cc",
              request_msg="tn_rc",

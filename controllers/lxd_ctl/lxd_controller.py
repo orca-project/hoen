@@ -159,8 +159,8 @@ class lxd_controller(base_controller):
         # In case it worked out fine
         else:
             # Append it to the service list
-            self.slice_list[s_id] = { 
-                    "container": container,  
+            self.slice_list[s_id] = {
+                    "container": container,
                     "interface": available_interface}
             # Log event and return
             self._log("Created container!", "Took:", (time()-st)*1000, "ms")
@@ -186,7 +186,7 @@ class lxd_controller(base_controller):
                     container.config['image.version']
                 # Log event and return
                 self._log("Found container!", "Took:", (time()-st)*1000, "ms")
-                return True, {"s_id": s_id, 
+                return True, {"s_id": s_id,
                         "info": {"s_distro": s_distro,
                                  "interface": self.slice_list[s_id]['interface']
                                  }}
@@ -237,7 +237,7 @@ class lxd_controller(base_controller):
             return False, str(e)
         # In case it worked out fine
         else:
-            # Release resources 
+            # Release resources
             self.interface_list[self.slice_list[s_id]["interface"]]["available"] = True
             # Remove container from list
             self.slice_list.pop(s_id)
@@ -260,7 +260,7 @@ if __name__ == "__main__":
             update_msg='lcc_urs',
             delete_msg='lcc_drs',
             host='127.0.0.1',
-            port=3600)
+            port=3300)
 
         # Start the LXD Controller Server
         lxd_controller_thread.start()
