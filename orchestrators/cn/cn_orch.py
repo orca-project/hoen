@@ -23,7 +23,7 @@ class core_network_orchestrator(base_orchestrator):
             host_key="LXD_host",
             port_key="LXD_port",
             default_host="127.0.0.1",
-            default_port="3600",
+            default_port="3300",
             request_key="lxd_req",
             reply_key="lxd_rep",
             create_msg='lcc_crs',

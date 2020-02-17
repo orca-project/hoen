@@ -359,11 +359,11 @@ class hyperstrator_server(Thread):
                     else:
                         self._log('Skipping CN')
                         # Use a fake source IP
-                        core_msg = {'s_id': sd_id, 'source': '20.0.0.1'}
+                        core_msg = {'s_id': s_id, 'source': '20.0.0.1'}
 
 
                     #TODO: RAN will come here
-                    radio_msg = {'s_id': sd_id, 'destination': '30.0.0.1'}
+                    radio_msg = {'s_id': s_id, 'destination': '30.0.0.1'}
 
 
                     # If allocating TN slices

@@ -19,40 +19,11 @@ from services.path_engine import PathEngine
 def cls():
     system('cls' if name=='nt' else 'clear')
 
-class ovs_base(ctl_base):
-    def post_init(self, **kwargs):
-
-        self.topology_msg = kwargs.get("topology_msg", "ctl_ts")
-        self.topology_ack = "_".join([self.topology_msg.split('_')[-1], "ack"])
-        self.topology_nack = "_".join([self.topology_msg.split('_')[-1], "nack"])
-
-    def get_topology(self, **kwargs):
-        # Send request message
-        success, msg = self._send_msg(
-            self.topology_ack, self.topology_nack, **{self.topology_msg: kwargs})
-
-        # If the slice request failed
-        if not success:
-            # Inform the hyperstrator about the failure
-            self._log('Failed requesting a ' + self.type + \
-                      ' topology in ' + self.name)
-            return False, msg
-
-        # Otherwise, it succeeded
-        else:
-            # Inform the hyperstrator about the success
-            self._log('Succeeded requesting a ' + self.type + \
-                      ' topology in ' + self.name)
-            return True, msg
-
-        return msg
-
-
 class tn_orchestrator(base_orchestrator):
 
     def post_init(self, **kwargs):
         # OVS Controller Handler
-        self.ovs_ctl = ovs_base(
+        self.ovs_ctl = ctl_base(
             name="OVS",
             host_key="ovs_host",
             port_key="ovs_port",

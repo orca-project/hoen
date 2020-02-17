@@ -50,9 +50,7 @@ class base_controller(Thread):
          # Get the create service acknowledgment from keyword arguments
         self.create_ack = "_".join([self.create_msg.split('_')[-1], "ack"])
         # Get the create service not acknowledgment from keyword arguments
-          def get_topology(self, **kwargs):
-        # Must overside this method
-        pass  self.create_nack = "_".join([self.create_msg.split('_')[-1], "nack"])
+        self.create_nack = "_".join([self.create_msg.split('_')[-1], "nack"])
 
         # Get the request service message from keyword arguments
         self.request_msg = kwargs.get('request_msg', 'ct_rs')

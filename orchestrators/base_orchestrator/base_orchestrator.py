@@ -36,6 +36,9 @@ class ctl_base(object):
         # Connect to the server
         self._server_connect(**kwargs)
 
+    # Make printing easier. TODO: Implement real logging
+    def _log(self, *args, head=False):
+        print("-" if head else '\t' ,*args)
 
     # Extract message headers from keyword arguments
     def _parse_kwargs(self, **kwargs):
@@ -57,6 +60,10 @@ class ctl_base(object):
         self.delete_msg = kwargs.get("delete_msg", "ctl_ds" )
         self.delete_ack = "_".join([self.delete_msg.split('_')[-1], "ack"])
         self.delete_nack = "_".join([self.delete_msg.split('_')[-1], "nack"])
+
+        self.topology_msg = kwargs.get("topology_msg", "ctl_ts")
+        self.topology_ack = "_".join([self.topology_msg.split('_')[-1], "ack"])
+        self.topology_nack = "_".join([self.topology_msg.split('_')[-1], "nack"])
 
     def _server_connect(self, **kwargs):
         # Default Server host
@@ -187,6 +194,27 @@ class ctl_base(object):
             # Inform the hyperstrator about the success
             print('\t', 'Succeeded removing a ' + self.type + ' Slice in ' + \
                   self.name)
+            return True, msg
+
+        return msg
+
+    def get_topology(self, **kwargs):
+        # Send request message
+        success, msg = self._send_msg(
+            self.topology_ack, self.topology_nack, **{self.topology_msg: kwargs})
+
+        # If the slice request failed
+        if not success:
+            # Inform the hyperstrator about the failure
+            self._log('Failed requesting a ' + self.type + \
+                      ' topology in ' + self.name)
+            return False, msg
+
+        # Otherwise, it succeeded
+        else:
+            # Inform the hyperstrator about the success
+            self._log('Succeeded requesting a ' + self.type + \
+                      ' topology in ' + self.name)
             return True, msg
 
         return msg
@@ -336,7 +364,7 @@ class base_orchestrator(Thread):
 
                     # If this service doesn't exist
                     elif delete_slice['s_id'] not in self.s_ids:
-                        self._log(('Service ID doesn\' exist')
+                        self._log('Service ID does not exist')
                         msg = 'The service does not exist:' + \
                             delete_slice['s_id']
                         # Send message
