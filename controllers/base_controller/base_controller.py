@@ -83,7 +83,7 @@ class base_controller(Thread):
         # Default HS Server host
         host = kwargs.get('host', '127.0.0.1')
         # Default HS Server port
-        port = kwargs.get('port', 10000)
+        port = kwargs.get('port', 3000)
 
         # Create a ZMQ context
         self.context = zmq.Context()
@@ -119,7 +119,7 @@ class base_controller(Thread):
 
 
     def run(self):
-        print('- Started ' + self.name + ' Controller')
+        self._log('Started ' + self.name + ' Controller', head=True)
         # Run while thread is active
         while not self.shutdown_flag.is_set():
             try:

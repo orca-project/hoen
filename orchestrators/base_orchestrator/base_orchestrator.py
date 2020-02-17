@@ -274,7 +274,7 @@ class base_orchestrator(Thread):
 
 
     def run(self):
-        print('- Started ' + self.name + ' Orchestrator')
+        self._log('Started ' + self.name + ' Orchestrator', head=True)
         # Run while thread is active
         while not self.shutdown_flag.is_set():
             # Wait for command
@@ -290,16 +290,16 @@ class base_orchestrator(Thread):
 
             # If the message is valid
             if request is not None:
-                print('- Received Message')
+                self._log('Received Message', head=True)
                 # Check whether is it a new service
                 create_slice = request.get(self.create_msg, None)
 
                 # If it is a new service
                 if create_slice is not None:
-                    print('- Create ' + self.type + ' Service')
+                    self._log('Create ' + self.type + ' Service', head=True)
                     # This service already exists
                     if create_slice['s_id'] in self.s_ids:
-                        print('\t', 'Service ID already exists.')
+                        self._log('Service ID already exists.')
                         msg = 'The service already exists: ' + \
                             create_slice['s_id']
                         # Send message
@@ -312,7 +312,7 @@ class base_orchestrator(Thread):
                     self.s_ids[create_slice['s_id']] = create_slice.get('type',
                                                                         None)
 
-                    print('\t', 'Service ID:', create_slice['s_id'])
+                    self._log('Service ID:', create_slice['s_id'])
 
                     # Create new slice
                     success, msg = self.create_slice(**create_slice)
@@ -325,7 +325,7 @@ class base_orchestrator(Thread):
                 delete_slice = request.get(self.delete_msg, None)
 
                 if delete_slice is not None:
-                    print('- Remove ' + self.type + ' Service')
+                    self._log('Remove ' + self.type + ' Service', head=True)
                     # If missing the slice ID:
                     if delete_slice['s_id'] is None:
                         self._log("Missing Service ID.")
@@ -336,7 +336,7 @@ class base_orchestrator(Thread):
 
                     # If this service doesn't exist
                     elif delete_slice['s_id'] not in self.s_ids:
-                        print('\t', 'Service ID doesn\' exist')
+                        self._log(('Service ID doesn\' exist')
                         msg = 'The service does not exist:' + \
                             delete_slice['s_id']
                         # Send message
@@ -344,7 +344,7 @@ class base_orchestrator(Thread):
                         # Leave if clause
                         continue
 
-                    print('\t', 'Service ID:', delete_slice['s_id'])
+                    self._log('Service ID:', delete_slice['s_id'])
 
                     # Remove a slice
                     success, msg = self.delete_slice(**delete_slice)
@@ -364,8 +364,8 @@ class base_orchestrator(Thread):
                                                                self.delete_msg]]
                 # If there is at least an existing unknown message
                 if unknown_msg:
-                    print('- Unknown message')
-                    print('\t', 'Message:', unknown_msg[0])
+                    self._log('Unknown message', head=True)
+                    self._log('Message:', unknown_msg[0])
 
                     msg = "Unknown message: " + str(unknown_msg[0])
                     # Send message
@@ -373,8 +373,8 @@ class base_orchestrator(Thread):
 
             # Failed to parse message
             else:
-                print('- Failed to parse message')
-                print('\t', 'Message:', cmd)
+                self._log('Failed to parse message', head=True)
+                self._log('Message:', cmd)
 
                 msg = "Failed to parse message: " + str(cmd)
                 # Send message
@@ -386,7 +386,7 @@ class base_orchestrator(Thread):
 
     # Method for stopping the server thread nicely
     def safe_shutdown(self):
-        print("Exiting")
+        self._log("Exiting", head=True)
         self.shutdown_flag.set()
         self.join()
 

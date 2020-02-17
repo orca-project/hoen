@@ -2,7 +2,7 @@
 
 # Import the ZMQ module
 import zmq
-# Import the Thread, Lock and even objects from the threading module
+# Import the Thread, Lock and Event objects from the threading module
 from threading import Thread, Lock, Event
 # Import the uuid4 function from the UUID module
 from uuid import uuid4
@@ -73,7 +73,7 @@ class orch_base(object):
         # Connect ZMQ socket to host:port
         self.socket.connect("tcp://" + host + ":" + str(port))
         # Timeout reception every 5 seconds
-        self.socket.setsockopt(zmq.RCVTIMEO, 10000)
+        self.socket.setsockopt(zmq.RCVTIMEO, RECV_DELAY)
         # # Allow multiple requests and replies
         self.socket.setsockopt(zmq.REQ_RELAXED, 1)
         # # Add IDs to ZMQ messages
@@ -215,13 +215,27 @@ class hyperstrator_server(Thread):
             host_key="cn_host",
             port_key="cn_port",
             default_host="127.0.0.1",
-            default_port="2200",
+            default_port="2300",
             create_msg="cn_cc",
             request_msg="cn_rc",
             update_msg="cn_uc",
             delete_msg="cn_dc",
             request_key="cn_req",
             reply_key="cn_rep")
+
+        # Create an instance of the TN orchestrator handler
+        self.tn_orch = orch_base(
+             name="Transport Network",
+             host_key="tn_host",
+             port_key="tn_port",
+             default_host="10.0.0.2",
+             default_port="2200",
+             create_msg="tn_cc",
+             request_msg="tn_rc",
+             update_msg="tn_uc",
+             delete_msg="tn_dc",
+             request_key="tn_req",
+             reply_key="tn_rep")
 
     # Make printing easier. TODO: Implement real logging
     def _log(self, *args, head=False):
@@ -313,8 +327,9 @@ class hyperstrator_server(Thread):
 
                     self._log('Service ID:', s_id)
 
+                    # If allocating CN slices
                     if self.do_core:
-                        self._log('Send message to CN orchestrator')
+                        self._log('Send message to the CN orchestrator')
                         # Otherwise, send message to the CN orchestrator
                         core_success, core_msg = self.cn_orch.create_slice(
                             **{
@@ -337,23 +352,67 @@ class hyperstrator_server(Thread):
                             # Finish the main loop here
                             continue
 
+                        # Otherwise, the CN allocation succeeded
+                        self._log('Succeeded creating a CN slice')
+
+                    # In case of tests
                     else:
                         self._log('Skipping CN')
                         # Use a fake source IP
-                        core_msg = {'source': '20.0.0.1'}
+                        core_msg = {'s_id': sd_id, 'source': '20.0.0.1'}
+
+
+                    #TODO: RAN will come here
+                    radio_msg = {'s_id': sd_id, 'destination': '30.0.0.1'}
+
+
+                    # If allocating TN slices
+                    if self.do_transport:
+                        self._log('Send message to the TN orchestrator')
+                        # Send UUID and requirements to the TN orchestrator
+                        transport_success, transport_msg = \
+                            self.tn_orch.create_slice(
+                            **{
+                                's_id': s_id,
+                                'requirements': create_service['requirements'],
+                                'source': core_msg['source'],
+                                'destination': radio_msg['destination']
+                            })
+
+                        # If the transport allocation failed
+                        if not transport_success:
+                            self._log('Failed creating Transport Slice')
+                            # Inform the user about the failure
+                            self.send_msg(
+                                self.create_nack,
+                                transport_msg if not transport_success else
+                                "Malformatted message from TN orchestrator.")
+                            # Measured elapsed time
+                            self._log('Failed transport, took:',
+                                  (time() - st)*1000, 'ms')
+                            # Finish here
+                            continue
+
+                        # Otherwise, the transport allocation succeeded
+                        self._log('Succeeded creating a TN Slice')
+
+                    # In case of tests
+                    else:
+                        self._log('Skipping TN')
+                        # Use a fake return message
+                        transport_msg = {'s_id': s_id}
 
                     # Append it to the list of service IDs
                     self.s_ids.append(s_id)
 
                     # Inform the user about the configuration success
                     self.send_msg(self.create_ack, {
-                        's_id': s_id,
-                        'source': core_msg['source']
+                        's_id': s_id
                     })
 
                     self._log('Creation time:', (time() - st)*1000, 'ms')
 
-                # Service rerquest, remove service
+                # Service request, remove service
                 delete_service = request.get(self.delete_msg, None)
 
                 # If the flag exists
@@ -379,10 +438,11 @@ class hyperstrator_server(Thread):
 
                     self._log('Service ID:', delete_service['s_id'])
 
+                    # If doing the CN
                     if self.do_core:
                         self._log('Send message to CN orchestrator')
 
-                        # Otherwise, send message to the SDN orchestrator
+                        # Otherwise, send message to the CN orchestrator
                         core_success, core_msg = self.cn_orch.delete_slice(
                             **{'s_id': delete_service['s_id']})
 
@@ -394,8 +454,32 @@ class hyperstrator_server(Thread):
                             # Finish here
                             continue
 
+                    # In case of testing
                     else:
                         self._log('Skipping core')
+
+                    #TODO: The RAN will come here.
+
+                    # If doing the TN
+                    if self.do_transport:
+                        self._log('Send message to the TN orchestrator')
+                        # Otherwise, send message to the TN orchestrator
+                        transport_success, transport_msg = \
+                          self.tn_orch.delete_slice(
+                            **{'s_id': delete_service['s_id']})
+
+                        # If the TN allocation failed
+                        if not tn_success:
+                            self._log('Failed removing Transport Slice')
+                            # Inform the user about the failure
+                            self.send_msg(self.delete_nack, transport_msg)
+                            # Finish here
+                            continue
+
+                    # In case of testing
+                    else:
+                        self._log('Skipping TN')
+
 
                     # Remove it to the list of service IDs
                     self.s_ids.remove(delete_service['s_id'])
@@ -442,7 +526,7 @@ if __name__ == "__main__":
             create_msg='sr_cs',
             remove_msg='sr_rs',
             do_radio=False,
-            do_transport=False,
+            do_transport=True,
             do_core=True)
         # Start the Hyperstrator Thread
         hyperstrator_thread.start()
