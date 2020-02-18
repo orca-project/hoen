@@ -72,7 +72,10 @@ class PathEngine():
             node = path[p]
             if p == 0:
                 p_in = first_port
-                p_out = topology[path[p]][path[p + 1]]
+                if len(path) == 1:
+                    p_out = last_port
+                else:
+                    p_out = topology[path[p]][path[p + 1]]
                 switches.append(self.append_switch(node, p_in, p_out))
             elif p == len(path) - 1:
                 p_in = topology[path[p]][path[p - 1]]

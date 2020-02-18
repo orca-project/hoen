@@ -10,11 +10,13 @@ from base_orchestrator.base_orchestrator import base_orchestrator, ctl_base
 from os import system, name
 # Import signal
 import signal
-import time
+import time 
 
 # Import SONAr services
 from services.ndb import ndb
 from services.path_engine import PathEngine
+# Import SONAr modules
+from sonar.scoe import scoe
 
 def cls():
     system('cls' if name=='nt' else 'clear')
@@ -40,31 +42,36 @@ class wired_orchestrator(base_orchestrator):
         # setting metrics manually
         # TODO: to create a service to fetch these metrics automatically from ovsdb or ofconfig
         catalog = ndb()
-        catalog.set_link_latency('h00','h01', 0.1)
-        catalog.set_link_latency('h01', 'h00', 0.1)
-        catalog.set_link_latency('h00', 'h02', 0.1)
-        catalog.set_link_latency('h02', 'h00', 0.1)
-        catalog.set_link_latency('h00', 'h03', 0.1)
-        catalog.set_link_latency('h03', 'h00', 0.1)
-        catalog.set_link_latency('h02', 'h03', 0.1)
-        catalog.set_link_latency('h03', 'h02', 0.1)
-        catalog.set_link_throughput('h00', 'h01', 10)
-        catalog.set_link_throughput('h01', 'h00', 10)
-        catalog.set_link_throughput('h00', 'h02', 10)
-        catalog.set_link_throughput('h02', 'h00', 10)
-        catalog.set_link_throughput('h00', 'h03', 10)
-        catalog.set_link_throughput('h03', 'h00', 10)
-        catalog.set_link_throughput('h02', 'h03', 10)
-        catalog.set_link_throughput('h03', 'h02', 10)
+        catalog.set_link_latency('s01','s02', 0.1)
+        catalog.set_link_latency('s02','s01', 0.1)
+        catalog.set_link_latency('s01','s03', 0.1)
+        catalog.set_link_latency('s03','s01', 0.1)
+        catalog.set_link_latency('s02','s05', 0.1)
+        catalog.set_link_latency('s05','s02', 0.1)
+        catalog.set_link_latency('s03','s04', 0.1)
+        catalog.set_link_latency('s04','s03', 0.1)
+        catalog.set_link_latency('s04','s05', 0.1)
+        catalog.set_link_latency('s05','s04', 0.1)
+        catalog.set_link_throughput('s01','s02', 10)
+        catalog.set_link_throughput('s02','s01', 10)
+        catalog.set_link_throughput('s01','s03', 10)
+        catalog.set_link_throughput('s03','s01', 10)
+        catalog.set_link_throughput('s02','s05', 10)
+        catalog.set_link_throughput('s05','s02', 10)
+        catalog.set_link_throughput('s03','s04', 10)
+        catalog.set_link_throughput('s04','s03', 10)
+        catalog.set_link_throughput('s04','s05', 10)
+        catalog.set_link_throughput('s05','s04', 10)
 
         '''
         Setting known hosts and networks manually.
         It could be automatic if we develop LLDP and ARP functions in the ovs controller...
         ... but it is out of scope.
         '''
-        catalog.add_network('10.0.0.4', 'h00', 1)
-        catalog.add_network('10.1.0.1', 'h01', 2)
-        catalog.add_network('10.2.0.1', 'h02', 3)
+        catalog.add_network('10.0.0.4', 's01', 1)
+        catalog.add_network('10.0.0.30', 's01', 5)
+        catalog.add_network('10.1.0.1', 's05', 3)
+        #catalog.add_network('10.2.0.1', 's05', 3)
 
 
     def create_slice(self, **kwargs):
@@ -72,15 +79,16 @@ class wired_orchestrator(base_orchestrator):
         st = time.time()
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
+        s_type = kwargs.get('type', None)
         source = kwargs.get('source', None)
         destination = kwargs.get('destination', None)
-        qos = kwargs.get('requirements', None)
+        qos = kwargs.get('qos', None)
 
         # Append it to the list of service IDs
-        self.s_ids[s_id] = qos
+        self.s_ids[s_id] = s_type
 
         # Get network topology
-        (topo_success, topo_msg) = self.ovs_ctl.get_topology()
+        (topo_success, topo_msg) = self.ovs_ctl.get_topology()    
         if not topo_success:
             # Send error message
             msg = '[ERROR]: Could not retrieve the network topology from ovs controller'
@@ -106,6 +114,7 @@ class wired_orchestrator(base_orchestrator):
         # Send the message to create a slice
         success, msg = self.ovs_ctl.create_slice(
                 **{'s_id': s_id,
+                    #'type': s_type,
                     'destination': kwargs.get('destination'),
                     'route': route
                     })
@@ -130,6 +139,7 @@ class wired_orchestrator(base_orchestrator):
 
         # Send message to remove slice
         success, msg = self.ovs_ctl.delete_slice(**{'s_id': s_id,
+                                                    #'type': s_type,
                                                     'route': route})
 
         if success:
@@ -160,11 +170,11 @@ class wired_orchestrator(base_orchestrator):
         print('\t', 'Path to be applied: ', path)
         (ipv4_src, ipv4_src_netmask) = self.convert_cidr_to_netmask(src)
         (ipv4_dst, ipv4_dst_netmask) = self.convert_cidr_to_netmask(dst)
-
+        
         first_port = src_network.get('port')
         last_port = dst_network.get('port')
         switches = engine.generate_match_switches(topology, path, first_port, last_port)
-
+        
         route = {
             'ipv4_src': ipv4_src,
             'ipv4_src_netmask': ipv4_src_netmask,
@@ -208,6 +218,9 @@ if __name__ == "__main__":
             host='10.0.0.2',
             port=2200
         )
+
+        # Start SONAr modules
+        # scoe_thread = scoe()
 
         # Start the Wired Network Orchestrator
         wired_orchestrator_thread.start()
