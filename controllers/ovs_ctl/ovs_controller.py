@@ -45,6 +45,7 @@ from ryu.app.wsgi import WSGIApplication
 
 from collections import defaultdict
 from sonar.scoe import scoe
+from sonar.nsb import nsb
 
 supported_ofctl = {
     ofproto_v1_0.OFP_VERSION: ofctl_v1_0,
@@ -217,6 +218,7 @@ class ovs_ctl(app_manager.RyuApp):
         self.topology['s05']['s04'] = 2
         self.ports = {}
         self.arp_disabled_ports = self.ports_to_disable()
+        self.control = {}
 
         self.waiters = {}
         #scoe_thread = scoe(self)
@@ -254,10 +256,16 @@ class ovs_ctl(app_manager.RyuApp):
         self.count-= 1
 
         self.get_current_ports(datapath)
+        self.connect_local_agent(datapath)
         print('took',  + (time.time() - single)*1000, 'ms')
 
         if (not self.count):
             print('total:', (time.time()-self.st)*1000, 'ms')
+
+    def connect_local_agent(self, datapath):
+        connection = nsb(datapath)
+        connection.reset_queues()
+        self.control[self.dpid_to_name[datapath.id]] = connection
 
     def ports_to_disable(self):
         stp = defaultdict(dict)
@@ -404,7 +412,7 @@ class ovs_ctl(app_manager.RyuApp):
             node = self.dpid_to_name.get(dpid)
             if node in self.ports:
                 for port in self.ports[node]:
-                    if port not in self.arp_disabled_ports[node]:
+                    if port not in self.arp_disabled_ports[node] and port != in_port:
                         actions.append(parser.OFPActionOutput(port))
             else:
                 return
