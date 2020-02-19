@@ -29,8 +29,12 @@ class base_controller(Thread):
         self._server_bind(**kwargs)
         # Container to hold slice information
         self.slice_list = {}
+
+        # Print start up message
+        self._log('Started ' + self.name + ' Controller', head=True)
         # Run post initialization operations
         self.post_init(**kwargs)
+
 
     # Make printing easier. TODO: Implement real logging
     def _log(self, *args, head=False):
@@ -78,7 +82,7 @@ class base_controller(Thread):
         self.topology_ack = "_".join([self.topology_msg.split('_')[-1], "ack"])
         self.topology_nack = "_".join([self.topology_msg.split('_')[-1], "nack"])
 
-    def _post_init(self, **kwargs):
+    def post_init(self, **kwargs):
         # Must overside this method
         pass
 
@@ -125,7 +129,6 @@ class base_controller(Thread):
         pass
 
     def run(self):
-        self._log('Started ' + self.name + ' Controller', head=True)
         # Run while thread is active
         while not self.shutdown_flag.is_set():
             try:
@@ -236,7 +239,7 @@ class base_controller(Thread):
 
     # Method for stopping the server thread nicely
     def safe_shutdown(self):
-        self._log("Exiting")
+        self._log("Exiting", head=True)
         self.shutdown_flag.set()
         self.join()
 

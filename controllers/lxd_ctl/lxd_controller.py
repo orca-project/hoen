@@ -33,6 +33,8 @@ class lxd_controller(base_controller):
         self.interface_list = {x: {"available": True} for x in \
                 net_if_addrs().keys() if x.startswith('enp')}
 
+        self._log("Found", len(self.interface_list), "Ethernet ports")
+
     def prepare_distro_image(self, image_name="ubuntu-19.04-plain"):
         # Keep track of time spent here
         st = time()
