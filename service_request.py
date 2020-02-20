@@ -28,12 +28,12 @@ def parse_cli_args():
     parser_a.add_argument(
         '-t', '--throughput',
         type=float,
-        default=1.0,
+        #default=1.0,
         help='Required throughput [Mbps]')
     parser_a.add_argument(
         '-l', '--latency',
         type=float,
-        default=10.0,
+        #default=10.0,
         help='Required latency [ms]')
 
     # Create parser for the removal of slices
@@ -53,7 +53,7 @@ def parse_cli_args():
 
 def establish_connection(**kwargs):
     # Default RU Server host
-    host = kwargs.get('host', '127.0.0.1')
+    host = kwargs.get('host', '10.0.0.3')
     # Default RU Server port
     port = kwargs.get('port', 1100)
 
@@ -77,7 +77,7 @@ def service_request(socket, **kwargs):
     socket.send_json({
         create_msg: {'source': kwargs['source'],
                      #  'destination': kwargs['destination'],
-                     'requirements': {'throughout': kwargs['throughput'],
+                     'requirements': {'throughput': kwargs['throughput'],
                                       'latency': kwargs['latency']}
                      }})
 

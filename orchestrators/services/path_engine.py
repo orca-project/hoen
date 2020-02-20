@@ -6,21 +6,35 @@ from collections import defaultdict
 
 class PathEngine():
 
-    def get_path(self, topology, src, dst, qos):
+    def get_path(self, topology, src, dst, requirements):
+        catalog = ndb()
+        catalog.init_arrays()
+        print('flows', catalog.get_flows())
+        print('usage', catalog.get_usage())
         paths = self.get_paths(topology, src, dst)
-        paths = self.get_capable_paths(paths, qos)
-        if len(paths) > 0:
-            return min(paths, key=len)
-        return None
+        path = self.get_capable_path(paths, requirements)
+        return path
 
-    def get_capable_paths(self, paths, qos):
-        if qos is not None:
+    def get_capable_path(self, paths, requirements):
+        catalog = ndb()
+        throughput = 0
+        if requirements is not None:
             # If our platform can support other QoS in the future, please add them as 'if' below:
-            if qos.get('latency') is not None:
-                paths = self.get_latency_comply_paths(paths, qos.get('latency'))
-            if qos.get('throughput') is not None:
-                paths = self.get_throughput_comply_paths(paths, qos.get('throughput'))
-        return paths
+            if requirements.get('latency') is not None:
+                paths = self.get_latency_comply_paths(paths, requirements.get('latency'))
+            if requirements.get('throughput') is not None:
+                throughput = requirements.get('throughput')
+                path = self.get_throughput_comply_path(paths, throughput)
+            else:
+                if len(paths) > 0:
+                    path = min(paths, key=len)
+                else:
+                    path = None
+        if path is not None:
+            for p in range(0, len(path) - 1):
+                catalog.add_link_usage(path[p], path[p + 1], throughput)
+                catalog.add_flow_count(path[p], path[p + 1], 1)
+        return path
 
     # This function applies the logic for latency QoS. Change it if necessary.
     def get_latency_comply_paths(self, paths, latency):
@@ -36,6 +50,7 @@ class PathEngine():
         return comply_paths
 
     # This function applies the logic for throughput QoS. Change it if necessary.
+    '''
     def get_throughput_comply_paths(self, paths, throughput):
         catalog = ndb()
         link_latency = catalog.get_link_throughput()
@@ -49,6 +64,42 @@ class PathEngine():
             if is_comply:
                 comply_paths.append(path)
         return comply_paths
+    '''
+
+    def get_throughput_comply_path(self, paths, throughput):
+        catalog = ndb()
+        flows = catalog.get_flows()
+        usage = catalog.get_usage()
+        capacity = catalog.get_capacity()
+        
+        count = {}
+        comply_paths = []
+        for path in paths:
+            is_comply = True
+            path_string = ''.join(map(str, path))
+            for p in range(0, len(path) - 1):
+                if path_string not in count:
+                    count[path_string] = 0
+                count[path_string] = count[path_string] + flows[path[p]][path[p + 1]]
+                if usage[path[p]][path[p + 1]] + throughput >= capacity[path[p]][path[p + 1]]:
+                    is_comply = False
+                    break
+            if is_comply:
+                comply_paths.append(path)
+
+        path_to_apply = None
+        min_count = 999999999
+        if len(comply_paths) > 0:
+            print('comply', comply_paths)
+            for path in comply_paths:
+                path_string = ''.join(map(str, path))
+                print(path_string)
+                print(min_count)
+                print(count[path_string])
+                if count[path_string] < min_count:
+                    min_count = count[path_string]
+                    path_to_apply = path
+        return path_to_apply
 
     # This function applies a Deep-First Source (DFS) algorithm to find all paths in the graph
     def get_paths(self, topology, src, dst):

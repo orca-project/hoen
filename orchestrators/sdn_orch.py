@@ -63,6 +63,17 @@ class wired_orchestrator(base_orchestrator):
         catalog.set_link_throughput('s04','s05', 10)
         catalog.set_link_throughput('s05','s04', 10)
 
+        catalog.set_link_capacity('s01','s02', 100)
+        catalog.set_link_capacity('s02','s01', 100)
+        catalog.set_link_capacity('s01','s03', 100)
+        catalog.set_link_capacity('s03','s01', 100)
+        catalog.set_link_capacity('s02','s05', 100)
+        catalog.set_link_capacity('s05','s02', 100)
+        catalog.set_link_capacity('s03','s04', 100)
+        catalog.set_link_capacity('s04','s03', 100)
+        catalog.set_link_capacity('s04','s05', 100)
+        catalog.set_link_capacity('s05','s04', 100)
+
         '''
         Setting known hosts and networks manually.
         It could be automatic if we develop LLDP and ARP functions in the ovs controller...
@@ -79,13 +90,9 @@ class wired_orchestrator(base_orchestrator):
         st = time.time()
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
-        s_type = kwargs.get('type', None)
         source = kwargs.get('source', None)
         destination = kwargs.get('destination', None)
-        qos = kwargs.get('qos', None)
-
-        # Append it to the list of service IDs
-        self.s_ids[s_id] = s_type
+        requirements = kwargs.get('requirements', None)
 
         # Get network topology
         (topo_success, topo_msg) = self.ovs_ctl.get_topology()    
@@ -97,13 +104,14 @@ class wired_orchestrator(base_orchestrator):
             return False, msg
 
         topology = topo_msg.get('topology')
+        catalog.set_topology(topology)
 
         # Define the route which can support the required QoS
-        route = self.build_route(topology, source, destination, qos)
+        route = self.build_route(topology, source, destination, requirements)
 
         if route is None:
             # Send error message
-            msg = '[WARN]: There is no available path for source '+  str(source) + ' and destination ' + str(destination) + ' supporting the follow QoS: ' + str(qos)
+            msg = '[WARN]: There is no available path for source '+  str(source) + ' and destination ' + str(destination) + ' supporting the follow QoS: ' + str(requirements)
             print('failed', (time.time()-st)*1000, 'ms')
             # Inform the user about the creation
             return False, msg
@@ -114,8 +122,6 @@ class wired_orchestrator(base_orchestrator):
         # Send the message to create a slice
         success, msg = self.ovs_ctl.create_slice(
                 **{'s_id': s_id,
-                    #'type': s_type,
-                    'destination': kwargs.get('destination'),
                     'route': route
                     })
 
@@ -147,9 +153,8 @@ class wired_orchestrator(base_orchestrator):
         # Inform the user about the removal
         return success, msg
 
-    def build_route(self, topology, src, dst, qos):
+    def build_route(self, topology, src, dst, requirements):
         catalog = ndb()
-        catalog.set_topology(topology)
         engine = PathEngine()
 
         # Fetch switches which can arrive to the src and dst networks
@@ -163,7 +168,7 @@ class wired_orchestrator(base_orchestrator):
             return None
 
         # Define the path to apply
-        path = engine.get_path(topology, src_network.get('switch'), dst_network.get('switch'), qos)
+        path = engine.get_path(topology, src_network.get('switch'), dst_network.get('switch'), requirements)
         if path is None:
             return None
 
