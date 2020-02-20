@@ -175,6 +175,7 @@ class wired_orchestrator(base_orchestrator):
         print('\t', 'Path to be applied: ', path)
         (ipv4_src, ipv4_src_netmask) = self.convert_cidr_to_netmask(src)
         (ipv4_dst, ipv4_dst_netmask) = self.convert_cidr_to_netmask(dst)
+        (min_rate, max_rate, priority) = self.define_queue_parameters(requirements)
         
         first_port = src_network.get('port')
         last_port = dst_network.get('port')
@@ -185,6 +186,9 @@ class wired_orchestrator(base_orchestrator):
             'ipv4_src_netmask': ipv4_src_netmask,
             'ipv4_dst': ipv4_dst,
             'ipv4_dst_netmask': ipv4_dst_netmask,
+            'min_rate': min_rate,
+            'max_rate': max_rate,
+            'priority': priority,
             'switches': switches
             }
         return route
@@ -203,6 +207,21 @@ class wired_orchestrator(base_orchestrator):
             net.append(int(addr[i]) & mask[i])
         ipv4_netmask = ".".join(map(str, mask))
         return (ipv4, ipv4_netmask)
+
+    def define_queue_parameters(self, requirements):
+        min_rate = None
+        max_rate = None
+        priority = None
+        if requirements.get('throughput') is not None:
+            min_rate = self.to_byte(requirements.get('throughput'))
+            max_rate = self.to_byte(requirements.get('throughput'))
+            priority = 10
+        if requirements.get('latency') is not None:
+            priority = 1
+        return min_rate, max_rate, priority
+
+    def to_byte(self, value):
+        return int(value * 1024 * 1024)
 
 if __name__ == "__main__":
     # clear screen

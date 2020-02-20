@@ -99,6 +99,9 @@ class PathEngine():
                 if count[path_string] < min_count:
                     min_count = count[path_string]
                     path_to_apply = path
+                elif count[path_string] == min_count and len(path) < len(path_to_apply):
+                    min_count = count[path_string]
+                    path_to_apply = path
         return path_to_apply
 
     # This function applies a Deep-First Source (DFS) algorithm to find all paths in the graph

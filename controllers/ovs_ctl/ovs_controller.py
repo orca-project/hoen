@@ -85,6 +85,7 @@ class ovs_controller(base_controller):
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
         route = kwargs.get('route', None)
+        print('route', route)
 
         # Check for validity of the slice ID
         if s_id in self.slice_list:
@@ -108,6 +109,8 @@ class ovs_controller(base_controller):
             ofproto = datapath.ofproto
             parser = datapath.ofproto_parser
 
+            queue = self.define_queue(route, datapath)
+
             # ip_src, ip_dst, s, p_in, p_out)
             # Creating ingress match and actions which will be send to ovs-switch
             match = parser.OFPMatch(
@@ -116,8 +119,8 @@ class ovs_controller(base_controller):
                     ipv4_src=(route['ipv4_src'], route['ipv4_src_netmask']),
                     ipv4_dst=(route['ipv4_dst'], route['ipv4_dst_netmask'])
                 )
-            actions = [parser.OFPActionOutput(switch['out_port'])]
-            #actions = [parser.OFPActionSetQueue(4), parser.OFPActionOutput(switch['out_port'])]
+            #actions = [parser.OFPActionOutput(switch['out_port'])]
+            actions = [parser.OFPActionSetQueue(queue), parser.OFPActionOutput(switch['out_port'])]
 
             # Add the flow to the switch
             self.ovs.add_flow(datapath, 10, match, actions)
@@ -129,7 +132,7 @@ class ovs_controller(base_controller):
                     ipv4_src=(route['ipv4_dst'], route['ipv4_dst_netmask']),
                     ipv4_dst=(route['ipv4_src'], route['ipv4_src_netmask'])
                 )
-            actions = [parser.OFPActionOutput(switch['in_port'])]
+            actions = [parser.OFPActionSetQueue(queue), parser.OFPActionOutput(switch['in_port'])]
 
             # Add the flow to the switch
             self.ovs.add_flow(datapath, 10, match, actions)
@@ -137,6 +140,13 @@ class ovs_controller(base_controller):
         print('worked, took',  + (time.time() - single)*1000, 'ms')
         return True, {'host': route['ipv4_dst']}
 
+
+    def define_queue(self, route, datapath):
+        connection = self.ovs.control[self.ovs.dpid_to_name[datapath.id]]
+        queue = connection.create_queue(route)
+        if 'max_rate' in route and route['max_rate'] is not None:
+            connection.modify_default_queue(route['max_rate'])
+        return queue
 
     def delete_slice(self, **kwargs):
         # Extract parameters from keyword arguments
@@ -216,6 +226,19 @@ class ovs_ctl(app_manager.RyuApp):
         self.topology['s04']['s03'] = 1
         self.topology['s04']['s05'] = 2
         self.topology['s05']['s04'] = 2
+
+        self.speed = defaultdict(dict)
+        self.speed['s01']['s02'] = 100
+        self.speed['s02']['s01'] = 100
+        self.speed['s01']['s03'] = 100
+        self.speed['s03']['s01'] = 100
+        self.speed['s02']['s05'] = 100
+        self.speed['s05']['s02'] = 100
+        self.speed['s03']['s04'] = 100
+        self.speed['s04']['s03'] = 100
+        self.speed['s04']['s05'] = 100
+        self.speed['s05']['s04'] = 100
+
         self.ports = {}
         self.arp_disabled_ports = self.ports_to_disable()
         self.control = {}

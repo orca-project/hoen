@@ -114,7 +114,10 @@ class queue_agent_server(Thread):
                     "default_qos": o2,
                     "default_queue": {
                       "q_id": q_id,
-                      "uuid": o4
+                      "uuid": o4,
+                      "min_rate": min_rate,
+                      "max_rate": max_rate,
+                      "priority": priority
                     }
                   }
         else:
@@ -135,11 +138,18 @@ class queue_agent_server(Thread):
         priority = operation.get('queue').get('priority')
         result_code = 1
 
-        create_queue_command = 'ovs-vsctl create queue other-config:min-rate=' + str(min_rate) + ' other-config:max-rate=' + str(max_rate) + ' other-config:priority=' + str(priority)
+        create_queue_command = 'ovs-vsctl create queue'
+        if min_rate is not None:
+            create_queue_command = create_queue_command + ' other-config:min-rate='+ str(min_rate)
+        if max_rate is not None:
+            create_queue_command = create_queue_command + ' other-config:max-rate='+ str(max_rate)
+        if priority is not None:
+            create_queue_command = create_queue_command + ' other-config:priority='+ str(priority)
+        
         (c1, o1) = self.run_system_command(create_queue_command)
 
         if c1 == 0:
-            add_default_queue_to_qos_command = 'ovs-vsctl set qos ' + o1 + ' queues:' + str(q_id) + '=' + qos
+            add_default_queue_to_qos_command = 'ovs-vsctl set qos ' + qos + ' queues:' + str(q_id) + '=' + o1
             (c2, o2) = self.run_system_command(add_default_queue_to_qos_command)
             if c2 == 0:
                 result_code = 0
@@ -172,11 +182,11 @@ class queue_agent_server(Thread):
         result_code = 1
         command = 'ovs-vsctl set queue ' + uuid
         if min_rate is not None:
-            command = command + ' other-config:min-rate='+ min_rate
+            command = command + ' other-config:min-rate='+ str(min_rate)
         if max_rate is not None:
-            command = command + ' other-config:max-rate='+ max_rate
+            command = command + ' other-config:max-rate='+ str(max_rate)
         if priority is not None:
-            command = command + ' other-config:priority='+ priority
+            command = command + ' other-config:priority='+ str(priority)
         (result_code, out) = self.run_system_command(command)
 
         resp = {
