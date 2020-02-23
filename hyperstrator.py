@@ -481,7 +481,7 @@ if __name__ == "__main__":
     try:
         # Instantiate the Hyperstrator Server
         hyperstrator_thread = hyperstrator_server(
-            host='127.0.0.1',
+            host='10.0.0.3',
             port=1100,
             error_msg='msg_err',
             create_msg='sr_cs',

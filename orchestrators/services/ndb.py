@@ -9,10 +9,6 @@ class ndb:
     topology = defaultdict(dict)
     # link capacity should be retrieved from SONAr
     capacity = defaultdict(dict)
-    # latency metrics
-    link_latency = defaultdict(dict)
-    # throughput metrics
-    link_throughput = defaultdict(dict)
     # known networks
     networks = {}
     # applied routes
@@ -21,6 +17,14 @@ class ndb:
     flows = {}
     # number of each link usage
     usage = {}
+    # local agents used by SONAr to collect metrics
+    local_agents = {}
+    # agents already configured by SONAr
+    configured_agents = {}
+    # latency of each path sent by the SONAr local agents
+    path_latency = {}
+    # virtual interface addresses configured in the local agents
+    virtual_ifaces = {}
 
     def init_arrays(self):
         for src in self.topology:
@@ -56,18 +60,6 @@ class ndb:
 
     def set_link_capacity(self, src, dst, value):
         self.capacity[src][dst] = value
-
-    def get_link_latency(self):
-        return self.link_latency
-
-    def set_link_latency(self, src, dst, latency):
-        self.link_latency[src][dst] = latency
-
-    def get_link_throughput(self):
-        return self.link_throughput
-
-    def set_link_throughput(self, src, dst, throughput):
-        self.link_throughput[src][dst] = throughput
 
     def get_routes(self):
         return self.routes
@@ -117,3 +109,61 @@ class ndb:
         if dst not in self.flows[src]:
             self.flows[src][dst] = 0
         self.flows[src][dst] = self.flows[src][dst] + count
+
+    def add_local_agent(self, name, host, iface, switch, port):
+        agent = { 
+                    'name': name,
+                    'host': host,
+                    'management_iface': iface,
+                    'switch': switch,
+                    'port': port
+                }
+        self.local_agents[name] = agent
+        return agent
+
+    def get_local_agents(self):
+        return self.local_agents
+
+    def get_local_agent(self, name):
+        if name not in self.local_agents.keys():
+            return None
+        return self.local_agents[name]
+
+    def get_configured_agents(self):
+        return self.configured_agents
+
+    def get_connfigured_agent(self, name):
+        if name not in self.configured_agents.keys():
+            return None
+        return self.configured_agents[name]
+
+    def add_configured_agent(self, name, src, dst):
+        configured_agent = { 
+                    'name': name,
+                    'src': src,
+                    'dst': dst
+                }
+        self.configured_agents['name'] = configured_agent
+        return configured_agent
+
+    def get_path_latency(self):
+        return self.path_latency
+
+    def set_path_latency(self, path, params):
+        self.path_latency[path] = params
+
+    def get_path_latency(self, path):
+        if path not in self.path_latency.keys():
+            return None
+        return self.path_latency[path]
+
+    def get_virtual_ifaces(self):
+        return self.get_virtual_ifaces
+
+    def get_virtual_iface(self, addresses):
+        if addresses not in self.virtual_ifaces.keys():
+            return None
+        return self.virtual_ifaces[addresses]
+
+    def add_virtual_iface(self, addresses, path):
+        self.virtual_ifaces[addresses] = path

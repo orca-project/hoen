@@ -39,30 +39,9 @@ class wired_orchestrator(base_orchestrator):
             delete_msg='wdc_drs',
             topology_msg='wdc_trs')
 
-        # setting metrics manually
-        # TODO: to create a service to fetch these metrics automatically from ovsdb or ofconfig
+        # setting link speeds manually
+        # TODO: to create a service to fetch these values automatically from ovsdb or ofconfig
         catalog = ndb()
-        catalog.set_link_latency('s01','s02', 0.1)
-        catalog.set_link_latency('s02','s01', 0.1)
-        catalog.set_link_latency('s01','s03', 0.1)
-        catalog.set_link_latency('s03','s01', 0.1)
-        catalog.set_link_latency('s02','s05', 0.1)
-        catalog.set_link_latency('s05','s02', 0.1)
-        catalog.set_link_latency('s03','s04', 0.1)
-        catalog.set_link_latency('s04','s03', 0.1)
-        catalog.set_link_latency('s04','s05', 0.1)
-        catalog.set_link_latency('s05','s04', 0.1)
-        catalog.set_link_throughput('s01','s02', 10)
-        catalog.set_link_throughput('s02','s01', 10)
-        catalog.set_link_throughput('s01','s03', 10)
-        catalog.set_link_throughput('s03','s01', 10)
-        catalog.set_link_throughput('s02','s05', 10)
-        catalog.set_link_throughput('s05','s02', 10)
-        catalog.set_link_throughput('s03','s04', 10)
-        catalog.set_link_throughput('s04','s03', 10)
-        catalog.set_link_throughput('s04','s05', 10)
-        catalog.set_link_throughput('s05','s04', 10)
-
         catalog.set_link_capacity('s01','s02', 100)
         catalog.set_link_capacity('s02','s01', 100)
         catalog.set_link_capacity('s01','s03', 100)
@@ -83,7 +62,6 @@ class wired_orchestrator(base_orchestrator):
         catalog.add_network('10.0.0.30', 's01', 5)
         catalog.add_network('10.1.0.1', 's05', 3)
         #catalog.add_network('10.2.0.1', 's05', 3)
-
 
     def create_slice(self, **kwargs):
         catalog = ndb()
@@ -161,8 +139,6 @@ class wired_orchestrator(base_orchestrator):
         src_network = catalog.get_network(src)
         dst_network = catalog.get_network(dst)
 
-        print('\t', 'Source network: ', src_network)
-        print('\t', 'Destination network: ', dst_network)
         if src_network is None or dst_network is None:
             print('\t', 'Impossible to arrive from ', src, 'to ', dst)
             return None
@@ -243,11 +219,13 @@ if __name__ == "__main__":
             port=2200
         )
 
-        # Start SONAr modules
-        # scoe_thread = scoe()
 
         # Start the Wired Network Orchestrator
         wired_orchestrator_thread.start()
+
+        # Start SONAr modules
+        scoe_thread = scoe(wired_orchestrator_thread, "0.0.0.0", 5500)
+        scoe_thread.start()
         # Pause the main thread
         signal.pause()
 
@@ -256,3 +234,5 @@ if __name__ == "__main__":
         print('Exiting')
         wired_orchestrator_thread.shutdown_flag.set()
         wired_orchestrator_thread.join()
+        scoe_thread.shutdown_flag.set()
+        scoe_thread.join()

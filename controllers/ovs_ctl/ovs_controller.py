@@ -44,7 +44,6 @@ from ryu.app.wsgi import Response
 from ryu.app.wsgi import WSGIApplication
 
 from collections import defaultdict
-from sonar.scoe import scoe
 from sonar.nsb import nsb
 
 supported_ofctl = {
@@ -85,7 +84,6 @@ class ovs_controller(base_controller):
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
         route = kwargs.get('route', None)
-        print('route', route)
 
         # Check for validity of the slice ID
         if s_id in self.slice_list:
@@ -244,7 +242,6 @@ class ovs_ctl(app_manager.RyuApp):
         self.control = {}
 
         self.waiters = {}
-        #scoe_thread = scoe(self)
 
         #  Instantiate the OVS SDR Controller
         self.ovs_controller_thread = ovs_controller(
@@ -353,7 +350,6 @@ class ovs_ctl(app_manager.RyuApp):
     def add_flow(self, datapath, priority, match, actions, buffer_id=None):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
-        #print(match)
 
         inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,
                                              actions)]

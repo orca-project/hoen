@@ -9,8 +9,6 @@ class PathEngine():
     def get_path(self, topology, src, dst, requirements):
         catalog = ndb()
         catalog.init_arrays()
-        print('flows', catalog.get_flows())
-        print('usage', catalog.get_usage())
         paths = self.get_paths(topology, src, dst)
         path = self.get_capable_path(paths, requirements)
         return path
@@ -36,35 +34,15 @@ class PathEngine():
                 catalog.add_flow_count(path[p], path[p + 1], 1)
         return path
 
-    # This function applies the logic for latency QoS. Change it if necessary.
     def get_latency_comply_paths(self, paths, latency):
         catalog = ndb()
-        link_latency = catalog.get_link_latency()
         comply_paths = []
         for path in paths:
-            sum = 0
-            for p in range(0, len(path) - 1):
-                sum += link_latency[path[p]][path[p + 1]]
-            if sum < latency:
+            path_string = '-'.join(map(str, path))
+            metric = catalog.get_path_latency(path_string)
+            if metric is not None and metric.get('max') != -1 and float(metric.get('max')) < float(latency):
                 comply_paths.append(path)
         return comply_paths
-
-    # This function applies the logic for throughput QoS. Change it if necessary.
-    '''
-    def get_throughput_comply_paths(self, paths, throughput):
-        catalog = ndb()
-        link_latency = catalog.get_link_throughput()
-        comply_paths = []
-        for path in paths:
-            is_comply = True
-            for p in range(0, len(path) - 1):
-                if link_throughput[path[p]][path[p + 1]] < throughput:
-                    is_comply = False
-                    break
-            if is_comply:
-                comply_paths.append(path)
-        return comply_paths
-    '''
 
     def get_throughput_comply_path(self, paths, throughput):
         catalog = ndb()
@@ -90,12 +68,8 @@ class PathEngine():
         path_to_apply = None
         min_count = 999999999
         if len(comply_paths) > 0:
-            print('comply', comply_paths)
             for path in comply_paths:
                 path_string = ''.join(map(str, path))
-                print(path_string)
-                print(min_count)
-                print(count[path_string])
                 if count[path_string] < min_count:
                     min_count = count[path_string]
                     path_to_apply = path
