@@ -412,6 +412,65 @@ class hyperstrator_server(Thread):
 
                     self._log('Creation time:', (time() - st)*1000, 'ms')
 
+                # Service request, get service
+                request_service = request.get(self.request_msg, None)
+
+                # If the flag exists
+                if request_service is not None:
+                    self._log('Get Service Request', head=True)
+                    # If missing the slice ID:
+                    if request_service['s_id'] is None:
+                        self._log("Missing Service ID.")
+                        # Send message
+                        self.send_msg(self.request_nack, "Missing Service ID")
+                        # Leave if clause
+                        continue
+
+                    # If this service doesn't exist
+                    elif request_service['s_id'] not in self.s_ids:
+                        self._log('Service ID does not exist')
+                        # Send message
+                        self.send_msg(self.request_nack,
+                                      'The service does not exist: ' + \
+                                      delete_service['s_id'])
+                        # Leave if clause
+                        continue
+
+                    self._log('Service ID:', request_service['s_id'])
+
+                    # If doing the CN
+                    if self.do_core:
+                        self._log('Send message to CN orchestrator')
+
+                        # Otherwise, send message to the CN orchestrator
+                        core_success, core_msg = self.cn_orch.request_slice(
+                            **{'s_id': request_service['s_id']})
+
+                        # If the core allocation failed
+                        if not core_success:
+                            self._log('Failed getting  Core Slice')
+                            # Inform the user about the failure
+                            self.send_msg(self.request_nack, core_msg)
+                            # Finish here
+                            continue
+
+                    # In case of testing
+                    else:
+                        self._log('Skipping core')
+
+                    #TODO: The RAN will come here.
+
+                    #TODO: The TN will come here.
+
+                    # Inform the user about the slice information
+                    self.send_msg(self.request_ack,
+                                  {'s_id': request_service['s_id'],
+                                   'ran': None, # TODO
+                                   'tn': None, # TODO
+                                   'cn': core_msg['info']})
+
+                    self._log('Get time:', (time() - st)*1000, 'ms')
+
                 # Service request, remove service
                 delete_service = request.get(self.delete_msg, None)
 
@@ -524,7 +583,9 @@ if __name__ == "__main__":
             port=1100,
             error_msg='msg_err',
             create_msg='sr_cs',
-            remove_msg='sr_rs',
+            request_msg='sr_rs',
+            update_msg='sr_us',
+            delete_msg='sr_ds',
             do_radio=False,
             do_transport=False,
             do_core=True)

@@ -17,7 +17,7 @@ def parse_cli_args():
     # Create parser for the creation of slices
     parser_a = subparsers.add_parser(
         'create',
-        help='Create E2E Network Slice',
+        help='Create a new E2E Network Slice',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     # Add CLI arguments
@@ -40,7 +40,10 @@ def parse_cli_args():
         help='Required latency [ms]')
 
     # Create parser for the removal of slices
-    parser_b = subparsers.add_parser('remove', help='Remove E2E Network Slice')
+    parser_b = subparsers.add_parser(
+        'delete',
+        help='Remove an existing E2E Network Slice')
+
     # Add CLI arguments
     parser_b.add_argument(
         '-i', '--service-id',
@@ -48,6 +51,19 @@ def parse_cli_args():
         type=str,
         required=True,
         help='Remove service based on the S_ID')
+
+    # Create parser for the getting information about the slices
+    parser_c = subparsers.add_parser(
+        'request',
+        help='Request information about  E2E Network Slice')
+
+    # Add CLI arguments
+    parser_c.add_argument(
+        '-i', '--service-id',
+        metavar='S_ID',
+        type=str,
+        required=True,
+        help='Request information on service based on the S_ID')
 
     # Parse CLI arguments
     arg_dict = vars(parser.parse_args())
@@ -71,7 +87,7 @@ def establish_connection(**kwargs):
     return socket
 
 
-def service_request(socket, **kwargs):
+def service_create(socket, **kwargs):
     # Service Request - Create Slice
     create_msg = 'sr_cs'
     create_ack = 'cs_ack'
@@ -95,7 +111,7 @@ def service_request(socket, **kwargs):
         print('- Created Service:')
         # Print information
         print('\tService ID:', ack['s_id'], '\n')
-              #  '\tDestination:', ack['destination'])
+              #  '\t', 'Destination:', ack['destination'])
 
         # Exit gracefully
         exit(0)
@@ -117,14 +133,54 @@ def service_request(socket, **kwargs):
         print('- Failed to parse message:')
         print('\tMessage:', rep)
 
+def service_request(socket, **kwargs):
+    request_msg = "sr_rs"
+    request_ack = "rs_ack"
+    request_nack = "rs_nack"
 
-def service_release(socket, **kwargs):
+    # Send service release message to the hyperstrator
+    socket.send_json({request_msg: {'s_id': kwargs['service_id']}})
+    # Receive acknowledgment
+    rep = socket.recv_json()
+
+    # Check if there's an acknowledgement
+    ack = rep.get(delete_ack, None)
+
+    # If received an acknowledgement
+    if ack is not None:
+        print('- Request Service:')
+        # Print information
+        print('\t', 'Service ID:', ack['s_id'])
+        # Exit gracefully
+        exit(0)
+
+    # Check if there's a not acknowledgement
+    nack = rep.get(request_nack, None)
+
+    # If received a not acknowledgement
+    if nack is not None:
+        print('- Failed to request information about service.')
+        # Print reason
+        print('\t', 'Reason: ', nack)
+        # Opsie
+        exit(0)
+
+    # If neither worked
+    if (ack is None) and (nack is None):
+        print('- Failed to parse message:')
+        print('\t', 'Message:', rep)
+
+def service_update(socket, **kwargs):
+    print('Not implemented.')
+    exit(120)
+
+def service_delete(socket, **kwargs):
     # Service Request - Delete Slice
     delete_msg = "sr_ds"
     delete_ack = "ds_ack"
     delete_nack = "ds_nack"
 
-    # Send service release messate to the hyperstrator
+    # Send service release message to the hyperstrator
     socket.send_json({delete_msg: {'s_id': kwargs['service_id']}})
     # Receive acknowledgment
     rep = socket.recv_json()
@@ -160,14 +216,26 @@ def service_release(socket, **kwargs):
 if __name__ == "__main__":
     # Parse CLI arguments
     kwargs = parse_cli_args()
-    # Establish connection to the RU Server
+    # Establish connection to the hyperstrator
     socket = establish_connection()
 
-    # If not passing a service ID
-    if 'service_id' not in kwargs:
-        # Request new E2E service
+    # Create new E2E service
+    if 'create' in kwargs['subcommand']:
+        service_create(socket, **kwargs)
+
+    # Get information on E2E service
+    elif 'request' in kwargs['subcommand']:
         service_request(socket, **kwargs)
-    # Otherwise
+
+    # Update configuration on E2E service
+    elif 'update' in kwargs['subcommand']:
+        service_update(socket, **kwargs)
+
+    # Remove an E2E service
+    elif 'delete' in kwargs['subcommand']:
+        service_delete(socket, **kwargs)
+
+    # Opsie
     else:
-        # Release an E2E service
-        service_release(socket, **kwargs)
+        print('Opsie, bad client. No subcommand found.')
+        exit(100)
