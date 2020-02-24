@@ -14,7 +14,7 @@ from signal import pause
 from time import time
 
 # Received delay of 10 sec
-RECV_DELAY = 30*1000
+RECV_DELAY = 30*10000
 
 # Clear terminal screen
 def cls():
@@ -179,14 +179,14 @@ class orch_base(object):
         # If the slice removal failed
         if not success:
             # Inform the hyperstrator about the failure
-            print('\t', 'Failed removing a ' + self.type + ' Slice in ' + \
+            print('\t', 'Failed deleting a ' + self.type + ' Slice in ' + \
                   self.name)
             return False, msg
 
         # Otherwise, it succeeded
         else:
             # Inform the hyperstrator about the success
-            print('\t', 'Succeeded removing a ' + self.type + ' Slice in ' + \
+            print('\t', 'Succeeded deleting a ' + self.type + ' Slice in ' + \
                   self.name)
             return True, msg
 
@@ -237,6 +237,22 @@ class hyperstrator_server(Thread):
              request_key="tn_req",
              reply_key="tn_rep")
 
+        # TODO Object there, but methods not implemented yet
+        if False:
+            # Create an instance of the TN orchestrator handler
+            self.ran_orch = orch_base(
+                 name="Radio Access Network",
+                 host_key="ran_host",
+                 port_key="ran_port",
+                 default_host="127.0.0.1",
+                 default_port="2300",
+                 create_msg="tn_cc",
+                 request_msg="rn_rc",
+                 update_msg="rn_uc",
+                 delete_msg="rn_dc",
+                 request_key="rn_req",
+                 reply_key="rn_rep")
+
     # Make printing easier. TODO: Implement real logging
     def _log(self, *args, head=False):
         print("-" if head else '\t' ,*args)
@@ -255,23 +271,23 @@ class hyperstrator_server(Thread):
 
         # Get the request service message from keyword arguments
         self.request_msg = kwargs.get('request_msg', 'sr_rs')
-        # Get the create service acknowledgment from keyword arguments
+        # Get the request service acknowledgment from keyword arguments
         self.request_ack = "_".join([self.request_msg.split('_')[-1], "ack"])
-        # Get the create service not acknowledgment from keyword arguments
+        # Get the request service not acknowledgment from keyword arguments
         self.request_nack = "_".join([self.request_msg.split('_')[-1], "nack"])
 
-        # Get the remove service message from keyword arguments
+        # Get the update service message from keyword arguments
         self.update_msg = kwargs.get('update_msg', 'sr_us')
-        # Get the create service acknowledgment from keyword arguments
+        # Get the update service acknowledgment from keyword arguments
         self.update_ack = "_".join([self.update_msg.split('_')[-1], "ack"])
-        # Get the create service not acknowledgment from keyword arguments
+        # Get the update service not acknowledgment from keyword arguments
         self.update_nack = "_".join([self.update_msg.split('_')[-1], "nack"])
 
-        # Get the remove service message from keyword arguments
+        # Get the delete service message from keyword arguments
         self.delete_msg = kwargs.get('delete_msg', 'sr_ds')
-        # Get the create service acknowledgment from keyword arguments
+        # Get the delete service acknowledgment from keyword arguments
         self.delete_ack = "_".join([self.delete_msg.split('_')[-1], "ack"])
-        # Get the create service not acknowledgment from keyword arguments
+        # Get the delete service not acknowledgment from keyword arguments
         self.delete_nack = "_".join([self.delete_msg.split('_')[-1], "nack"])
 
         # Debug flags
@@ -305,8 +321,8 @@ class hyperstrator_server(Thread):
         while not self.shutdown_flag.is_set():
 
             try:
-                # Wait for request
-                request = self.socket.recv_json()
+                # Wait for transaction
+                transaction = self.socket.recv_json()
             # If nothing was received during the timeout
             except zmq.Again:
                 # Try again
@@ -316,12 +332,12 @@ class hyperstrator_server(Thread):
             else:
                 # Start time counter
                 st = time()
-                # Service request, new service
-                create_service = request.get(self.create_msg, None)
+                # Service transaction , new service
+                create_service = transaction .get(self.create_msg, None)
 
                 # If the message worked
                 if create_service is not None:
-                    self._log('Create Service Request', head=True)
+                    self._log('Create Service Transaction', head=True)
                     # Create a Service ID
                     s_id = str(uuid4())
 
@@ -412,12 +428,12 @@ class hyperstrator_server(Thread):
 
                     self._log('Creation time:', (time() - st)*1000, 'ms')
 
-                # Service request, get service
-                request_service = request.get(self.request_msg, None)
+                # Service transaction, request service
+                request_service = transaction .get(self.request_msg, None)
 
                 # If the flag exists
                 if request_service is not None:
-                    self._log('Get Service Request', head=True)
+                    self._log('Request Service Transaction', head=True)
                     # If missing the slice ID:
                     if request_service['s_id'] is None:
                         self._log("Missing Service ID.")
@@ -426,57 +442,89 @@ class hyperstrator_server(Thread):
                         # Leave if clause
                         continue
 
-                    # If this service doesn't exist
-                    elif request_service['s_id'] not in self.s_ids:
+                    # If there is an S_ID but it doesn't exist
+                    elif (request_service['s_id']) and \
+                            (request_service['s_id'] not in self.s_ids):
                         self._log('Service ID does not exist')
                         # Send message
                         self.send_msg(self.request_nack,
                                       'The service does not exist: ' + \
-                                      delete_service['s_id'])
+                                      request_service['s_id'])
                         # Leave if clause
                         continue
 
-                    self._log('Service ID:', request_service['s_id'])
+                   # If set to gather information about all slices
+                    if not request_service['s_id']:
+                        self._log('Gather information about all Service IDs')
 
-                    # If doing the CN
-                    if self.do_core:
-                        self._log('Send message to CN orchestrator')
-
-                        # Otherwise, send message to the CN orchestrator
-                        core_success, core_msg = self.cn_orch.request_slice(
-                            **{'s_id': request_service['s_id']})
-
-                        # If the core allocation failed
-                        if not core_success:
-                            self._log('Failed getting  Core Slice')
-                            # Inform the user about the failure
-                            self.send_msg(self.request_nack, core_msg)
-                            # Finish here
+                    # Container to hold all slice information
+                    slice_info = dict()
+                    # Iterate over all the existing services
+                    for s_id in self.s_ids:
+                        # If there's an S_ID and it doesn't match current one
+                        if request_service['s_id'] and \
+                                request_service['s_id'] != s_id:
+                            # Skip to next S_ID
                             continue
 
-                    # In case of testing
-                    else:
-                        self._log('Skipping core')
+                        self._log('Service ID:', s_id)
 
-                    #TODO: The RAN will come here.
+                        # Append S_ID to the container
+                        slice_info[s_id] = {}
 
-                    #TODO: The TN will come here.
+                        # If doing the CN
+                        if self.do_core:
+                            self._log('Send message to CN orchestrator')
+
+                            # Otherwise, send message to the CN orchestrator
+                            core_success, core_msg = self.cn_orch.request_slice(
+                                **{'s_id': request_service['s_id']})
+
+                            # If the core allocation failed
+                            if not core_success:
+                                self._log('Failed getting  Core Slice')
+                                # Inform the user about the failure
+                                self.send_msg(self.request_nack, core_msg)
+                                # Finish here
+                                continue
+
+                        # In case of testing
+                        else:
+                            self._log('Skipping core')
+
+                        #TODO: The RAN will come here.
+
+                        #TODO: The TN will come here.
 
                     # Inform the user about the slice information
                     self.send_msg(self.request_ack,
                                   {'s_id': request_service['s_id'],
-                                   'ran': None, # TODO
-                                   'tn': None, # TODO
-                                   'cn': core_msg['info']})
+                                   'info': {
+                                        'ran': None, # TODO
+                                        'tn': None, # TODO
+                                        'cn': core_msg['info']}
+                                   })
 
                     self._log('Get time:', (time() - st)*1000, 'ms')
 
-                # Service request, remove service
-                delete_service = request.get(self.delete_msg, None)
+
+                # Update service transaction
+                update_service = request.get(self.update_msg, None)
+
+                # If the flag exists
+                if update_service is not None:
+                    self._log('Update Service Transaction', head=True)
+
+                    self._log("Not implemented yet.")
+
+                    continue
+
+                # Service transaction , remove service
+                delete_service = transaction .get(self.delete_msg, None)
 
                 # If the flag exists
                 if delete_service is not None:
-                    self._log('Delete Service Request', head=True)
+                    self._log('Delete Service Transaction', head=True)
                     # If missing the slice ID:
                     if delete_service['s_id'] is None:
                         self._log("Missing Service ID.")
@@ -507,7 +555,7 @@ class hyperstrator_server(Thread):
 
                         # If the core allocation failed
                         if not core_success:
-                            self._log('Failed removing Core Slice')
+                            self._log('Failed deleting Core Slice')
                             # Inform the user about the failure
                             self.send_msg(self.delete_nack, core_msg)
                             # Finish here
@@ -529,7 +577,7 @@ class hyperstrator_server(Thread):
 
                         # If the TN allocation failed
                         if not tn_success:
-                            self._log('Failed removing Transport Slice')
+                            self._log('Failed deleting Transport Slice')
                             # Inform the user about the failure
                             self.send_msg(self.delete_nack, transport_msg)
                             # Finish here
@@ -548,7 +596,7 @@ class hyperstrator_server(Thread):
                                   {'s_id': delete_service['s_id']})
 
                 # Check for unknown messages
-                unknown_msg = [x for x in request if x not in
+                unknown_msg = [x for x in transaction  if x not in
                                 [self.create_msg, self.request_msg,
                                  self.update_msg, self.delete_msg] ]
                 # If there is at least an existing unknown message
