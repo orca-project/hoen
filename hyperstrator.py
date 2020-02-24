@@ -333,7 +333,7 @@ class hyperstrator_server(Thread):
                 # Start time counter
                 st = time()
                 # Service transaction , new service
-                create_service = transaction .get(self.create_msg, None)
+                create_service = transaction.get(self.create_msg, None)
 
                 # If the message worked
                 if create_service is not None:
@@ -429,7 +429,7 @@ class hyperstrator_server(Thread):
                     self._log('Creation time:', (time() - st)*1000, 'ms')
 
                 # Service transaction, request service
-                request_service = transaction .get(self.request_msg, None)
+                request_service = transaction.get(self.request_msg, None)
 
                 # If the flag exists
                 if request_service is not None:
@@ -453,63 +453,111 @@ class hyperstrator_server(Thread):
                         # Leave if clause
                         continue
 
+                    # If gathering information about a slice
+                    if request_service['s_id']:
+                        self._log('Service ID:', request_service['s_id'])
                    # If set to gather information about all slices
-                    if not request_service['s_id']:
+                    else:
                         self._log('Gather information about all Service IDs')
 
-                    # Container to hold all slice information
-                    slice_info = dict()
-                    # Iterate over all the existing services
-                    for s_id in self.s_ids:
-                        # If there's an S_ID and it doesn't match current one
-                        if request_service['s_id'] and \
-                                request_service['s_id'] != s_id:
-                            # Skip to next S_ID
+                    # Container to hold information about the slices
+                    slice_info = {s_id: {} for s_id in self.s_ids} \
+                            if not request_service['s_id'] else \
+                                    {request_service['s_id']: {}}
+
+                    # If doing the CN
+                    if self.do_core:
+                        self._log('Send message to CN orchestrator')
+
+                        # Otherwise, send message to the CN orchestrator
+                        core_success, core_msg = self.cn_orch.request_slice(
+                            **{'s_id': request_service['s_id']})
+
+                        # If there was an error at the CN orchestrator
+                        if not core_success:
+                            self._log('Failed requesting Core Slice')
+                            # Inform the user about the failure
+                            self.send_msg(self.request_nack, core_msg)
+                            # Finish here
                             continue
 
-                        self._log('Service ID:', s_id)
+                        # Fill in the slice info
+                        for s_id in slice_info:
+                            slice_info[s_id]['cn'] = \
+                                core_msg.get(s_id, "Not reported by CN")
 
-                        # Append S_ID to the container
-                        slice_info[s_id] = {}
+                    # If debugging
+                    else:
+                        # Fill in the slice info with a stub
+                        for s_id in slice_info:
+                            slice_info[s_id]['cn'] = {'stub'}
 
-                        # If doing the CN
-                        if self.do_core:
-                            self._log('Send message to CN orchestrator')
+                    # If doing the TN
+                    if self.do_transport:
+                        self._log('Send message to TN orchestrator')
 
-                            # Otherwise, send message to the CN orchestrator
-                            core_success, core_msg = self.cn_orch.request_slice(
+                        # Otherwise, send message to the TN orchestrator
+                        transport_success, transport_msg = \
+                            self.tn_orch.request_slice(
                                 **{'s_id': request_service['s_id']})
 
-                            # If the core allocation failed
-                            if not core_success:
-                                self._log('Failed getting  Core Slice')
-                                # Inform the user about the failure
-                                self.send_msg(self.request_nack, core_msg)
-                                # Finish here
-                                continue
+                        # If there was an error at the TN orchestrator
+                        if not transport_success:
+                            self._log('Failed requesting Transport Slice')
+                            # Inform the user about the failure
+                            self.send_msg(self.request_nack, transport_msg)
+                            # Finish here
+                            continue
 
-                        # In case of testing
-                        else:
-                            self._log('Skipping core')
+                        # Fill in the slice info
+                        for s_id in slice_info:
+                            slice_info[s_id]['tn'] = \
+                                transport_msg.get(s_id, "Not reported by TN")
 
-                        #TODO: The RAN will come here.
+                    # If debugging
+                    else:
+                        # Fill in the slice info with a stub
+                        for s_id in slice_info:
+                            slice_info[s_id]['tn'] = {'stub'}
 
-                        #TODO: The TN will come here.
+                    # If doing the RAN
+                    if self.do_radio:
+                        self._log('Send message to RAN orchestrator')
+
+                        # Otherwise, send message to the RAN orchestrator
+                        radio_success, radio_msg = \
+                            self.ran_orch.request_slice(
+                                **{'s_id': request_service['s_id']})
+
+                        # If there was an error at the RAN orchestrator
+                        if not radio_success:
+                            self._log('Failed requesting Radio Slice')
+                            # Inform the user about the failure
+                            self.send_msg(self.request_nack, radio_msg)
+                            # Finish here
+                            continue
+
+                        # Fill in the slice info
+                        for s_id in slice_info:
+                            slice_info[s_id]['ran'] = \
+                                radio_msg.get(s_id, "Not reported by RAN")
+
+                    # If debugging
+                    else:
+                        # Fill in the slice info with a stub
+                        for s_id in slice_info:
+                            slice_info[s_id].update({'ran': 'stub'})
+
+
 
                     # Inform the user about the slice information
-                    self.send_msg(self.request_ack,
-                                  {'s_id': request_service['s_id'],
-                                   'info': {
-                                        'ran': None, # TODO
-                                        'tn': None, # TODO
-                                        'cn': core_msg['info']}
-                                   })
-
+                    self.send_msg(self.request_ack, slice_info)
+                    # Measure elapsed time
                     self._log('Get time:', (time() - st)*1000, 'ms')
 
 
                 # Update service transaction
-                update_service = request.get(self.update_msg, None)
+                update_service = transaction.get(self.update_msg, None)
 
                 # If the flag exists
                 if update_service is not None:
@@ -520,7 +568,7 @@ class hyperstrator_server(Thread):
                     continue
 
                 # Service transaction , remove service
-                delete_service = transaction .get(self.delete_msg, None)
+                delete_service = transaction.get(self.delete_msg, None)
 
                 # If the flag exists
                 if delete_service is not None:

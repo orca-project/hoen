@@ -185,14 +185,14 @@ class ctl_base(object):
         # If the slice removal failed
         if not success:
             # Inform the hyperstrator about the failure
-            print('\t', 'Failed removing a ' + self.type + ' Slice in ' + \
+            print('\t', 'Failed deleting a ' + self.type + ' Slice in ' + \
                   self.name, "Reason:", msg)
             return False, msg
 
         # Otherwise, it succeeded
         else:
             # Inform the hyperstrator about the success
-            print('\t', 'Succeeded removing a ' + self.type + ' Slice in ' + \
+            print('\t', 'Succeeded deleting a ' + self.type + ' Slice in ' + \
                   self.name)
             return True, msg
 
@@ -313,14 +313,14 @@ class base_orchestrator(Thread):
                 # Try again
                 continue
 
-            # Request
-            request = cmd.get(self.req_header, None)
+            # Received transaction
+            transaction = cmd.get(self.req_header, None)
 
             # If the message is valid
-            if request is not None:
+            if transaction is not None:
                 self._log('Received Message', head=True)
                 # Check whether is it a new service
-                create_slice = request.get(self.create_msg, None)
+                create_slice = transaction.get(self.create_msg, None)
 
                 # If it is a new service
                 if create_slice is not None:
@@ -349,11 +349,55 @@ class base_orchestrator(Thread):
                     self._send_msg(self.create_ack if success else \
                                    self.create_nack, msg)
 
-                # If it is a remove service
-                delete_slice = request.get(self.delete_msg, None)
+
+                # If it is a request service
+                request_slice = transaction.get(self.request_msg, None)
+
+                if request_slice is not None:
+                    self._log('Request' + self.type + ' Service', head=True)
+                    # If missing the slice ID:
+                    if request_slice['s_id'] is None:
+                        self._log("Missing Service ID.")
+                        # Send message
+                        self._send_msg(self.request_nack, "Missing Service ID")
+                        # Leave if clause
+                        continue
+
+                    # If this service doesn't exist
+                    elif request_slice['s_id'] not in self.s_ids:
+                        self._log('Service ID does not exist')
+                        msg = 'The service does not exist:' + \
+                            request_slice['s_id']
+                        # Send message
+                        self._send_msg(self.request_nack, msg)
+                        # Leave if clause
+                        continue
+
+                    self._log('Service ID:', request_slice['s_id'])
+
+                    # Request a slice
+                    success, msg = self.request_slice(**request_slice)
+
+                    # Send message
+                    self._send_msg(self.request_ack if success else \
+                                   self.request_nack, msg)
+
+                # Update service transaction
+                update_service = transaction.get(self.update_msg, None)
+
+                # If the flag exists
+                if update_service is not None:
+                    self._log('Update Service Transaction', head=True)
+
+                    self._log("Not implemented yet.")
+
+                    continue
+
+                # If it is a delete service
+                delete_slice = transaction.get(self.delete_msg, None)
 
                 if delete_slice is not None:
-                    self._log('Remove ' + self.type + ' Service', head=True)
+                    self._log('Delete' + self.type + ' Service', head=True)
                     # If missing the slice ID:
                     if delete_slice['s_id'] is None:
                         self._log("Missing Service ID.")
@@ -374,22 +418,22 @@ class base_orchestrator(Thread):
 
                     self._log('Service ID:', delete_slice['s_id'])
 
-                    # Remove a slice
+                    # Delete a slice
                     success, msg = self.delete_slice(**delete_slice)
 
                     # Send message
                     self._send_msg(self.delete_ack if success else \
                                    self.delete_nack, msg)
 
-                    # Remove it from the list of service IDs
+                    # Delete it from the list of service IDs
                     del self.s_ids[delete_slice['s_id']]
 
 
                 # Check for unknown messages
-                unknown_msg = [x for x in request if x not in [self.create_msg,
-                                                               self.request_msg,
-                                                               self.update_msg,
-                                                               self.delete_msg]]
+                unknown_msg = [x for x in transaction if x not in [
+                    self.create_msg, self.request_msg,
+                    self.update_msg, self.delete_msg]]
+
                 # If there is at least an existing unknown message
                 if unknown_msg:
                     self._log('Unknown message', head=True)
