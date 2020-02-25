@@ -313,6 +313,9 @@ class base_orchestrator(Thread):
                 # Try again
                 continue
 
+            # Start time counter
+            st = time()
+
             # Received transaction
             transaction = cmd.get(self.req_header, None)
 
@@ -345,7 +348,8 @@ class base_orchestrator(Thread):
 
                     # Log event
                     self._log("Created Slice" if success else \
-                        "Failed creating Slice")
+                        "Failed creating Slice", 'Took:',
+                              (time() - st)*1000, 'ms')
 
                     # Send message
                     self._send_msg(self.create_ack if success else \
@@ -388,7 +392,8 @@ class base_orchestrator(Thread):
 
                     # Log event
                     self._log("Requested Slice" if success else \
-                        "Failed requesting  Slice")
+                        "Failed requesting  slice", 'took:',
+                              (time() - st)*1000, 'ms')
 
                     # Send message
                     self._send_msg(self.request_ack if success else \
@@ -435,7 +440,8 @@ class base_orchestrator(Thread):
 
                     # Log event
                     self._log("Deleted Slice" if success else \
-                        "Failed deleting  Slice")
+                        "Failed deleting  slice", 'took:',
+                              (time() - st)*1000, 'ms')
 
                     # Send message
                     self._send_msg(self.delete_ack if success else \

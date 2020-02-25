@@ -6,7 +6,8 @@ import zmq
 from threading import Thread, Lock, Event
 # Import the Pause method of the Signal module
 from signal import pause
-
+# Import the time method from the time module
+from time import time
 # Received delay of 10 sec
 RECV_DELAY = 10*1000
 
@@ -119,11 +120,11 @@ class base_controller(Thread):
         pass
 
     def delete_slice(self, **kwargs):
-        # Must overside this method
+        # Must override this method
         pass
 
     def get_topology(self, **kwargs):
-        # Must overside this method
+        # Must override this method
         pass
 
     def run(self):
@@ -137,6 +138,8 @@ class base_controller(Thread):
                 # Try again
                 continue
 
+            # Keep track of time
+            st = time()
             # Controller transaction
             transaction = cmd.get(self.req_header, None)
             # If the message is valid
@@ -167,7 +170,8 @@ class base_controller(Thread):
 
                     # Log event
                     self._log("Created Slice" if success else \
-                        "Failed  creating Slice")
+                        "Failed  creating Slice", 'Took:',
+                              (time() - st)*1000, 'ms')
 
                     # Send message
                     self._send_msg(self.create_ack if success else \
@@ -209,7 +213,8 @@ class base_controller(Thread):
 
                     # Log event
                     self._log("Requested Slice" if success else \
-                        "Failed requesting  Slice")
+                        "Failed requesting Slice", 'Took:',
+                              (time() - st)*1000, 'ms')
 
                     # Send message
                     self._send_msg(self.request_ack if success else \
@@ -243,14 +248,15 @@ class base_controller(Thread):
                         # Leave if clause
                         continue
 
-                   self._log('Service ID:', delete_slice['s_id'])
+                    self._log('Service ID:', delete_slice['s_id'])
 
                     # Remove a slice
                     success, msg = self.delete_slice(**delete_slice)
 
                     # Log event
                     self._log("Deleted Slice" if success else \
-                        "Failed deleting Slice")
+                        "Failed deleting Slice", 'Took:',
+                              (time() - st)*1000, 'ms')
 
                     # If deleted the slice
                     if success:

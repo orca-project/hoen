@@ -11,8 +11,6 @@ from base_controller.base_controller import base_controller
 import os
 # Import signal
 import signal
-# Import the Time method from the time module
-from time import time
 # Import the net_if_address from the ps_util module
 from psutil import net_if_addrs
 # Import the Client class from the pylxd module
@@ -36,8 +34,6 @@ class lxd_controller(base_controller):
         self._log("Found", len(self.interface_list), "Ethernet ports")
 
     def prepare_distro_image(self, image_name="ubuntu-19.04-plain"):
-        # Keep track of time spent here
-        st = time()
         # Image server locations
         #  image_server = "https://images.linuxcontainers.org"
         image_server = "https://cloud-images.ubuntu.com/releases/"
@@ -75,25 +71,17 @@ class lxd_controller(base_controller):
                 image.add_alias(name=image_name, description="")
 
         # Log event and return possible new name
-        self._log("Base image ready!", (time()-st)*1000, "ms")
+        self._log("Base image ready!")
         return image_name
 
 
     def create_slice(self, **kwargs):
-         # Keep track of time spent here
-        st = time()
        # Extract parameters from keyword arguments
         s_id = str(kwargs.get('s_id', None))
         s_distro = kwargs.get('s_distro', "ubuntu-19.04-plain")
         # TODO: Ideally the CN orchestrator would specify the resources
         s_cpu = str(kwargs.get('s_cpu', 1))
         s_ram = str(int(kwargs.get('s_ram', 1.0)))
-
-       # Check for validity of the slice ID
-        if s_id in self.s_ids:
-            self._log('Creation did not work!', 'Took',
-                      (time() - st)*1000, 'ms')
-            return False, 'Slice ID already exists'
 
         # Try to get an available interface
         index = 0
@@ -109,8 +97,7 @@ class lxd_controller(base_controller):
         # If there are no interfaces available
         if not available_interface:
             # Log event and return message
-            self._log('Not enough resources!', 'Took',
-                      (time() - st)*1000, 'ms')
+            self._log('Not enough resources!')
             return False, 'Not enough resources!'
 
         #  Check if container already exist
@@ -177,18 +164,16 @@ class lxd_controller(base_controller):
                     "interface": available_interface}
                 )
             # Log event and return
-            self._log("Created container!", "Took:", (time()-st)*1000, "ms")
+            self._log("Created container!")
             return True, {'s_id': s_id, "source": interface_ip}
 
     def request_slice(self, **kwargs):
-         # Keep track of time spent here
-        st = time()
       # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
 
        # Check for validity of the slice ID
         if s_id not in self.s_ids:
-            self._log('Request did not work!', 'Took', (time() - st)*1000, 'ms')
+            self._log('Request did not work!')
             return True, {"s_id": s_id,
                           "info": 'There is no slice with this ID'}
 
@@ -199,7 +184,7 @@ class lxd_controller(base_controller):
                 s_distro = container.config["image.os"]+ "-" + \
                     container.config['image.version']
                 # Log event and return
-                self._log("Found container!", "Took:", (time()-st)*1000, "ms")
+                self._log("Found container!")
                 return True, {"s_id": s_id,
                         "info": {"s_distro": s_distro,
                                  "interface": self.s_ids[s_id]['interface']
@@ -209,17 +194,8 @@ class lxd_controller(base_controller):
         return False, "Container missing."
 
     def delete_slice(self, **kwargs):
-        # Keep track of time spent here
-        st = time()
       # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
-
-       # Check for validity of the slice ID
-        if s_id not in self.s_ids:
-            # Log event and return
-            self._log('Delete did not work!', 'Took',
-                      (time() - st)*1000, 'ms')
-            return False, 'There is no slice with this ID'
 
         # Default value
         container = None
@@ -256,12 +232,10 @@ class lxd_controller(base_controller):
                 self.s_ids[s_id]["interface"]]["available"] = True
 
             # Log event and return
-            self._log("Deleted container!", "Took:", (time()-st)*1000, "ms")
+            self._log("Deleted container!")
             return True, {"s_id": s_id}
 
-
 if __name__ == "__main__":
-
     # Handle keyboard interrupt (SIGINT)
     try:
         # Instantiate the LXD Controller
