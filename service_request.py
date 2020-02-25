@@ -202,6 +202,7 @@ def service_request(socket, **kwargs):
     # Try to get the service ID
     s_id = kwargs.get("service_id", "")
 
+    print(s_id, kwargs)
     # Send service release message to the hyperstrator
     socket.send_json({request_msg: {'s_id': s_id}})
 
@@ -256,8 +257,6 @@ def service_delete(socket, **kwargs):
 
     # Send service release message to the hyperstrator
     socket.send_json({delete_msg: {'s_id': kwargs['service_id']}})
-    # Receive acknowledgment
-    rep = socket.recv_json()
 
     try:
         # Receive acknowledgment

@@ -435,7 +435,7 @@ class hyperstrator_server(Thread):
                 if request_service is not None:
                     self._log('Request Service Transaction', head=True)
                     # If missing the slice ID:
-                    if request_service['s_id'] is None:
+                    if 's_id' not in request_service:
                         self._log("Missing Service ID.")
                         # Send message
                         self.send_msg(self.request_nack, "Missing Service ID")
@@ -443,7 +443,7 @@ class hyperstrator_server(Thread):
                         continue
 
                     # If there is an S_ID but it doesn't exist
-                    elif (request_service['s_id']) and \
+                    elif request_service['s_id'] and \
                             (request_service['s_id'] not in self.s_ids):
                         self._log('Service ID does not exist')
                         # Send message
@@ -572,7 +572,8 @@ class hyperstrator_server(Thread):
                 if delete_service is not None:
                     self._log('Delete Service Transaction', head=True)
                     # If missing the slice ID:
-                    if delete_service['s_id'] is None:
+                    if 's_id' not in delete_service or not \
+                            delete_service['s_id']:
                         self._log("Missing Service ID.")
                         # Send message
                         self.send_msg(self.delete_nack, "Missing Service ID")

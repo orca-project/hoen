@@ -189,11 +189,12 @@ class lxd_controller(base_controller):
         # Iterate over all containers
         for container in self.lxd_client.containers.all():
             # If going for a specific S_ID but it does not match
-            if s_id and ("id-" + s_id != container.name):
+            if (s_id and ("id-" + s_id != container.name)) or \
+                    not container.name.startswith("id"):
                 continue
 
             # Log event and return
-            self._log("Found container:", s_id)
+            self._log("Found container:", container.name.split('-',1)[-1])
 
             # Append this information to the output dictionary
             msg[container.name.split('-',1)[-1]] = \
@@ -245,9 +246,11 @@ class lxd_controller(base_controller):
             return False, str(e)
         # In case it worked out fine
         else:
-            # Release resources
-            self.interface_list[ \
-                self.s_ids[s_id]["interface"]]["available"] = True
+            # If set to have its own physical NIC
+            if grab_ethernet:
+                # Release resources
+                self.interface_list[ \
+                    self.s_ids[s_id]["interface"]]["available"] = True
 
             # Log event and return
             self._log("Deleted container!")

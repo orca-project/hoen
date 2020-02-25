@@ -362,7 +362,7 @@ class base_orchestrator(Thread):
                 if request_slice is not None:
                     self._log('Request' + self.type + ' Service', head=True)
                     # If missing the slice ID:
-                    if request_slice['s_id'] is None:
+                    if 's_id' not in request_slice:
                         self._log("Missing Service ID.")
                         # Send message
                         self._send_msg(self.request_nack, "Missing Service ID")
@@ -370,13 +370,13 @@ class base_orchestrator(Thread):
                         continue
 
                     # If there is an S_ID but it doesn't exist
-                    elif (request_slice['s_id']) and \
+                    elif request_slice['s_id'] and \
                             (request_slice['s_id'] not in self.s_ids):
                         self._log('The service does not exist')
                         # Send message
                         self.send_msg(self.request_nack,
                                       'The service does not exist: ' + \
-                                      request_service['s_id'])
+                                      request_slice['s_id'])
                         # Leave if clause
                         continue
 
@@ -400,10 +400,10 @@ class base_orchestrator(Thread):
                                    self.request_nack, msg)
 
                 # Update service transaction
-                update_service = transaction.get(self.update_msg, None)
+                update_slice= transaction.get(self.update_msg, None)
 
                 # If the flag exists
-                if update_service is not None:
+                if update_slice is not None:
                     self._log('Update Service Transaction', head=True)
 
                     self._log("Not implemented yet.")
