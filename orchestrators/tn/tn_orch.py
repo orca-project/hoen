@@ -66,7 +66,6 @@ class tn_orchestrator(base_orchestrator):
         catalog.add_network('10.1.0.1', 'h01', 2)
         catalog.add_network('10.2.0.1', 'h02', 3)
 
-
     def create_slice(self, **kwargs):
         catalog = ndb()
         st = time()
@@ -116,6 +115,12 @@ class tn_orchestrator(base_orchestrator):
             catalog.add_route(s_id, route)
         # Inform the user about the creation
         return success, msg
+
+    def request_slice(self, **kwargs):
+        pass
+
+    def update_slice(self, **kwargs):
+        pass
 
     def delete_slice(self, **kwargs):
         # Extract parameters from keyword arguments

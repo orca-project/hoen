@@ -18,7 +18,7 @@ class base_controller(Thread):
         # Flat to exit gracefully
         self.shutdown_flag = Event()
         # Container to hold the list of Service IDs
-        self.s_ids = []
+        self.s_ids = {}
 
         # Get the name from keyword arguments
         self.name = kwargs.get('name', 'CTL')
@@ -27,8 +27,6 @@ class base_controller(Thread):
         self._parse_kwargs(**kwargs)
         # Start the controller server
         self._server_bind(**kwargs)
-        # Container to hold slice information
-        self.slice_list = {}
 
         # Print start up message
         self._log('Started ' + self.name + ' Controller', head=True)
@@ -139,13 +137,13 @@ class base_controller(Thread):
                 # Try again
                 continue
 
-            # CTL request
-            request = cmd.get(self.req_header, None)
+            # Controller transaction
+            transaction = cmd.get(self.req_header, None)
             # If the message is valid
-            if request is not None:
+            if transaction is not None:
                 self._log('Received Message', head=True)
-                # Check wheter is it a new slice
-                create_slice = request.get(self.create_msg, None)
+                # Check whether is it a new slice
+                create_slice = transaction.get(self.create_msg, None)
 
                 # If we must create a new slice
                 if create_slice is not None:
@@ -161,17 +159,76 @@ class base_controller(Thread):
                         continue
 
                     # Append it to the list of service IDs
-                    self.s_ids.append(create_slice['s_id'])
+                    self.s_ids[create_slice['s_id']] = {}
                     self._log('Service ID:', create_slice['s_id'])
 
                     # Create new slice
                     success, msg = self.create_slice(**create_slice)
+
+                    # Log event
+                    self._log("Created Slice" if success else \
+                        "Failed  creating Slice")
+
                     # Send message
                     self._send_msg(self.create_ack if success else \
                                    self.create_nack, msg)
 
+                # If it is a request service
+                request_slice = transaction.get(self.request_msg, None)
+
+                if request_slice is not None:
+                    self._log('Request Slice', head=True)
+                    # If missing the slice ID:
+                    if request_slice['s_id'] is None:
+                        self._log("Missing Service ID.")
+                        # Send message
+                        self._send_msg(self.request_nack, "Missing Service ID")
+                        # Leave if clause
+                        continue
+
+                    # If there is an S_ID but it doesn't exist
+                    elif (request_slice['s_id']) and \
+                            (request_slice['s_id'] not in self.s_ids):
+                        self._log('The slice does not exist')
+                        # Send message
+                        self.send_msg(self.request_nack,
+                                      'The slice does not exist: ' + \
+                                      request_service['s_id'])
+                        # Leave if clause
+                        continue
+
+                    # If gathering information about a slice
+                    if request_slice['s_id']:
+                        self._log('Service ID:', request_slice['s_id'])
+                   # If set to gather information about all slices
+                    else:
+                        self._log('Gather information about all Service IDs')
+
+                    # Request a slice
+                    success, msg = self.request_slice(**request_slice)
+
+                    # Log event
+                    self._log("Requested Slice" if success else \
+                        "Failed requesting  Slice")
+
+                    # Send message
+                    self._send_msg(self.request_ack if success else \
+                                   self.request_nack, msg)
+
+
+                # Update slice transaction
+                update_slice = transaction.get(self.update_msg, None)
+
+                # If the flag exists
+                if update_slice is not None:
+                    self._log('Update Slice Transaction', head=True)
+
+                    self._log("Not implemented yet.")
+
+                    continue
+
                 # Check whether it is a removal
-                delete_slice = request.get(self.delete_msg, None)
+                delete_slice = transaction.get(self.delete_msg, None)
 
                 # If we must delete a slice
                 if delete_slice is not None:
@@ -186,19 +243,26 @@ class base_controller(Thread):
                         # Leave if clause
                         continue
 
-                    # Remove it from the list of service IDs
-                    self.s_ids.remove(delete_slice['s_id'])
-                    self._log('Service ID:', delete_slice['s_id'])
+                   self._log('Service ID:', delete_slice['s_id'])
 
                     # Remove a slice
                     success, msg = self.delete_slice(**delete_slice)
+
+                    # Log event
+                    self._log("Deleted Slice" if success else \
+                        "Failed deleting Slice")
+
+                    # If deleted the slice
+                    if success:
+                        # Remove it from the list of service IDs
+                        del self.s_ids[delete_slice['s_id']]
 
                     # Send message
                     self._send_msg(self.delete_ack if success else \
                                    self.delete_nack, msg)
 
                 # Check whether it is a topology check
-                get_topology = request.get(self.topology_msg, None)
+                get_topology = transaction.get(self.topology_msg, None)
 
                 # If we must retrieve the network topology
                 if get_topology is not None:
@@ -210,11 +274,10 @@ class base_controller(Thread):
                                    self.topology_nack, msg)
 
                 # Check for unknown messages
-                unknown_msg = [x for x in request if x not in [self.create_msg,
-                                                               self.request_msg,
-                                                               self.update_msg,
-                                                               self.delete_msg,
-                                                               self.topology_msg]]
+                unknown_msg = [x for x in transaction if x not in [
+                    self.create_msg, self.request_msg,
+                    self.update_msg, self.delete_msg, self.topology_msg]]
+
                 # If there is at least an existing unknown message
                 if unknown_msg:
                     self._log('Unknown message', head=True)
@@ -227,9 +290,9 @@ class base_controller(Thread):
             # Failed to parse message
             else:
                 self._log('Failed to parse message', head=True)
-                self._log('Message:', request)
+                self._log('Message:', transaction)
 
-                msg = "Failed to parse message: " + str(request)
+                msg = "Failed to parse message: " + str(transaction)
                 # Send message
                 self._send_msg(self.error_msg, msg)
 

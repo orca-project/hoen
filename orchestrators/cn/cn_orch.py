@@ -55,6 +55,23 @@ class core_network_orchestrator(base_orchestrator):
         # Inform the user about the creation
         return success, msg
 
+    def request_slice(self, **kwargs):
+        # Extract parameters from keyword arguments
+        s_id = kwargs.get('s_id', None)
+
+        # Send message to LXD CN controller
+        self._log('Delegating it to the LXD Controller')
+
+        # Send the message to create a slice
+        success, msg = self.lxd_ctl.request_slice(**{'s_id': s_id})
+
+        # Inform the user about the creation
+        return success, msg
+
+
+    def update_slice(self, **kwargs):
+        pass
+
     def delete_slice(self, **kwargs):
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
@@ -68,8 +85,7 @@ class core_network_orchestrator(base_orchestrator):
         self._log('Delegating it to the LXD Controller')
 
         # Send message to remove slice
-        success, msg = self.lxd_ctl.delete_slice(
-                **{'s_id': s_id, 'ditribution': s_dis})
+        success, msg = self.lxd_ctl.delete_slice(**{'s_id': s_id})
 
         # Inform the user about the removal
         return success, msg

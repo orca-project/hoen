@@ -29,7 +29,7 @@ class lxd_controller(base_controller):
         # Instantiate the LXD client
         self.lxd_client = Client()
 
-
+        # List of external ethernet ports
         self.interface_list = {x: {"available": True} for x in \
                 net_if_addrs().keys() if x.startswith('enp')}
 
@@ -90,7 +90,7 @@ class lxd_controller(base_controller):
         s_ram = str(int(kwargs.get('s_ram', 1.0)))
 
        # Check for validity of the slice ID
-        if s_id in self.slice_list:
+        if s_id in self.s_ids:
             self._log('Creation did not work!', 'Took',
                       (time() - st)*1000, 'ms')
             return False, 'Slice ID already exists'
@@ -172,9 +172,10 @@ class lxd_controller(base_controller):
         # In case it worked out fine
         else:
             # Append it to the service list
-            self.slice_list[s_id] = {
+            self.s_ids[s_id].update({
                     "container": container,
                     "interface": available_interface}
+                )
             # Log event and return
             self._log("Created container!", "Took:", (time()-st)*1000, "ms")
             return True, {'s_id': s_id, "source": interface_ip}
@@ -186,7 +187,7 @@ class lxd_controller(base_controller):
         s_id = kwargs.get('s_id', None)
 
        # Check for validity of the slice ID
-        if s_id not in self.slice_list:
+        if s_id not in self.s_ids:
             self._log('Request did not work!', 'Took', (time() - st)*1000, 'ms')
             return True, {"s_id": s_id,
                           "info": 'There is no slice with this ID'}
@@ -201,7 +202,7 @@ class lxd_controller(base_controller):
                 self._log("Found container!", "Took:", (time()-st)*1000, "ms")
                 return True, {"s_id": s_id,
                         "info": {"s_distro": s_distro,
-                                 "interface": self.slice_list[s_id]['interface']
+                                 "interface": self.s_ids[s_id]['interface']
                                  }}
 
         # In case the records are outdated
@@ -214,7 +215,7 @@ class lxd_controller(base_controller):
         s_id = kwargs.get('s_id', None)
 
        # Check for validity of the slice ID
-        if s_id not in self.slice_list:
+        if s_id not in self.s_ids:
             # Log event and return
             self._log('Delete did not work!', 'Took',
                       (time() - st)*1000, 'ms')
@@ -251,9 +252,9 @@ class lxd_controller(base_controller):
         # In case it worked out fine
         else:
             # Release resources
-            self.interface_list[self.slice_list[s_id]["interface"]]["available"] = True
-            # Remove container from list
-            self.slice_list.pop(s_id)
+            self.interface_list[ \
+                self.s_ids[s_id]["interface"]]["available"] = True
+
             # Log event and return
             self._log("Deleted container!", "Took:", (time()-st)*1000, "ms")
             return True, {"s_id": s_id}

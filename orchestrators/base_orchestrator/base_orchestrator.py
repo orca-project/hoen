@@ -335,15 +335,17 @@ class base_orchestrator(Thread):
                         # Leave if clause
                         continue
 
-                    # Otherwise, it is a new service
                     # Append it to the list of service IDs
-                    self.s_ids[create_slice['s_id']] = create_slice.get('type',
-                                                                        None)
+                    self.s_ids[create_slice['s_id']] = {}
 
                     self._log('Service ID:', create_slice['s_id'])
 
                     # Create new slice
                     success, msg = self.create_slice(**create_slice)
+
+                    # Log event
+                    self._log("Created Slice" if success else \
+                        "Failed creating Slice")
 
                     # Send message
                     self._send_msg(self.create_ack if success else \
@@ -363,20 +365,30 @@ class base_orchestrator(Thread):
                         # Leave if clause
                         continue
 
-                    # If this service doesn't exist
-                    elif request_slice['s_id'] not in self.s_ids:
-                        self._log('Service ID does not exist')
-                        msg = 'The service does not exist:' + \
-                            request_slice['s_id']
+                    # If there is an S_ID but it doesn't exist
+                    elif (request_slice['s_id']) and \
+                            (request_slice['s_id'] not in self.s_ids):
+                        self._log('The service does not exist')
                         # Send message
-                        self._send_msg(self.request_nack, msg)
+                        self.send_msg(self.request_nack,
+                                      'The service does not exist: ' + \
+                                      request_service['s_id'])
                         # Leave if clause
                         continue
 
-                    self._log('Service ID:', request_slice['s_id'])
+                    # If gathering information about a slice
+                    if request_slice['s_id']:
+                        self._log('Service ID:', request_slice['s_id'])
+                   # If set to gather information about all slices
+                    else:
+                        self._log('Gather information about all Service IDs')
 
                     # Request a slice
                     success, msg = self.request_slice(**request_slice)
+
+                    # Log event
+                    self._log("Requested Slice" if success else \
+                        "Failed requesting  Slice")
 
                     # Send message
                     self._send_msg(self.request_ack if success else \
@@ -420,6 +432,10 @@ class base_orchestrator(Thread):
 
                     # Delete a slice
                     success, msg = self.delete_slice(**delete_slice)
+
+                    # Log event
+                    self._log("Deleted Slice" if success else \
+                        "Failed deleting  Slice")
 
                     # Send message
                     self._send_msg(self.delete_ack if success else \
