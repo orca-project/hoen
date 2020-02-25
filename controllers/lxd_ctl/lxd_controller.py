@@ -16,10 +16,11 @@ from psutil import net_if_addrs
 # Import the Client class from the pylxd module
 from pylxd import Client
 
+#  from threading import Thread
+
 # Supress pylxd warnings
 os.environ["PYLXD_WARNINGS"] = "none"
-from threading import Thread
-
+grab_ethernet = False
 
 class lxd_controller(base_controller):
 
@@ -83,28 +84,23 @@ class lxd_controller(base_controller):
         s_cpu = str(kwargs.get('s_cpu', 1))
         s_ram = str(int(kwargs.get('s_ram', 1.0)))
 
-        # Try to get an available interface
-        index = 0
-        available_interface = ""
-        # Iterate over the interface list
-        for index, interface in enumerate(self.interface_list):
-            if self.interface_list[interface]['available']:
-                # Use the first available interface and break the loop
-                available_interface = interface
-                self.interface_list[interface]['available'] = False
-                break
+        if grab_ethernet:
+            # Try to get an available interface
+            index = 0
+            available_interface = ""
+            # Iterate over the interface list
+            for index, interface in enumerate(self.interface_list):
+                if self.interface_list[interface]['available']:
+                    # Use the first available interface and break the loop
+                    available_interface = interface
+                    self.interface_list[interface]['available'] = False
+                    break
 
-        # If there are no interfaces available
-        if not available_interface:
-            # Log event and return message
-            self._log('Not enough resources!')
-            return False, 'Not enough resources!'
-
-        #  Check if container already exist
-        #  if self.get_slice(name) is not None:
-            #  self.log('Container', name, 'already exists!')
-        #  If not, lets create it
-        #  else:
+            # If there are no interfaces available
+            if not available_interface:
+                # Log event and return message
+                self._log('Not enough resources!')
+                return False, 'Not enough resources!'
 
         try:
             #  Prepare image of the chosen distribution
@@ -115,43 +111,52 @@ class lxd_controller(base_controller):
             self._log("Could not prepare base image:", str(e))
             return False, str(e)
 
+
+        # Default container profile configuration
+        profile = {'name':  "id-" + s_id,
+                   'config': {
+                     'limits.cpu': s_cpu,
+                     'limits.memory': s_ram + "GB"},
+                   'source': {'type': 'image', 'alias': s_distro}}
+
+        # If attaching an physical ethernet port to it
+        if grab_ethernet:
+            # Add new entry to the profile configuration
+            profile['devices'] = {"oth0": {
+                "type": "nic",
+                "nictype": "physical",
+                "parent": available_interface,
+                "name": "oth0"}
+            }
+
         # Try to create a new container
         try:
             # Create a new container with the specified configuration
-            container = self.lxd_client.containers.create(
-                {'name':  "id-" + s_id,
-                 'config': {
-                   'limits.cpu': s_cpu,
-                   'limits.memory': s_ram + "GB"
-                 },
-                 'source': {'type': 'image', 'alias': s_distro},
-                 'devices': {"oth0": {"type": "nic",
-                                      "nictype": "physical",
-                                      "parent": available_interface,
-                                      "name": "oth0"}}
-                 },
-                 wait=True)
+            container = self.lxd_client.containers.create(profile, wait=True)
 
             # Start the container
             container.start(wait=True)
 
-            # Set the interface's IP
-            interface_ip = "10.0.{0}.1/24".format(index)
-            container.execute(
-                    ["ip", "addr", "add", interface_ip, "dev", "oth0"])
+            # If attaching an physical ethernet port to it
+            if grab_ethernet:
+                # Set the interface's IPenp0s31f6
+                interface_ip = "10.0.{0}.1/24".format(index)
+                container.execute(
+                        ["ip", "addr", "add", interface_ip, "dev", "oth0"])
 
-            self._log("Configured IP:", interface_ip)
+                self._log("Configured IP:", interface_ip)
 
             # TODO: Dirty awful way, hate it. It should be a docker.
-            Thread(target=container.execute,
-                   args=(['python3', '-m', 'http.server'],)).start()
-
-            self._log("Return!")
+            #  Thread(target=container.execute,
+                   #  args=(['python3', '-m', 'http.server'],)).start()
 
         # In case of issues
         except Exception as e:
-            # Release resources
-            self.interface_list[interface]['available'] = True
+            # If attaching an physical ethernet port to it
+            if grab_ethernet:
+                # Release resources
+                self.interface_list[interface]['available'] = True
+
             # Log event and return
             self._log(str(e))
             return False, str(e)
@@ -159,39 +164,52 @@ class lxd_controller(base_controller):
         # In case it worked out fine
         else:
             # Append it to the service list
-            self.s_ids[s_id].update({
-                    "container": container,
-                    "interface": available_interface}
-                )
+            self.s_ids[s_id].update({"container": container})
+
+            # If attaching an physical ethernet port to it
+            if grab_ethernet:
+                self.s_ids[s_id].update({"interface": available_interface})
             # Log event and return
+
             self._log("Created container!")
-            return True, {'s_id': s_id, "source": interface_ip}
+
+            return True, {
+                's_id': s_id,
+                "source": interface_ip if grab_ethernet else "127.0.0.1"}
 
     def request_slice(self, **kwargs):
       # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
 
-       # Check for validity of the slice ID
-        if s_id not in self.s_ids:
-            self._log('Request did not work!')
-            return True, {"s_id": s_id,
-                          "info": 'There is no slice with this ID'}
+        # Container to hold the requested information
+        msg = {}
+        # Pick the correct interface
+        interface = "oth0" if grab_ethernet else "eth0"
 
-        # Iterate over all container and return the matching one
+        # Iterate over all containers
         for container in self.lxd_client.containers.all():
-            if "id-" + s_id == container.name:
-                # Get info about the OS. #TODO CPU & RAM, maybe?
-                s_distro = container.config["image.os"]+ "-" + \
-                    container.config['image.version']
-                # Log event and return
-                self._log("Found container!")
-                return True, {"s_id": s_id,
-                        "info": {"s_distro": s_distro,
-                                 "interface": self.s_ids[s_id]['interface']
-                                 }}
+            # If going for a specific S_ID but it does not match
+            if s_id and ("id-" + s_id != container.name):
+                continue
 
-        # In case the records are outdated
-        return False, "Container missing."
+            # Log event and return
+            self._log("Found container:", s_id)
+
+            # Append this information to the output dictionary
+            msg[container.name.split('-',1)[-1]] = \
+                {'distro': container.config["image.os"]+ "-" + \
+                     container.config['image.version'],
+                'memory': {"limit": container.config.get('limits.memory', ""),
+                           "usage": container.state().memory['usage']},
+                 'cpu': {"limit":  container.config.get('limits.cpu', ""),
+                         "usage": container.state().cpu['usage']},
+                 "network": {interface: \
+                        container.state().network[interface]['counters']}
+                 }
+
+        # If there's an S_ID but the result was empty
+        return (False, "Container missing.") \
+            if (s_id and not msg) else (True, msg)
 
     def delete_slice(self, **kwargs):
       # Extract parameters from keyword arguments

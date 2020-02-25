@@ -223,8 +223,8 @@ def service_request(socket, **kwargs):
             log('Request Service:', head=True)
             # For every returned slice
             for entry in ack:
-                log('Service ID:', entry['s_id'])
-                log('Info:', entry['info'])
+                log('Service ID:', entry)
+                log('Info:', ack[entry])
             # Exit gracefully
             exit(0)
 

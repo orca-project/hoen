@@ -220,7 +220,6 @@ class base_controller(Thread):
                     self._send_msg(self.request_ack if success else \
                                    self.request_nack, msg)
 
-
                 # Update slice transaction
                 update_slice = transaction.get(self.update_msg, None)
 

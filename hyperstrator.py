@@ -461,9 +461,9 @@ class hyperstrator_server(Thread):
                         self._log('Gather information about all Service IDs')
 
                     # Container to hold information about the slices
-                    slice_info = {s_id: {} for s_id in self.s_ids} \
+                    slice_info = dict((s_id, {}) for s_id in self.s_ids) \
                             if not request_service['s_id'] else \
-                                    {request_service['s_id']: {}}
+                            {request_service['s_id']: {}}
 
                     # If doing the CN
                     if self.do_core:
@@ -518,7 +518,7 @@ class hyperstrator_server(Thread):
                     else:
                         # Fill in the slice info with a stub
                         for s_id in slice_info:
-                            slice_info[s_id]['tn'] = {'stub'}
+                            slice_info[s_id].update({'tn': 'stub'})
 
                     # If doing the RAN
                     if self.do_radio:
@@ -547,8 +547,6 @@ class hyperstrator_server(Thread):
                         # Fill in the slice info with a stub
                         for s_id in slice_info:
                             slice_info[s_id].update({'ran': 'stub'})
-
-
 
                     # Inform the user about the slice information
                     self.send_msg(self.request_ack, slice_info)
