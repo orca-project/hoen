@@ -17,6 +17,7 @@ from services.ndb import ndb
 from services.path_engine import PathEngine
 # Import SONAr modules
 from sonar.scoe import scoe
+from sonar.she import she
 
 def cls():
     system('cls' if name=='nt' else 'clear')
@@ -131,6 +132,66 @@ class wired_orchestrator(base_orchestrator):
         # Inform the user about the removal
         return success, msg
 
+    def reconfigure_slice(self, **kwargs):
+        s_id = kwargs.get('s_id', None)
+        catalog = ndb()
+        old_route = catalog.get_route(s_id)
+
+        source = old_route.get('src')
+        destination = old_route.get('dst')
+        latency = old_route.get('latency')
+        throughput = old_route.get('throughput')
+  
+        slice_args = {'s_id': s_id,
+                        'source': source,
+                        'destination': destination,
+                        'requirements': {'throughput': throughput,
+                                      'latency': latency}
+                     }
+        print('slice args ', slice_args)
+        (success, msg) = self.create_slice(**slice_args)
+        print('create success ', success)
+        if success:
+            switches = []
+            new_route = catalog.get_route(s_id)
+            print('new_route', new_route)
+            if old_route.get('path_string') != new_route.get('path_string'):
+                for old in old_route.get('switches'):
+                    current = self.get_in_switches(old, new_route.get('switches'))
+                    if len(current) > 0:
+                        #if old.get('in_port') != current[0].get('in_port'):
+                        #    switches.append(old)
+                        if old.get('in_port') != current[0].get('in_port'):
+                            if old.get('out_port') != current[0].get('out_port'):
+                                old['direction'] = 'full'
+                                switches.append(old)
+                            else:
+                                old['direction'] = 'half-fw'
+                                switches.append(old)
+                        elif old.get('out_port') != current[0].get('out_port'):
+                            old['direction'] = 'half-rv'
+                            switches.append(old)
+                    else:
+                        old['direction'] = 'full'
+                        switches.append(old)
+                route_to_delete = self.generate_route_to_delete(old_route, switches)
+                success, msg = self.ovs_ctl.delete_slice(**{'s_id': s_id,
+                                                            #'type': s_type,
+                                                            'route': route_to_delete})
+        return success, msg
+
+
+    def get_in_switches(self, switch, switches):
+        return [ 
+            i for i in switches 
+            if i.get('node') == switch.get('node') 
+            ]
+
+    def generate_route_to_delete(self, old_route, switches):
+        route = old_route
+        route['switches'] = switches
+        return route
+
     def build_route(self, topology, src, dst, requirements):
         catalog = ndb()
         engine = PathEngine()
@@ -145,6 +206,7 @@ class wired_orchestrator(base_orchestrator):
 
         # Define the path to apply
         path = engine.get_path(topology, src_network.get('switch'), dst_network.get('switch'), requirements)
+        print('path ', path)
         if path is None:
             return None
 
@@ -156,8 +218,11 @@ class wired_orchestrator(base_orchestrator):
         first_port = src_network.get('port')
         last_port = dst_network.get('port')
         switches = engine.generate_match_switches(topology, path, first_port, last_port)
-        
+        path_string = '-'.join(map(str, path))
+
         route = {
+            'src': src,
+            'dst': dst,
             'ipv4_src': ipv4_src,
             'ipv4_src_netmask': ipv4_src_netmask,
             'ipv4_dst': ipv4_dst,
@@ -165,7 +230,10 @@ class wired_orchestrator(base_orchestrator):
             'min_rate': min_rate,
             'max_rate': max_rate,
             'priority': priority,
-            'switches': switches
+            'switches': switches,
+            'path_string': path_string,
+            'latency': requirements.get('latency'),
+            'throughput': requirements.get('throughput')
             }
         return route
 
@@ -226,6 +294,10 @@ if __name__ == "__main__":
         # Start SONAr modules
         scoe_thread = scoe(wired_orchestrator_thread, "0.0.0.0", 5500)
         scoe_thread.start()
+
+        she_thread = she(wired_orchestrator_thread)
+        she_thread.start()
+
         # Pause the main thread
         signal.pause()
 
@@ -236,3 +308,5 @@ if __name__ == "__main__":
         wired_orchestrator_thread.join()
         scoe_thread.shutdown_flag.set()
         scoe_thread.join()
+        she_thread.shutdown_flag.set()
+        she_thread.join()

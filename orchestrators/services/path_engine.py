@@ -10,17 +10,22 @@ class PathEngine():
         catalog = ndb()
         catalog.init_arrays()
         paths = self.get_paths(topology, src, dst)
+        print('paths', paths)
         path = self.get_capable_path(paths, requirements)
         return path
 
     def get_capable_path(self, paths, requirements):
+        print('requirements', requirements)
         catalog = ndb()
         throughput = 0
         if requirements is not None:
             # If our platform can support other QoS in the future, please add them as 'if' below:
             if requirements.get('latency') is not None:
+                print('latency qos')
                 paths = self.get_latency_comply_paths(paths, requirements.get('latency'))
+                print('paths', paths)
             if requirements.get('throughput') is not None:
+                print('throughput qos')
                 throughput = requirements.get('throughput')
                 path = self.get_throughput_comply_path(paths, throughput)
             else:

@@ -139,7 +139,7 @@ class base_controller(object):
                 if create_slice is not None:
                     print('- Create Slice')
                     # This service already exists
-                    if create_slice['s_id'] in self.s_ids:
+                    '''if create_slice['s_id'] in self.s_ids:
                         print('\tService ID already exists.')
                         msg = 'The Slice already exists: ' + \
                             create_slice['s_id']
@@ -147,6 +147,7 @@ class base_controller(object):
                         self._send_msg(self.create_nack, msg)
                         # Leave if clause
                         continue
+                    '''
 
                     # Append it to the list of service IDs
                     self.s_ids.append(create_slice['s_id'])

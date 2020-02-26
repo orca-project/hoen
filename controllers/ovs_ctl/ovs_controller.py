@@ -84,11 +84,13 @@ class ovs_controller(base_controller):
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
         route = kwargs.get('route', None)
+        print('create s_id ', s_id, 'route ', route)
 
         # Check for validity of the slice ID
+
         if s_id in self.slice_list:
-            print('did not work, took',  + (time.time() - single)*1000, 'ms')
-            return False, 'Slice ID already exists'
+            print('updating slice ', s_id)
+        #    return False, 'Slice ID already exists'
         # Check for validity of the route
         if not route:
             print('did not work, took',  + (time.time() - single)*1000, 'ms')
@@ -150,6 +152,7 @@ class ovs_controller(base_controller):
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
         route = kwargs.get('route', None)
+        print('delete s_id ', s_id, 'route ', route)
 
         # Check for validity of the slice ID
         if s_id not in self.slice_list:
@@ -169,23 +172,31 @@ class ovs_controller(base_controller):
             ofproto = datapath.ofproto
             parser = datapath.ofproto_parser
 
-            match = parser.OFPMatch(
+            direction = None
+            if 'direction' in switch:
+                direction = switch['direction']
+            match_fw = parser.OFPMatch(
+                    in_port=(switch['in_port']),
                     eth_type=switch['eth_type'],
                     ipv4_src=(route['ipv4_src'], route['ipv4_src_netmask']),
                     ipv4_dst=(route['ipv4_dst'], route['ipv4_dst_netmask'])
                 )
-
-            # Add the flow to the switch
-            self.ovs.del_flow(datapath, match)
-
-            match = parser.OFPMatch(
+            match_rv = parser.OFPMatch(
+                    in_port=(switch['out_port']),
                     eth_type=switch['eth_type'],
                     ipv4_src=(route['ipv4_dst'], route['ipv4_dst_netmask']),
                     ipv4_dst=(route['ipv4_src'], route['ipv4_src_netmask'])
                 )
 
-            # Add the flow to the switch
-            self.ovs.del_flow(datapath, match)
+            # Added this clause to verify if the flow rules should be 
+            # deleted in the both directions
+            if direction is None or direction == 'full':
+                self.ovs.del_flow(datapath, match_fw)
+                self.ovs.del_flow(datapath, match_rv)
+            elif direction == 'half-fw':
+                self.ovs.del_flow(datapath, match_fw)
+            else:
+                self.ovs.del_flow(datapath, match_rv)
 
         # Return host and port -- TODO may drop port entirely
         return True, {'s_id': s_id}

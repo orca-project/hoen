@@ -15,9 +15,11 @@ import signal
 from uuid import uuid4
 import itertools
 import time
-from sonar.log import get_log
-from services.ndb import ndb
 
+from sonar.log import get_log
+from sonar.nem import nem
+
+from services.ndb import ndb
 from services.path_engine import PathEngine
 
 logger = get_log('sonar-scoe')
@@ -73,6 +75,7 @@ class scoe(Thread):
                                 "type": "report_resp",
                                 "result_code": 1
                             }
+                # print('scoe resp: ', resp)
                 self.send_msg(resp)
 
         # Terminate zmq
@@ -82,16 +85,28 @@ class scoe(Thread):
     def report(self, request):
         t_id = request.get('t_id')
         catalog = ndb()
+        broker = nem()
         for metric in request.get('metrics'):
             if metric.get('type') == 'latency':
                 path_string = catalog.get_virtual_iface(metric.get('src') + '-' + metric.get('dst'))
                 catalog.set_path_latency(path_string, metric.get('params'))
+                broker.insert_metric(metric)
+                #self.check_paths(path_string, metric.get('params'))
         resp = {
                     "id": t_id,
                     "type": "report_resp",
                     "result_code": 0
                 }
         return resp
+
+    '''
+    def check_paths(self, path_string, metric):
+        catalog = ndb()
+        routes = catalog.get_routes()
+        # change this format of retrieving the latency...
+        latency = metric.get('max')
+        affected_slices = [i for i in routes if string_path == routes[i].get('path_string') and routes[i].get('latency') is not None and routes[i].get('latency') <= latency]
+    '''
 
     def get_configuration(self, request):
         catalog = ndb()
