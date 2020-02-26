@@ -146,7 +146,7 @@ class ndb:
         self.configured_agents['name'] = configured_agent
         return configured_agent
 
-    def get_path_latency(self):
+    def get_path_latencies(self):
         return self.path_latency
 
     def set_path_latency(self, path, params):
@@ -158,7 +158,7 @@ class ndb:
         return self.path_latency[path]
 
     def get_virtual_ifaces(self):
-        return self.get_virtual_ifaces
+        return self.virtual_ifaces
 
     def get_virtual_iface(self, addresses):
         if addresses not in self.virtual_ifaces.keys():

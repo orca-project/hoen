@@ -18,6 +18,7 @@ from services.path_engine import PathEngine
 # Import SONAr modules
 from sonar.scoe import scoe
 from sonar.she import she
+from sonar.nad import nad
 
 def cls():
     system('cls' if name=='nt' else 'clear')
@@ -298,6 +299,9 @@ if __name__ == "__main__":
         she_thread = she(wired_orchestrator_thread)
         she_thread.start()
 
+        api_thread = nad()
+        api_thread.start()
+
         # Pause the main thread
         signal.pause()
 
@@ -310,3 +314,5 @@ if __name__ == "__main__":
         scoe_thread.join()
         she_thread.shutdown_flag.set()
         she_thread.join()
+        api_thread.shutdown_flag.set()
+        api_thread.join()
