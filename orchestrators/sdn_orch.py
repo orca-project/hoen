@@ -127,12 +127,17 @@ class wired_orchestrator(base_orchestrator):
         success, msg = self.ovs_ctl.delete_slice(**{'s_id': s_id,
                                                     #'type': s_type,
                                                     'route': route})
-
         if success:
+            path = route['path']
+            for p in range(0, len(path) - 1):
+                catalog.add_flow_count(path[p], path[p + 1], -1)
+                if route['throughput'] is not None:
+                    catalog.add_link_usage(path[p], path[p + 1], -route['throughput'])
             catalog.remove_route(s_id)
         # Inform the user about the removal
         return success, msg
 
+    # TODO: initial version is using create_slice service. Change it to have its own services.
     def reconfigure_slice(self, **kwargs):
         s_id = kwargs.get('s_id', None)
         catalog = ndb()
@@ -233,6 +238,7 @@ class wired_orchestrator(base_orchestrator):
             'priority': priority,
             'switches': switches,
             'path_string': path_string,
+            'path': path,
             'latency': requirements.get('latency'),
             'throughput': requirements.get('throughput')
             }

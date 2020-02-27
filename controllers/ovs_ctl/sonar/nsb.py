@@ -113,7 +113,7 @@ class nsb(object):
 			}]
 		(status, resp) = self._send_msg(req)
 		if status:
-			self.default_queue['max_rate'] = self.default_queue.get('max_rate') - max_rate
+			self.default_queue['max_rate'] = self.default_queue.get('max_rate') - value
 
 	def _send_msg(self, req):
 		self.socket.send_json(req)
