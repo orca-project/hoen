@@ -71,7 +71,7 @@ class ovs_controller(base_controller):
         self.ovs = kwargs.get('ovs')
 
         # Hold information about the slices
-        self.slice_list = {} 
+        self.slice_list = {}
 
     def pre_exit(self):
      # Terminate the OVS SDR Controller Server
@@ -166,7 +166,7 @@ class ovs_controller(base_controller):
         if not route:
             self._log('error: route not received, took',  + (time.time() - single)*1000, 'ms')
             return False, 'Missing route'
-        
+
 
         # For each switch in the route
         for switch in route['switches']:
@@ -192,7 +192,7 @@ class ovs_controller(base_controller):
                     ipv4_dst=(route['ipv4_src'], route['ipv4_src_netmask'])
                 )
 
-            # Added this clause to verify if the flow rules should be 
+            # Added this clause to verify if the flow rules should be
             # deleted in the both directions
             if direction is None or direction == 'full':
                 self.ovs.del_flow(datapath, match_fw)
@@ -219,19 +219,19 @@ class ovs_ctl(app_manager.RyuApp):
         super(ovs_ctl, self).__init__(*args, **kwargs)
         self.mac_to_port = {}
         self.switches = {}
-        
+
         self.dpid_to_name = {
             #  95536754289: 'h00',
             #  95535344413: 'h01',
             #  95542363502: 'h02'
-            #95534111059: 'h00',
-            #95538556217: 'h01',
-            #95533205304: 'h02'
-            95532435104: 's01',
-            95533179799: 's02',
-            95532162947: 's03',
-            95539282496: 's04',
-            95533558180: 's05'
+            95534111059: 'h00',
+            95538556217: 'h01',
+            95533205304: 'h02'
+            #  95532435104: 's01',
+            #  95533179799: 's02',
+            #  95532162947: 's03',
+            #  95539282496: 's04',
+            #  95533558180: 's05'
         }
 
         self.topology = defaultdict(dict)
@@ -290,10 +290,10 @@ class ovs_ctl(app_manager.RyuApp):
         single = time.time()
         # Get the new switch
         datapath = ev.msg.datapath
-        # Add the new switch to the container 
+        # Add the new switch to the container
         self.switches[self.dpid_to_name[datapath.id]] = datapath
         # Send proactive rules to the switches
-        self._base_start(datapath)        
+        self._base_start(datapath)
         self.count-= 1
 
         self.get_current_ports(datapath)
@@ -341,7 +341,7 @@ class ovs_ctl(app_manager.RyuApp):
         try:
             ofctl = supported_ofctl.get(datapath.ofproto.OFP_VERSION)
             desc = ofctl.get_port_desc(datapath, self.waiters)
-        except Exception as e: 
+        except Exception as e:
             print(e)
             pass
 
@@ -439,7 +439,7 @@ class ovs_ctl(app_manager.RyuApp):
 
         self.provision_paths(
                 msg, in_port, pkt_ethernet.src, out_port, pkt_ethernet.dst, dpid)
-            
+
 
     def provision_paths(self, msg, in_port, src, out_port, dst, dpid):
         parser = msg.datapath.ofproto_parser
