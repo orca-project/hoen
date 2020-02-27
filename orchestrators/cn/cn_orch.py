@@ -22,7 +22,7 @@ class core_network_orchestrator(base_orchestrator):
             name="LXD",
             host_key="LXD_host",
             port_key="LXD_port",
-            default_host="127.0.0.1",
+            default_host="0.0.0.0",
             default_port="3300",
             request_key="lxd_req",
             reply_key="lxd_rep",
@@ -106,7 +106,7 @@ if __name__ == "__main__":
             request_msg='cn_rc',
             update_msg='cn_uc',
             delete_msg='cn_dc',
-            host='127.0.0.1',
+            host='0.0.0.0',
             port=2300)
 
         # Start the Core Network Orchestrator
