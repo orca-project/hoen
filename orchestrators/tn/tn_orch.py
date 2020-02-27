@@ -78,7 +78,7 @@ class tn_orchestrator(base_orchestrator):
         self.s_ids[s_id] = requirements
 
         # Get network topology
-        (topo_success, topo_msg) = self.ovs_ctl.get_topology()    
+        (topo_success, topo_msg) = self.ovs_ctl.get_topology()
         if not topo_success:
             # Send error message
             msg = '[ERROR]: Could not retrieve the network topology from ovs controller'
@@ -150,7 +150,7 @@ class tn_orchestrator(base_orchestrator):
         destination = old_route.get('dst')
         latency = old_route.get('latency')
         throughput = old_route.get('throughput')
-  
+
         slice_args = {'s_id': s_id,
                         'source': source,
                         'destination': destination,
@@ -191,9 +191,9 @@ class tn_orchestrator(base_orchestrator):
 
 
     def get_in_switches(self, switch, switches):
-        return [ 
-            i for i in switches 
-            if i.get('node') == switch.get('node') 
+        return [
+            i for i in switches
+            if i.get('node') == switch.get('node')
             ]
 
     def generate_route_to_delete(self, old_route, switches):
@@ -225,7 +225,7 @@ class tn_orchestrator(base_orchestrator):
         (ipv4_src, ipv4_src_netmask) = self.convert_cidr_to_netmask(src)
         (ipv4_dst, ipv4_dst_netmask) = self.convert_cidr_to_netmask(dst)
         (min_rate, max_rate, priority) = self.define_queue_parameters(requirements)
-        
+
         first_port = src_network.get('port')
         last_port = dst_network.get('port')
         switches = engine.generate_match_switches(topology, path, first_port, last_port)
@@ -302,10 +302,10 @@ if __name__ == "__main__":
         tn_orchestrator_thread.start()
 
         # Start SONAr modules
-        scoe_thread = scoe(wired_orchestrator_thread, "0.0.0.0", 5500)
+        scoe_thread = scoe(tn_orchestrator_thread, "0.0.0.0", 5500)
         scoe_thread.start()
 
-        she_thread = she(wired_orchestrator_thread)
+        she_thread = she(tn_orchestrator_thread)
         she_thread.start()
 
         api_thread = nad()
