@@ -201,9 +201,15 @@ class ovs_controller(base_controller):
                 self.ovs.del_flow(datapath, match_fw)
             else:
                 self.ovs.del_flow(datapath, match_rv)
+            self.return_default_queue_reservation(datapath, route['max_rate'])
 
         # Return host and port -- TODO may drop port entirely
         return True, {'s_id': s_id}
+
+    def return_default_queue_reservation(self, datapath, value):
+        connection = self.ovs.control[self.ovs.dpid_to_name[datapath.id]]
+        if value is not None:
+            connection.modify_default_queue(-value)
 
 
 class ovs_ctl(app_manager.RyuApp):

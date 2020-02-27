@@ -20,7 +20,7 @@ from pylxd import Client
 
 # Supress pylxd warnings
 os.environ["PYLXD_WARNINGS"] = "none"
-grab_ethernet = False
+grab_ethernet = True
 
 class lxd_controller(base_controller):
 
