@@ -282,7 +282,7 @@ class base_orchestrator(Thread):
 
     def _server_bind(self, **kwargs):
         # Default HS Server host
-        host = kwargs.get('host', '127.0.0.1')
+        host = kwargs.get('host', '0.0.0.0')
         # Default HS Server port
         port = kwargs.get('port', 4000)
 
@@ -502,7 +502,7 @@ if __name__ == "__main__":
             request_msg='oc_rs',
             update_msg='oc_us',
             delete_msg='oc_ds',
-            host='127.0.0.1',
+            host='0.0.0.0',
             port=2000)
 
         # Start the Template Orchestrator Thread

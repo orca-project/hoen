@@ -88,7 +88,7 @@ class base_controller(Thread):
 
     def _server_bind(self, **kwargs):
         # Default HS Server host
-        host = kwargs.get('host', '127.0.0.1')
+        host = kwargs.get('host', '0.0.0.0')
         # Default HS Server port
         port = kwargs.get('port', 3000)
 

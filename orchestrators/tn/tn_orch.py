@@ -78,11 +78,11 @@ class tn_orchestrator(base_orchestrator):
         self.s_ids[s_id] = requirements
 
         # Get network topology
-        (topo_success, topo_msg) = self.ovs_ctl.get_topology()    
+        (topo_success, topo_msg) = self.ovs_ctl.get_topology()
         if not topo_success:
             # Send error message
             msg = '[ERROR]: Could not retrieve the network topology from ovs controller'
-            print('failed', (time.time()-st)*1000, 'ms')
+            print('failed', (time()-st)*1000, 'ms')
             # Inform the user about the creation
             return False, msg
 
@@ -95,7 +95,7 @@ class tn_orchestrator(base_orchestrator):
         if route is None:
             # Send error message
             msg = '[WARN]: There is no available path for source '+  str(source) + ' and destination ' + str(destination) + ' supporting the follow QoS: ' + str(requirements)
-            print('failed', (time.time()-st)*1000, 'ms')
+            print('failed', (time()-st)*1000, 'ms')
             # Inform the user about the creation
             return False, msg
 
@@ -197,9 +197,9 @@ class tn_orchestrator(base_orchestrator):
 
 
     def get_in_switches(self, switch, switches):
-        return [ 
-            i for i in switches 
-            if i.get('node') == switch.get('node') 
+        return [
+            i for i in switches
+            if i.get('node') == switch.get('node')
             ]
 
     def generate_route_to_delete(self, old_route, switches):
@@ -301,7 +301,7 @@ if __name__ == "__main__":
             update_msg='tn_uc',
             delete_msg='tn_dc',
             topology_msg='tn_tc',
-            host='127.0.0.1',
+            host='0.0.0.0',
             port=2200
         )
 
