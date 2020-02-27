@@ -15,6 +15,10 @@ from time import time
 # Import SONAr services
 from services.ndb import ndb
 from services.path_engine import PathEngine
+# Import SONAr modules
+from sonar.scoe import scoe
+from sonar.she import she
+from sonar.nad import nad
 
 def cls():
     system('cls' if name=='nt' else 'clear')
@@ -37,34 +41,29 @@ class tn_orchestrator(base_orchestrator):
             delete_msg='ovc_drs',
             topology_msg='ovc_trs')
 
-        # setting metrics manually
-        # TODO: to create a service to fetch these metrics automatically from ovsdb or ofconfig
+        # setting link speeds manually
+        # TODO: to create a service to fetch these values automatically from ovsdb or ofconfig
         catalog = ndb()
-        catalog.set_link_latency('h00','h01', 0.1)
-        catalog.set_link_latency('h01', 'h00', 0.1)
-        catalog.set_link_latency('h00', 'h02', 0.1)
-        catalog.set_link_latency('h02', 'h00', 0.1)
-        catalog.set_link_latency('h00', 'h03', 0.1)
-        catalog.set_link_latency('h03', 'h00', 0.1)
-        catalog.set_link_latency('h02', 'h03', 0.1)
-        catalog.set_link_latency('h03', 'h02', 0.1)
-        catalog.set_link_throughput('h00', 'h01', 10)
-        catalog.set_link_throughput('h01', 'h00', 10)
-        catalog.set_link_throughput('h00', 'h02', 10)
-        catalog.set_link_throughput('h02', 'h00', 10)
-        catalog.set_link_throughput('h00', 'h03', 10)
-        catalog.set_link_throughput('h03', 'h00', 10)
-        catalog.set_link_throughput('h02', 'h03', 10)
-        catalog.set_link_throughput('h03', 'h02', 10)
+        catalog.set_link_capacity('s01','s02', 100)
+        catalog.set_link_capacity('s02','s01', 100)
+        catalog.set_link_capacity('s01','s03', 100)
+        catalog.set_link_capacity('s03','s01', 100)
+        catalog.set_link_capacity('s02','s05', 100)
+        catalog.set_link_capacity('s05','s02', 100)
+        catalog.set_link_capacity('s03','s04', 100)
+        catalog.set_link_capacity('s04','s03', 100)
+        catalog.set_link_capacity('s04','s05', 100)
+        catalog.set_link_capacity('s05','s04', 100)
 
         '''
         Setting known hosts and networks manually.
         It could be automatic if we develop LLDP and ARP functions in the ovs controller...
         ... but it is out of scope.
         '''
-        catalog.add_network('10.0.0.4', 'h00', 1)
-        catalog.add_network('10.1.0.1', 'h01', 2)
-        catalog.add_network('10.2.0.1', 'h02', 3)
+        catalog.add_network('10.0.0.4', 's01', 1)
+        catalog.add_network('10.0.0.30', 's01', 5)
+        catalog.add_network('10.1.0.1', 's05', 3)
+        #catalog.add_network('10.2.0.1', 's05', 3)
 
     def create_slice(self, **kwargs):
         catalog = ndb()
@@ -73,29 +72,30 @@ class tn_orchestrator(base_orchestrator):
         s_id = kwargs.get('s_id', None)
         source = kwargs.get('source', None)
         destination = kwargs.get('destination', None)
-        qos = kwargs.get('requirements', None)
+        requirements = kwargs.get('requirements', None)
 
         # Append it to the list of service IDs
-        self.s_ids[s_id] = qos
+        self.s_ids[s_id] = requirements
 
         # Get network topology
-        (topo_success, topo_msg) = self.ovs_ctl.get_topology()
+        (topo_success, topo_msg) = self.ovs_ctl.get_topology()    
         if not topo_success:
             # Send error message
             msg = '[ERROR]: Could not retrieve the network topology from ovs controller'
-            print('failed', (time()-st)*1000, 'ms')
+            print('failed', (time.time()-st)*1000, 'ms')
             # Inform the user about the creation
             return False, msg
 
         topology = topo_msg.get('topology')
+        catalog.set_topology(topology)
 
         # Define the route which can support the required QoS
-        route = self.build_route(topology, source, destination, qos)
+        route = self.build_route(topology, source, destination, requirements)
 
         if route is None:
             # Send error message
-            msg = '[WARN]: There is no available path for source '+  str(source) + ' and destination ' + str(destination) + ' supporting the follow QoS: ' + str(qos)
-            print('failed', (time()-st)*1000, 'ms')
+            msg = '[WARN]: There is no available path for source '+  str(source) + ' and destination ' + str(destination) + ' supporting the follow QoS: ' + str(requirements)
+            print('failed', (time.time()-st)*1000, 'ms')
             # Inform the user about the creation
             return False, msg
 
@@ -105,7 +105,6 @@ class tn_orchestrator(base_orchestrator):
         # Send the message to create a slice
         success, msg = self.ovs_ctl.create_slice(
                 **{'s_id': s_id,
-                    'destination': kwargs.get('destination'),
                     'route': route
                     })
 
@@ -142,9 +141,68 @@ class tn_orchestrator(base_orchestrator):
         # Inform the user about the removal
         return success, msg
 
-    def build_route(self, topology, src, dst, qos):
+    def reconfigure_slice(self, **kwargs):
+        s_id = kwargs.get('s_id', None)
         catalog = ndb()
-        catalog.set_topology(topology)
+        old_route = catalog.get_route(s_id)
+
+        source = old_route.get('src')
+        destination = old_route.get('dst')
+        latency = old_route.get('latency')
+        throughput = old_route.get('throughput')
+  
+        slice_args = {'s_id': s_id,
+                        'source': source,
+                        'destination': destination,
+                        'requirements': {'throughput': throughput,
+                                      'latency': latency}
+                     }
+        print('slice args ', slice_args)
+        (success, msg) = self.create_slice(**slice_args)
+        print('create success ', success)
+        if success:
+            switches = []
+            new_route = catalog.get_route(s_id)
+            print('new_route', new_route)
+            if old_route.get('path_string') != new_route.get('path_string'):
+                for old in old_route.get('switches'):
+                    current = self.get_in_switches(old, new_route.get('switches'))
+                    if len(current) > 0:
+                        #if old.get('in_port') != current[0].get('in_port'):
+                        #    switches.append(old)
+                        if old.get('in_port') != current[0].get('in_port'):
+                            if old.get('out_port') != current[0].get('out_port'):
+                                old['direction'] = 'full'
+                                switches.append(old)
+                            else:
+                                old['direction'] = 'half-fw'
+                                switches.append(old)
+                        elif old.get('out_port') != current[0].get('out_port'):
+                            old['direction'] = 'half-rv'
+                            switches.append(old)
+                    else:
+                        old['direction'] = 'full'
+                        switches.append(old)
+                route_to_delete = self.generate_route_to_delete(old_route, switches)
+                success, msg = self.ovs_ctl.delete_slice(**{'s_id': s_id,
+                                                            #'type': s_type,
+                                                            'route': route_to_delete})
+        return success, msg
+
+
+    def get_in_switches(self, switch, switches):
+        return [ 
+            i for i in switches 
+            if i.get('node') == switch.get('node') 
+            ]
+
+    def generate_route_to_delete(self, old_route, switches):
+        route = old_route
+        route['switches'] = switches
+        return route
+
+    def build_route(self, topology, src, dst, requirements):
+        catalog = ndb()
         engine = PathEngine()
 
         # Fetch switches which can arrive to the src and dst networks
@@ -158,24 +216,35 @@ class tn_orchestrator(base_orchestrator):
             return None
 
         # Define the path to apply
-        path = engine.get_path(topology, src_network.get('switch'), dst_network.get('switch'), qos)
+        path = engine.get_path(topology, src_network.get('switch'), dst_network.get('switch'), requirements)
+        print('path ', path)
         if path is None:
             return None
 
-        self._log('Path to be applied: ', path)
+        print('\t', 'Path to be applied: ', path)
         (ipv4_src, ipv4_src_netmask) = self.convert_cidr_to_netmask(src)
         (ipv4_dst, ipv4_dst_netmask) = self.convert_cidr_to_netmask(dst)
-
+        (min_rate, max_rate, priority) = self.define_queue_parameters(requirements)
+        
         first_port = src_network.get('port')
         last_port = dst_network.get('port')
         switches = engine.generate_match_switches(topology, path, first_port, last_port)
+        path_string = '-'.join(map(str, path))
 
         route = {
+            'src': src,
+            'dst': dst,
             'ipv4_src': ipv4_src,
             'ipv4_src_netmask': ipv4_src_netmask,
             'ipv4_dst': ipv4_dst,
             'ipv4_dst_netmask': ipv4_dst_netmask,
-            'switches': switches
+            'min_rate': min_rate,
+            'max_rate': max_rate,
+            'priority': priority,
+            'switches': switches,
+            'path_string': path_string,
+            'latency': requirements.get('latency'),
+            'throughput': requirements.get('throughput')
             }
         return route
 
@@ -193,6 +262,21 @@ class tn_orchestrator(base_orchestrator):
             net.append(int(addr[i]) & mask[i])
         ipv4_netmask = ".".join(map(str, mask))
         return (ipv4, ipv4_netmask)
+
+    def define_queue_parameters(self, requirements):
+        min_rate = None
+        max_rate = None
+        priority = None
+        if requirements.get('throughput') is not None:
+            min_rate = self.to_byte(requirements.get('throughput'))
+            max_rate = self.to_byte(requirements.get('throughput'))
+            priority = 10
+        if requirements.get('latency') is not None:
+            priority = 1
+        return min_rate, max_rate, priority
+
+    def to_byte(self, value):
+        return int(value * 1024 * 1024)
 
 if __name__ == "__main__":
     # clear screen
@@ -216,9 +300,27 @@ if __name__ == "__main__":
 
         # Start the Transport Network Orchestrator
         tn_orchestrator_thread.start()
+
+        # Start SONAr modules
+        scoe_thread = scoe(wired_orchestrator_thread, "0.0.0.0", 5500)
+        scoe_thread.start()
+
+        she_thread = she(wired_orchestrator_thread)
+        she_thread.start()
+
+        api_thread = nad()
+        api_thread.start()
+
         # Pause the main thread
         signal.pause()
 
     except KeyboardInterrupt:
         # Terminate the TN Orchestrator Server
         tn_orchestrator_thread.safe_shutdown()
+
+        scoe_thread.shutdown_flag.set()
+        scoe_thread.join()
+        she_thread.shutdown_flag.set()
+        she_thread.join()
+        api_thread.shutdown_flag.set()
+        api_thread.join()
