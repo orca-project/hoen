@@ -214,7 +214,7 @@ class hyperstrator_server(Thread):
             name="Core Network",
             host_key="cn_host",
             port_key="cn_port",
-            default_host="127.0.0.1",
+            default_host="134.226.55.122",
             default_port="2300",
             create_msg="cn_cc",
             request_msg="cn_rc",
@@ -228,7 +228,7 @@ class hyperstrator_server(Thread):
              name="Transport Network",
              host_key="tn_host",
              port_key="tn_port",
-             default_host="127.0.0.1",
+             default_host="134.226.55.106",
              default_port="2200",
              create_msg="tn_cc",
              request_msg="tn_rc",
@@ -682,7 +682,7 @@ if __name__ == "__main__":
             update_msg='sr_us',
             delete_msg='sr_ds',
             do_radio=False,
-            do_transport=False,
+            do_transport=True,
             do_core=True)
         # Start the Hyperstrator Thread
         hyperstrator_thread.start()
