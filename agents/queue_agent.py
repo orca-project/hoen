@@ -79,53 +79,55 @@ class queue_agent_server(Thread):
 
     def call_reset_service(self, operation):
         t_id = operation.get('t_id')
-        q_id = operation.get('default_queue').get('q_id')
         min_rate = operation.get('default_queue').get('min_rate')
         max_rate = operation.get('default_queue').get('max_rate')
         priority = operation.get('default_queue').get('priority')
-        result_code = 1
 
+        count = 0
+        total = 0
+        default_qos = {}
+        default_queue = {}
         destroy_command = 'for p in `ovs-vsctl list port | grep name | cut -d":" -f2 | sed "s/ //g" | sed "s/\\"//g"` ;do ovs-vsctl clear port $p qos ;done; ovs-vsctl --all destroy qos ; ovs-vsctl --all destroy queue'
         (c1, o1) = self.run_system_command(destroy_command)
-
         if c1 == 0:
-            create_qos_command = 'ovs-vsctl create qos type=linux-htb other-config:max-rate=10000000000'
-            (c2, o2) = self.run_system_command(create_qos_command)
+            ports = self.map_ports()
+            total = len(ports)
+            for port in ports:
+                create_qos_command = 'ovs-vsctl create qos type=linux-htb other-config:max-rate=10000000000'
+                (c2, o2) = self.run_system_command(create_qos_command)
 
-            if c2 == 0:
-                add_qos_to_ports_command = 'for p in `ovs-vsctl list port | grep name | cut -d":" -f2 | sed "s/ //g" | sed "s/\\"//g"` ;do ovs-vsctl set port $p qos=' + o2 + ' ;done'
-                (c3, o3) = self.run_system_command(add_qos_to_ports_command)
+                if c2 == 0:
+                    default_qos[port] = o2
+                    add_qos_to_ports_command = 'ovs-vsctl set port ' + port + ' qos=' + o2
+                    (c3, o3) = self.run_system_command(add_qos_to_ports_command)
 
-                if c3 == 0:
-                    create_default_queue_command = 'ovs-vsctl create queue other-config:min-rate=' + str(min_rate) + ' other-config:max-rate=' + str(max_rate) + ' other-config:priority=' + str(priority)
-                    (c4, o4) = self.run_system_command(create_default_queue_command)
+                    if c3 == 0:
+                        create_default_queue_command = 'ovs-vsctl create queue other-config:min-rate=' + str(min_rate) + ' other-config:max-rate=' + str(max_rate) + ' other-config:priority=' + str(priority)
+                        (c4, o4) = self.run_system_command(create_default_queue_command)
 
-                    if c4 == 0:
-                        add_default_queue_to_qos_command = 'ovs-vsctl set qos ' + o2 + ' queues=' + str(q_id) + '=' + o4
-                        (c5, o5) = self.run_system_command(add_default_queue_to_qos_command)
-                        if c5 == 0:
-                            result_code = 0
+                        if c4 == 0:
+                            default_queue[port] = self.create_queue_object(ports[port], o4, min_rate, max_rate, priority)
+                            add_default_queue_to_qos_command = 'ovs-vsctl set qos ' + o2 + ' queues=' + str(ports[port]) + '=' + o4
+                            (c5, o5) = self.run_system_command(add_default_queue_to_qos_command)
+                            if c5 == 0:
+                                count = count + 1
+
         
-        if result_code == 0:
+        if count == total:
             resp = {
                     "t_id": t_id,
                     "type": "reset_resp",
-                    "result_code": result_code,
-                    "default_qos": o2,
-                    "default_queue": {
-                      "q_id": q_id,
-                      "uuid": o4,
-                      "min_rate": min_rate,
-                      "max_rate": max_rate,
-                      "priority": priority
-                    }
+                    "result_code": 0,
+                    "default_qos": default_qos,
+                    "default_queue": default_queue,
+                    "ports": ports
                   }
         else:
             self.run_system_command(destroy_command)
             resp = {
                     "t_id": t_id,
                     "type": "reset_resp",
-                    "result_code": result_code
+                    "result_code": 1
                   }
         return resp
 
@@ -203,6 +205,34 @@ class queue_agent_server(Thread):
         out = resp.stdout.read().decode().strip()
         code = resp.returncode
         return code, out
+
+    def map_ports(self):
+        command = 'ovs-vsctl --columns=name,ofport list Interface'
+        (c1, o1) = self.run_system_command(command)
+        lines = o1.split('\n')
+        flag = 0
+        ports = {}
+        for line in lines:
+          if len(line.split(': ')) > 1:
+            if flag == 0:
+              name = line.split(': ')[1][1:-1]
+              ports[name] = None
+              flag = 1
+            else:
+              port_no = line.split(': ')[1]
+              ports[name] = int(port_no)
+              flag = 0
+        #p = dict(zip(ports.values(),ports.keys()))
+        return ports
+
+    def create_queue_object(self, q_id, uuid, min_rate, max_rate, priority):
+        return {
+                  "q_id": q_id,
+                  "uuid": uuid,
+                  "min_rate": min_rate,
+                  "max_rate": max_rate,
+                  "priority": priority
+                }
 
 if __name__ == "__main__":
     cls()
