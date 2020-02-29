@@ -280,30 +280,28 @@ class ovs_ctl(app_manager.RyuApp):
         self.ovs_controller_hub = hub.spawn(self.ovs_controller_thread.run)
 
         self.count = 5
+        self.switch_config_count = {}
+        self.single = {}
         self.st = time.time()
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
-        single = time.time()
         # Get the new switch
         datapath = ev.msg.datapath
+        self.single[datapath.id] = time.time()
         # Add the new switch to the container 
         self.switches[self.dpid_to_name[datapath.id]] = datapath
         # Send proactive rules to the switches
-        self._base_start(datapath)        
-        self.count-= 1
-
+        self._base_start(datapath)
         self.get_current_ports(datapath)
         self.connect_local_agent(datapath)
-        print('took',  + (time.time() - single)*1000, 'ms')
-
-        if (not self.count):
-            print('total:', (time.time()-self.st)*1000, 'ms')
 
     def connect_local_agent(self, datapath):
         connection = nsb(datapath)
-        connection.reset_queues()
+        reset = connection.reset_queues()
         self.control[self.dpid_to_name[datapath.id]] = connection
+        if reset:
+            self.check_finished_config(datapath.id)
 
     def ports_to_disable(self):
         stp = defaultdict(dict)
@@ -363,7 +361,8 @@ class ovs_ctl(app_manager.RyuApp):
         self.add_flow(datapath, 0, match, actions)
 
         # Output info message
-        print('\t','Configured Switch ', self.dpid_to_name[dpid])
+        #print('\t','Configured Switch ', self.dpid_to_name[dpid])
+        self.check_finished_config(dpid)
 
     def add_flow(self, datapath, priority, match, actions, buffer_id=None):
         ofproto = datapath.ofproto
@@ -537,4 +536,17 @@ class ovs_ctl(app_manager.RyuApp):
             port = p.port_no
             if port != 4294967294:
                 self.ports[node].append(port)
-        print('Switch', node, ' ports:', self.ports[node])
+        #print('Switch', node, ' ports:', self.ports[node])
+        self.check_finished_config(dpid)
+
+    def check_finished_config(self, dpid):
+        if dpid not in self.switch_config_count:
+            self.switch_config_count[dpid] = 0
+        self.switch_config_count[dpid] = self.switch_config_count[dpid] + 1
+
+        if self.switch_config_count[dpid] == 3:
+            self.count-= 1
+            print('\t','Configured Switch ', self.dpid_to_name[dpid])            
+            print('took',  + (time.time() - self.single[dpid])*1000, 'ms')
+        if (not self.count):
+            print('total:', (time.time()-self.st)*1000, 'ms')

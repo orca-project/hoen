@@ -12,6 +12,8 @@ from os import system, name
 import signal
 import time 
 
+from netaddr import IPAddress, IPNetwork
+
 # Import SONAr services
 from services.ndb import ndb
 from services.path_engine import PathEngine
@@ -62,7 +64,7 @@ class wired_orchestrator(base_orchestrator):
         '''
         catalog.add_network('10.0.0.4', 's01', 1)
         catalog.add_network('10.0.0.30', 's01', 5)
-        catalog.add_network('10.1.0.1', 's05', 3)
+        catalog.add_network('10.1.0.1/16', 's05', 3)
         #catalog.add_network('10.2.0.1', 's05', 3)
 
     def create_slice(self, **kwargs):
@@ -115,13 +117,17 @@ class wired_orchestrator(base_orchestrator):
     def delete_slice(self, **kwargs):
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
+        route = kwargs.get('route', None)
+        complete_remove = False
 
-        # Retrieve the route previously applied
         catalog = ndb()
-        route = catalog.get_route(s_id)
-
         if route is None:
-            return False, 'Route not found for s_id ' + s_id
+            # Retrieve the route previously applied
+            complete_remove = True            
+            route = catalog.get_route(s_id)
+
+            if route is None:
+                return False, 'Route not found for s_id ' + s_id
 
         # Send message to remove slice
         success, msg = self.ovs_ctl.delete_slice(**{'s_id': s_id,
@@ -133,7 +139,8 @@ class wired_orchestrator(base_orchestrator):
                 catalog.add_flow_count(path[p], path[p + 1], -1)
                 if route['throughput'] is not None:
                     catalog.add_link_usage(path[p], path[p + 1], -route['throughput'])
-            catalog.remove_route(s_id)
+            if complete_remove:
+                catalog.remove_route(s_id)
         # Inform the user about the removal
         return success, msg
 
@@ -181,8 +188,9 @@ class wired_orchestrator(base_orchestrator):
                         old['direction'] = 'full'
                         switches.append(old)
                 route_to_delete = self.generate_route_to_delete(old_route, switches)
-                success, msg = self.ovs_ctl.delete_slice(**{'s_id': s_id,
-                                                            #'type': s_type,
+                #success, msg = self.ovs_ctl.delete_slice(**{'s_id': s_id,
+                #                                            'route': route_to_delete})
+                success, msg = self.delete_slice(**{'s_id': s_id,
                                                             'route': route_to_delete})
         return success, msg
 
@@ -198,13 +206,24 @@ class wired_orchestrator(base_orchestrator):
         route['switches'] = switches
         return route
 
+    def find_border_switch(self, address):
+        catalog = ndb()
+        resp = None
+        networks = catalog.get_networks()
+        for network in networks:
+            if IPAddress(address) in IPNetwork(network):
+                resp = networks[network]
+                break
+        return resp
+
+
     def build_route(self, topology, src, dst, requirements):
         catalog = ndb()
         engine = PathEngine()
 
         # Fetch switches which can arrive to the src and dst networks
-        src_network = catalog.get_network(src)
-        dst_network = catalog.get_network(dst)
+        src_network = self.find_border_switch(src)
+        dst_network = self.find_border_switch(dst)
 
         if src_network is None or dst_network is None:
             print('\t', 'Impossible to arrive from ', src, 'to ', dst)

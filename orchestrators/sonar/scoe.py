@@ -13,7 +13,7 @@ from os import system, name
 import signal
 
 from uuid import uuid4
-import itertools
+import ipaddress
 import time
 
 from sonar.log import get_log
@@ -29,8 +29,7 @@ class scoe(Thread):
     def __init__(self, orch, host, port):
         Thread.__init__(self)
         self.orch = orch
-        self.src_seq = itertools.count()
-        next(self.src_seq)
+        self.src_seq = ipaddress.ip_address("10.10.0.0")
         self.shutdown_flag = Event()
         self._server_bind(host, port)
         catalog = ndb()
@@ -128,7 +127,7 @@ class scoe(Thread):
                     "result_code": 0
                 }
         else:
-            resp = error_resp(t_id, 2)
+            resp = self.error_resp(t_id, 2)
         return resp
 
     def configure_metric_paths(self, request):
@@ -155,10 +154,8 @@ class scoe(Thread):
         paths = engine.get_paths(topology, src_agent.get('switch'), dst_agent.get('switch'))
         src = []
         for path in paths:
-            seq = next(self.src_seq)
-            if seq > 254:
-                return None
-            src_host = '10.10.0.' + str(seq)
+            self.src_seq = self.src_seq + 1
+            src_host = str(self.src_seq)
             src.append(src_host)
             switches = engine.generate_match_switches(topology, path, src_agent.get('port'), dst_agent.get('port'))
             route = {

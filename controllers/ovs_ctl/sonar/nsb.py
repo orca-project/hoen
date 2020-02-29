@@ -52,7 +52,7 @@ class nsb(object):
 			}]
 		(status, resp) = self._send_msg(req)
 		if not status:
-			return None
+			return False
 
 		for r in resp:
 			if r.get('result_code') == 0 and r.get('t_id') == t_id:
@@ -62,7 +62,7 @@ class nsb(object):
 				self.default_queue = r.get('default_queue')
 				self.q_number = self.set_queue_seq(r.get('default_queue'))
 				return True
-		return None
+		return False
 
 	def create_queue(self, route, port):
 		port_name = self.ports_name[port]
@@ -121,12 +121,9 @@ class nsb(object):
 			self.default_queue[port_name]['max_rate'] = self.default_queue[port_name].get('max_rate') - value
 
 	def _send_msg(self, req):
-		#print('queue req', req)
 		self.socket.send_json(req)
-
 		try:
 			msg = self.socket.recv_json()
-			#print('queue resp', msg)
 			return True, msg
 		except zmq.Again:
 			return False, "Connection timeout to " + str(self.dpid) + " switch"

@@ -48,6 +48,15 @@ class local_agent_server(Thread):
         except zmq.Again:
             return False, "Connection timeout to SONAr server"
 
+    def _send_config_msg(self, req):
+        self.socket.send_json(req)
+        while True:
+            try:
+                msg = self.socket.recv_json()
+                return True, msg
+            except zmq.Again:
+                continue
+
     def run(self):
         print('- Started SONAr local agent')
         t_id = str(uuid4())
@@ -56,12 +65,14 @@ class local_agent_server(Thread):
                 "type": "config_req",
                 "name": platform.node()
               }
-        (status, resp) = self._send_msg(req)
-        if status:
-            print('resp', resp)
-            if resp.get('result_code') == 0 and resp.get('type') == 'config_resp':
-                self.boot_service(resp)
-                self.collect_metrics()
+        (status, resp) = self._send_config_msg(req)
+        if resp.get('result_code') == 0 and resp.get('type') == 'config_resp':
+            self.boot_service(resp)
+            self.collect_metrics()
+        else:
+            print('- Error trying get config information', resp)
+            self.socket.close()
+            self.context.term()
 
 
     def collect_metrics(self):
