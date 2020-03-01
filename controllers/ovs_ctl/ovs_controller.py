@@ -144,8 +144,10 @@ class ovs_controller(base_controller):
     def define_queue(self, route, datapath, port):
         connection = self.ovs.control[self.ovs.dpid_to_name[datapath.id]]
         queue = connection.create_queue(route, port)
-        if 'max_rate' in route and route['max_rate'] is not None:
-            connection.modify_default_queue(route['max_rate'], port)
+        #if 'max_rate' in route and route['max_rate'] is not None:
+        #    connection.modify_default_queue(route['max_rate'], port)
+        if 'min_rate' in route and route['min_rate'] is not None:
+            connection.modify_default_queue(route['min_rate'], port)
         return queue
 
     def delete_slice(self, **kwargs):
@@ -197,8 +199,10 @@ class ovs_controller(base_controller):
                 self.ovs.del_flow(datapath, match_fw)
             else:
                 self.ovs.del_flow(datapath, match_rv)
-            self.return_default_queue_reservation(datapath, route['max_rate'], switch['in_port'])
-            self.return_default_queue_reservation(datapath, route['max_rate'], switch['out_port'])
+            #self.return_default_queue_reservation(datapath, route['max_rate'], switch['in_port'])
+            #self.return_default_queue_reservation(datapath, route['max_rate'], switch['out_port'])
+            self.return_default_queue_reservation(datapath, route['min_rate'], switch['in_port'])
+            self.return_default_queue_reservation(datapath, route['min_rate'], switch['out_port'])
 
         # Return host and port -- TODO may drop port entirely
         return True, {'s_id': s_id}

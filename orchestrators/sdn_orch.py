@@ -284,7 +284,7 @@ class wired_orchestrator(base_orchestrator):
         priority = None
         if requirements.get('throughput') is not None:
             min_rate = self.to_byte(requirements.get('throughput'))
-            max_rate = self.to_byte(requirements.get('throughput'))
+            #max_rate = self.to_byte(requirements.get('throughput'))
             priority = 10
         if requirements.get('latency') is not None:
             priority = 1
