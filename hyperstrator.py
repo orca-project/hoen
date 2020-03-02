@@ -237,21 +237,19 @@ class hyperstrator_server(Thread):
              request_key="tn_req",
              reply_key="tn_rep")
 
-        # TODO Object there, but methods not implemented yet
-        if False:
-            # Create an instance of the TN orchestrator handler
-            self.ran_orch = orch_base(
-                 name="Radio Access Network",
-                 host_key="ran_host",
-                 port_key="ran_port",
-                 default_host="127.0.0.1",
-                 default_port="2300",
-                 create_msg="tn_cc",
-                 request_msg="rn_rc",
-                 update_msg="rn_uc",
-                 delete_msg="rn_dc",
-                 request_key="rn_req",
-                 reply_key="rn_rep")
+        # Create an instance of the RAN orchestrator handler
+        self.ran_orch = orch_base(
+             name="Radio Access Network",
+             host_key="ran_host",
+             port_key="ran_port",
+             default_host="127.0.0.1",
+             default_port="2100",
+             create_msg="rn_cc",
+             request_msg="rn_rc",
+             update_msg="rn_uc",
+             delete_msg="rn_dc",
+             request_key="rn_req",
+             reply_key="rn_rep")
 
     # Make printing easier. TODO: Implement real logging
     def _log(self, *args, head=False):

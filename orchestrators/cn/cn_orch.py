@@ -22,7 +22,7 @@ class core_network_orchestrator(base_orchestrator):
             name="LXD",
             host_key="LXD_host",
             port_key="LXD_port",
-            default_host="0.0.0.0",
+            default_host="127.0.0.1",
             default_port="3300",
             request_key="lxd_req",
             reply_key="lxd_rep",
@@ -55,6 +55,7 @@ class core_network_orchestrator(base_orchestrator):
         # Inform the user about the creation
         return success, msg
 
+
     def request_slice(self, **kwargs):
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
@@ -71,6 +72,7 @@ class core_network_orchestrator(base_orchestrator):
 
     def update_slice(self, **kwargs):
         pass
+
 
     def delete_slice(self, **kwargs):
         # Extract parameters from keyword arguments
