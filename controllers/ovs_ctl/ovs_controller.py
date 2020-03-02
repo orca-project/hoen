@@ -1,5 +1,8 @@
 #!/usr/local/bin/ryu-manager
 
+from os import environ
+environ['EVENTLET_ZMQ'] = '1'
+
 # Hack to load parent module
 from sys import path
 path.append('..')
@@ -220,6 +223,10 @@ class ovs_controller(base_controller):
 
 class ovs_ctl(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
+
+    # Make printing easier. TODO: Implement real logging
+    def _log(self, *args, head=False):
+        print("-" if head else '\t' ,*args)
 
     def __init__(self, *args, **kwargs):
         super(ovs_ctl, self).__init__(*args, **kwargs)

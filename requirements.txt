@@ -6,3 +6,4 @@ flask-restful==0.3.8
 flask-cors==3.0.8
 ryu==4.32
 netaddr==0.7.19
+eventlet==0.25.1
