@@ -1,13 +1,13 @@
 #!/usr/local/bin/ryu-manager
 
-from eventlet.green import zmq
-
 # Hack to load parent module
 from sys import path
 path.append('..')
 
 # Import the Template Controller
 from base_controller.base_controller import base_controller
+
+from eventlet.green import zmq
 
 # Import the System and Name methods from the OS module
 from os import system, name
@@ -113,7 +113,7 @@ class ovs_controller(base_controller):
             ofproto = datapath.ofproto
             parser = datapath.ofproto_parser
 
-            queue = self.define_queue(route, datapath)
+            queue_fw = self.define_queue(route, datapath, switch['out_port'])
 
             # ip_src, ip_dst, s, p_in, p_out)
             # Creating ingress match and actions which will be send to ovs-switch
@@ -124,11 +124,12 @@ class ovs_controller(base_controller):
                     ipv4_dst=(route['ipv4_dst'], route['ipv4_dst_netmask'])
                 )
             #actions = [parser.OFPActionOutput(switch['out_port'])]
-            actions = [parser.OFPActionSetQueue(queue), parser.OFPActionOutput(switch['out_port'])]
+            actions = [parser.OFPActionSetQueue(queue_fw), parser.OFPActionOutput(switch['out_port'])]
 
             # Add the flow to the switch
             self.ovs.add_flow(datapath, 10, match, actions)
 
+            queue_rv = self.define_queue(route, datapath, switch['in_port'])
             # Creating egress match and actions which will be send to ovs-switch
             match = parser.OFPMatch(
                     eth_type=switch['eth_type'],
@@ -136,20 +137,22 @@ class ovs_controller(base_controller):
                     ipv4_src=(route['ipv4_dst'], route['ipv4_dst_netmask']),
                     ipv4_dst=(route['ipv4_src'], route['ipv4_src_netmask'])
                 )
-            actions = [parser.OFPActionSetQueue(queue), parser.OFPActionOutput(switch['in_port'])]
+            actions = [parser.OFPActionSetQueue(queue_rv), parser.OFPActionOutput(switch['in_port'])]
 
             # Add the flow to the switch
             self.ovs.add_flow(datapath, 10, match, actions)
 
-        self._log('worked, took',  + (time.time() - single)*1000, 'ms')
+        print('worked, took',  + (time.time() - single)*1000, 'ms')
         return True, {'host': route['ipv4_dst']}
 
 
-    def define_queue(self, route, datapath):
+    def define_queue(self, route, datapath, port):
         connection = self.ovs.control[self.ovs.dpid_to_name[datapath.id]]
-        queue = connection.create_queue(route)
-        if 'max_rate' in route and route['max_rate'] is not None:
-            connection.modify_default_queue(route['max_rate'])
+        queue = connection.create_queue(route, port)
+        #if 'max_rate' in route and route['max_rate'] is not None:
+        #    connection.modify_default_queue(route['max_rate'], port)
+        if 'min_rate' in route and route['min_rate'] is not None:
+            connection.modify_default_queue(route['min_rate'], port)
         return queue
 
     def delete_slice(self, **kwargs):
@@ -201,15 +204,18 @@ class ovs_controller(base_controller):
                 self.ovs.del_flow(datapath, match_fw)
             else:
                 self.ovs.del_flow(datapath, match_rv)
-            self.return_default_queue_reservation(datapath, route['max_rate'])
+            #self.return_default_queue_reservation(datapath, route['max_rate'], switch['in_port'])
+            #self.return_default_queue_reservation(datapath, route['max_rate'], switch['out_port'])
+            self.return_default_queue_reservation(datapath, route['min_rate'], switch['in_port'])
+            self.return_default_queue_reservation(datapath, route['min_rate'], switch['out_port'])
 
         # Return host and port -- TODO may drop port entirely
         return True, {'s_id': s_id}
 
-    def return_default_queue_reservation(self, datapath, value):
+    def return_default_queue_reservation(self, datapath, value, port):
         connection = self.ovs.control[self.ovs.dpid_to_name[datapath.id]]
         if value is not None:
-            connection.modify_default_queue(-value)
+            connection.modify_default_queue(-value, port)
 
 
 class ovs_ctl(app_manager.RyuApp):
@@ -283,30 +289,28 @@ class ovs_ctl(app_manager.RyuApp):
         self.ovs_controller_hub = hub.spawn(self.ovs_controller_thread.run)
 
         self.count = 5
+        self.switch_config_count = {}
+        self.single = {}
         self.st = time.time()
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
-        single = time.time()
         # Get the new switch
         datapath = ev.msg.datapath
-        # Add the new switch to the container
+        self.single[datapath.id] = time.time()
+        # Add the new switch to the container 
         self.switches[self.dpid_to_name[datapath.id]] = datapath
         # Send proactive rules to the switches
         self._base_start(datapath)
-        self.count-= 1
-
         self.get_current_ports(datapath)
         self.connect_local_agent(datapath)
-        print('took',  + (time.time() - single)*1000, 'ms')
-
-        if (not self.count):
-            self._log('total:', (time.time()-self.st)*1000, 'ms')
 
     def connect_local_agent(self, datapath):
         connection = nsb(datapath)
-        connection.reset_queues()
+        reset = connection.reset_queues()
         self.control[self.dpid_to_name[datapath.id]] = connection
+        if reset:
+            self.check_finished_config(datapath.id)
 
     def ports_to_disable(self):
         stp = defaultdict(dict)
@@ -366,7 +370,8 @@ class ovs_ctl(app_manager.RyuApp):
         self.add_flow(datapath, 0, match, actions)
 
         # Output info message
-        self._log('Configured Switch ', self.dpid_to_name[dpid], head=True)
+        #self._log('Configured Switch ', self.dpid_to_name[dpid], head=True)
+        self.check_finished_config(dpid)
 
     def add_flow(self, datapath, priority, match, actions, buffer_id=None):
         ofproto = datapath.ofproto
@@ -540,4 +545,17 @@ class ovs_ctl(app_manager.RyuApp):
             port = p.port_no
             if port != 4294967294:
                 self.ports[node].append(port)
-        print('Switch', node, ' ports:', self.ports[node])
+        #print('Switch', node, ' ports:', self.ports[node])
+        self.check_finished_config(dpid)
+
+    def check_finished_config(self, dpid):
+        if dpid not in self.switch_config_count:
+            self.switch_config_count[dpid] = 0
+        self.switch_config_count[dpid] = self.switch_config_count[dpid] + 1
+
+        if self.switch_config_count[dpid] == 3:
+            self.count-= 1
+            self._log('Configured Switch ', self.dpid_to_name[dpid], head=True)
+            print('took',  + (time.time() - self.single[dpid])*1000, 'ms')
+        if (not self.count):
+            self._log('total:', (time.time()-self.st)*1000, 'ms')

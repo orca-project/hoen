@@ -12,6 +12,8 @@ from os import system, name
 import signal
 from time import time
 
+from netaddr import IPAddress, IPNetwork
+
 # Import SONAr services
 from services.ndb import ndb
 from services.path_engine import PathEngine
@@ -62,7 +64,7 @@ class tn_orchestrator(base_orchestrator):
         '''
         catalog.add_network('10.0.0.4', 's01', 1)
         catalog.add_network('10.0.0.30', 's01', 5)
-        catalog.add_network('10.1.0.1', 's05', 3)
+        catalog.add_network('10.1.0.1/16', 's05', 3)
         #catalog.add_network('10.2.0.1', 's05', 3)
 
     def create_slice(self, **kwargs):
@@ -124,25 +126,29 @@ class tn_orchestrator(base_orchestrator):
     def delete_slice(self, **kwargs):
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
+        route = kwargs.get('route', None)
+        complete_remove = False
 
-        # Retrieve the route previously applied
         catalog = ndb()
-        route = catalog.get_route(s_id)
-
         if route is None:
-            return False, 'Route not found for s_id ' + s_id
+            # Retrieve the route previously applied
+            complete_remove = True            
+            route = catalog.get_route(s_id)
+
+            if route is None:
+                return False, 'Route not found for s_id ' + s_id
 
         # Send message to remove slice
         success, msg = self.ovs_ctl.delete_slice(**{'s_id': s_id,
                                                     'route': route})
-
         if success:
             path = route['path']
             for p in range(0, len(path) - 1):
                 catalog.add_flow_count(path[p], path[p + 1], -1)
                 if route['throughput'] is not None:
                     catalog.add_link_usage(path[p], path[p + 1], -route['throughput'])
-            catalog.remove_route(s_id)
+            if complete_remove:
+                catalog.remove_route(s_id)
         # Inform the user about the removal
         return success, msg
 
@@ -190,8 +196,7 @@ class tn_orchestrator(base_orchestrator):
                         old['direction'] = 'full'
                         switches.append(old)
                 route_to_delete = self.generate_route_to_delete(old_route, switches)
-                success, msg = self.ovs_ctl.delete_slice(**{'s_id': s_id,
-                                                            #'type': s_type,
+                success, msg = self.delete_slice(**{'s_id': s_id,
                                                             'route': route_to_delete})
         return success, msg
 
@@ -207,18 +212,26 @@ class tn_orchestrator(base_orchestrator):
         route['switches'] = switches
         return route
 
+    def find_border_switch(self, address):
+        catalog = ndb()
+        resp = None
+        networks = catalog.get_networks()
+        for network in networks:
+            if IPAddress(address) in IPNetwork(network):
+                resp = networks[network]
+                break
+        return resp
+
     def build_route(self, topology, src, dst, requirements):
         catalog = ndb()
         engine = PathEngine()
 
         # Fetch switches which can arrive to the src and dst networks
-        src_network = catalog.get_network(src)
-        dst_network = catalog.get_network(dst)
+        src_network = self.find_border_switch(src)
+        dst_network = self.find_border_switch(dst)
 
-        self._log('Source network: ', src_network)
-        self._log('Destination network: ', dst_network)
         if src_network is None or dst_network is None:
-            self._log('Impossible to arrive from ', src, 'to ', dst)
+            print('\t', 'Impossible to arrive from ', src, 'to ', dst)
             return None
 
         # Define the path to apply
@@ -231,7 +244,7 @@ class tn_orchestrator(base_orchestrator):
         (ipv4_src, ipv4_src_netmask) = self.convert_cidr_to_netmask(src)
         (ipv4_dst, ipv4_dst_netmask) = self.convert_cidr_to_netmask(dst)
         (min_rate, max_rate, priority) = self.define_queue_parameters(requirements)
-
+        
         first_port = src_network.get('port')
         last_port = dst_network.get('port')
         switches = engine.generate_match_switches(topology, path, first_port, last_port)
@@ -276,7 +289,7 @@ class tn_orchestrator(base_orchestrator):
         priority = None
         if requirements.get('throughput') is not None:
             min_rate = self.to_byte(requirements.get('throughput'))
-            max_rate = self.to_byte(requirements.get('throughput'))
+            #max_rate = self.to_byte(requirements.get('throughput'))
             priority = 10
         if requirements.get('latency') is not None:
             priority = 1
