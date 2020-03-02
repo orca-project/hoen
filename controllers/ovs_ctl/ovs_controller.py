@@ -1,6 +1,7 @@
 #!/usr/local/bin/ryu-manager
 
-from eventlet.green import zmq
+from os import environ
+environ['EVENTLET_ZMQ'] = '1'
 
 # Hack to load parent module
 from sys import path

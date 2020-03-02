@@ -1,13 +1,22 @@
 #!/usr/bin/env python3
 
-# Import the ZMQ module
-import zmq
+# Import the environ object from the OS module
+from os import environ
 # Import the Thread and Lock objects from the threading module
 from threading import Thread, Lock, Event
 # Import the Pause method of the Signal module
 from signal import pause
 # Import the time method from the time module
 from time import time
+
+# Check which ZMQ we should load
+if "EVENTLET_ZMQ" not in environ:
+    # Import the original ZMQ module
+    import zmq
+else:
+    # Import Eventlet's ZMQ modules
+    from eventlet.green import zmq
+
 # Received delay of 10 sec
 RECV_DELAY = 10*1000
 
