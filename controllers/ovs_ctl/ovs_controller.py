@@ -216,6 +216,10 @@ class ovs_controller(base_controller):
 class ovs_ctl(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
 
+    # Make printing easier. TODO: Implement real logging
+    def _log(self, *args, head=False):
+        print("-" if head else '\t' ,*args)
+
     def __init__(self, *args, **kwargs):
         super(ovs_ctl, self).__init__(*args, **kwargs)
         self.mac_to_port = {}
