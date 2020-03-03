@@ -36,7 +36,7 @@ class opw_controller(base_controller):
 
     def update_slice(self, **kwargs):
         # Extract parameters from keyword arguments
-        s_id = kwargs.get('s_id', none)
+        s_id = kwargs.get('s_id', None)
 
         # Return state
         return True, "This is a stub"
@@ -44,10 +44,10 @@ class opw_controller(base_controller):
 
     def delete_slice(self, **kwargs):
         # Extract parameters from keyword arguments
-        s_id = kwargs.get('s_id', none)
+        s_id = kwargs.get('s_id', None)
 
         # Return state
-        return True, "This is a stub"
+        return True, {"s_id": s_id}
 
 
 if __name__ == "__main__":
@@ -60,8 +60,8 @@ if __name__ == "__main__":
             rep_header='opw_rep',  # Don't modify
             create_msg='owc_crs',
             request_msg='owc_rrs',
-            update_msg='owc_ucs',
-            delete_msg='owc_dcs',
+            update_msg='owc_urs',
+            delete_msg='owc_drs',
             host='0.0.0.0',
             port=3300)
 

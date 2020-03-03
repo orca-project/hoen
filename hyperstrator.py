@@ -682,9 +682,27 @@ class hyperstrator_server(Thread):
 
         # In case of testing
         else:
-            self._log('Skipping core')
+            self._log('Skipping CN')
 
-        #TODO: The RAN will come here.
+        # If doing the RAN
+        if self.do_radio:
+            self._log('Send message to RAN orchestrator')
+
+            # Otherwise, send message to the RAN orchestrator
+            radio_success, radio_msg = self.ran_orch.delete_slice(
+                **{'s_id': delete_transaction['s_id']})
+
+            # If the radio allocation failed
+            if not radio_success:
+                self._log('Failed deleting Radio Slice')
+                # Inform the user about the failure
+                self._send_msg(self.delete_nack, radio_msg)
+                # Finish here
+                return
+
+        # In case of testing
+        else:
+            self._log('Skipping RAN')
 
         # If doing the TN
         if self.do_transport:
