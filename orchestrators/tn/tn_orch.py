@@ -62,10 +62,13 @@ class tn_orchestrator(base_orchestrator):
         It could be automatic if we develop LLDP and ARP functions in the ovs controller...
         ... but it is out of scope.
         '''
-        catalog.add_network('10.0.0.4', 's01', 1)
-        catalog.add_network('10.0.0.30', 's01', 5)
-        catalog.add_network('10.1.0.1/16', 's05', 3)
-        #catalog.add_network('10.2.0.1', 's05', 3)
+        catalog.add_network('10.50.0.0/24', 's01', 5)
+        catalog.add_network('10.60.0.0/24', 's01', 6)
+        catalog.add_network('10.70.0.0/24', 's01', 7)
+        catalog.add_network('10.20.0.0/24', 's05', 3)
+        catalog.add_network('10.30.0.0/24', 's05', 3)
+        # remove this one:
+        catalog.add_network('10.0.0.0/24', 's01', 5)
 
     def create_slice(self, **kwargs):
         catalog = ndb()

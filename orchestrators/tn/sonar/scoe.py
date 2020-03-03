@@ -33,8 +33,10 @@ class scoe(Thread):
         self.shutdown_flag = Event()
         self._server_bind(host, port)
         catalog = ndb()
-        agent = catalog.add_local_agent('sonar-req02', '10.0.0.30', 'ith0', 's01', 5)
-        agent = catalog.add_local_agent('sonar-p01', '10.1.0.1', 'ith0', 's05', 3)
+        #agent = catalog.add_local_agent('sonar-req02', '10.0.0.30', 'ith0', 's01', 5)
+        #agent = catalog.add_local_agent('sonar-p01', '10.1.0.1', 'ith0', 's05', 3)
+        agent = catalog.add_local_agent('sonar-local-agent01', '100.1.3.3', 'sth01', 's01', 1)
+        agent = catalog.add_local_agent('sonar-local-agent02', '100.1.3.4', 'sth01', 's05', 4)
 
     # Bind server to socket
     def _server_bind(self, host, port):

@@ -160,7 +160,7 @@ if __name__ == "__main__":
     cls()
 
     try:
-        sonar_host = '10.0.0.2'
+        sonar_host = '100.1.2.1'
         port = 5500
         local_agent_thread = local_agent_server(sonar_host, port)
         local_agent_thread.start()

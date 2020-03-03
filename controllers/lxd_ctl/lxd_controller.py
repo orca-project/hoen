@@ -30,7 +30,7 @@ class lxd_controller(base_controller):
 
         # List of external ethernet ports
         self.interface_list = {x: {"available": True} for x in \
-                net_if_addrs().keys() if x.startswith('enp')}
+                sorted(net_if_addrs().keys()) if x.startswith('enp')}
 
         self._log("Found", len(self.interface_list), "Ethernet ports")
 

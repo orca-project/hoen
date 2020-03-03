@@ -234,17 +234,26 @@ class ovs_ctl(app_manager.RyuApp):
         self.switches = {}
 
         self.dpid_to_name = {
+            # Original environment -- uncomment the 3 lines below
             #  95536754289: 'h00',
             #  95535344413: 'h01',
             #  95542363502: 'h02'
-            95534111059: 'h00',
-            95538556217: 'h01',
-            95533205304: 'h02'
+            # ORCA first demo -- uncomment the 3 lines below
+            #  95534111059: 'h00',
+            #  95538556217: 'h01',
+            #  95533205304: 'h02'
+            # Virtual Machine SONAr -- uncomment the 5 lines below
             #  95532435104: 's01',
             #  95533179799: 's02',
             #  95532162947: 's03',
             #  95539282496: 's04',
             #  95533558180: 's05'
+            # ORCA second demo -- uncomment the 5 lines below:
+            95532594594: 's01',
+            95534454058: 's02',
+            95536781980: 's03',
+            95531791552: 's04',
+            95532050795: 's05'            
         }
 
         self.topology = defaultdict(dict)
@@ -287,7 +296,7 @@ class ovs_ctl(app_manager.RyuApp):
             update_msg='ovc_urs',
             delete_msg='ovc_drs',
             topology_msg='ovc_trs',
-            host=kwargs.get('host', '127.0.0.1'),
+            host=kwargs.get('host', '0.0.0.0'),
             port=kwargs.get('port', 3200),
             ovs=self
         )
