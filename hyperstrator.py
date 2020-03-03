@@ -309,7 +309,7 @@ class hyperstrator_server(Thread):
         # Timeout reception every 500 milliseconds
         self.socket.setsockopt(zmq.RCVTIMEO, RECV_DELAY)
 
-    def send_msg(self, message_type, message):
+    def _send_msg(self, message_type, message):
         # Send a message with a header
         self.socket.send_json({message_type: message})
 
@@ -320,7 +320,7 @@ class hyperstrator_server(Thread):
 
             try:
                 # Wait for transaction
-                transaction = self.socket.recv_json()
+                transactions = self.socket.recv_json()
             # If nothing was received during the timeout
             except zmq.Again:
                 # Try again
@@ -328,322 +328,39 @@ class hyperstrator_server(Thread):
 
             # Received a command
             else:
-                # Start time counter
-                st = time()
                 # Service transaction , new service
-                create_service = transaction.get(self.create_msg, None)
+                create_transaction = transactions.get(self.create_msg, None)
 
                 # If the message worked
-                if create_service is not None:
-                    self._log('Create Service Transaction', head=True)
-                    # Create a Service ID
-                    s_id = str(uuid4())
-
-                    self._log('Service ID:', s_id)
-
-                    # If allocating CN slices
-                    if self.do_core:
-                        self._log('Send message to the CN orchestrator')
-                        # Otherwise, send message to the CN orchestrator
-                        core_success, core_msg = self.cn_orch.create_slice(
-                            **{
-                                's_id': s_id,
-                                'requirements': create_service['requirements'],
-                                'distribution': create_service['distribution']
-                            })
-
-                        # If the core allocation failed
-                        if not core_success or 'source' not in core_msg:
-                            self._log('Failed creating Core Slice')
-                            # Inform the user about the failure
-                            self.send_msg(
-                                self.create_nack,
-                                core_msg if not core_success else
-                                "Malformatted message from CN orchestrator.")
-                            # Measured elapsed time
-                            self._log('Failed core, took:',
-                                  (time() - st)*1000, 'ms')
-                            # Finish the main loop here
-                            continue
-
-                        # Otherwise, the CN allocation succeeded
-                        self._log('Succeeded creating a CN slice')
-
-                    # In case of tests
-                    else:
-                        self._log('Skipping CN')
-                        # Use a fake source IP
-                        core_msg = {'s_id': s_id, 'source': '20.0.0.1'}
-
-
-                    #TODO: RAN will come here
-                    radio_msg = {'s_id': s_id, 'destination': '30.0.0.1'}
-
-
-                    # If allocating TN slices
-                    if self.do_transport:
-                        self._log('Send message to the TN orchestrator')
-                        # Send UUID and requirements to the TN orchestrator
-                        transport_success, transport_msg = \
-                            self.tn_orch.create_slice(
-                            **{
-                                's_id': s_id,
-                                'requirements': create_service['requirements'],
-                                'source': core_msg['source'],
-                                'destination': radio_msg['destination']
-                            })
-
-                        # If the transport allocation failed
-                        if not transport_success:
-                            self._log('Failed creating Transport Slice')
-                            # Inform the user about the failure
-                            self.send_msg(
-                                self.create_nack,
-                                transport_msg if not transport_success else
-                                "Malformatted message from TN orchestrator.")
-                            # Measured elapsed time
-                            self._log('Failed transport, took:',
-                                  (time() - st)*1000, 'ms')
-                            # Finish here
-                            continue
-
-                        # Otherwise, the transport allocation succeeded
-                        self._log('Succeeded creating a TN Slice')
-
-                    # In case of tests
-                    else:
-                        self._log('Skipping TN')
-                        # Use a fake return message
-                        transport_msg = {'s_id': s_id}
-
-                    # Append it to the list of service IDs
-                    self.s_ids.append(s_id)
-
-                    # Inform the user about the configuration success
-                    self.send_msg(self.create_ack, {
-                        's_id': s_id
-                    })
-
-                    self._log('Creation time:', (time() - st)*1000, 'ms')
+                if create_transaction is not None:
+                    self._create_service(create_transaction)
 
                 # Service transaction, request service
-                request_service = transaction.get(self.request_msg, None)
+                request_transaction = transactions.get(self.request_msg, None)
 
                 # If the flag exists
-                if request_service is not None:
-                    self._log('Request Service Transaction', head=True)
-                    # If missing the slice ID:
-                    if 's_id' not in request_service:
-                        self._log("Missing Service ID.")
-                        # Send message
-                        self.send_msg(self.request_nack, "Missing Service ID")
-                        # Leave if clause
-                        continue
+                if request_transaction is not None:
+                    self._request_service(request_transaction)
 
-                    # If there is an S_ID but it doesn't exist
-                    elif request_service['s_id'] and \
-                            (request_service['s_id'] not in self.s_ids):
-                        self._log('Service ID does not exist')
-                        # Send message
-                        self.send_msg(self.request_nack,
-                                      'The service does not exist: ' + \
-                                      request_service['s_id'])
-                        # Leave if clause
-                        continue
-
-                    # If gathering information about a slice
-                    if request_service['s_id']:
-                        self._log('Service ID:', request_service['s_id'])
-                   # If set to gather information about all slices
-                    else:
-                        self._log('Gather information about all Service IDs')
-
-                    # Container to hold information about the slices
-                    slice_info = dict((s_id, {}) for s_id in self.s_ids) \
-                            if not request_service['s_id'] else \
-                            {request_service['s_id']: {}}
-
-                    # If doing the CN
-                    if self.do_core:
-                        self._log('Send message to CN orchestrator')
-
-                        # Otherwise, send message to the CN orchestrator
-                        core_success, core_msg = self.cn_orch.request_slice(
-                            **{'s_id': request_service['s_id']})
-
-                        # If there was an error at the CN orchestrator
-                        if not core_success:
-                            self._log('Failed requesting Core Slice')
-                            # Inform the user about the failure
-                            self.send_msg(self.request_nack, core_msg)
-                            # Finish here
-                            continue
-
-                        # Fill in the slice info
-                        for s_id in slice_info:
-                            slice_info[s_id]['cn'] = \
-                                core_msg.get(s_id, "Not reported by CN")
-
-                    # If debugging
-                    else:
-                        # Fill in the slice info with a stub
-                        for s_id in slice_info:
-                            slice_info[s_id]['cn'] = {'stub'}
-
-                    # If doing the TN
-                    if self.do_transport:
-                        self._log('Send message to TN orchestrator')
-
-                        # Otherwise, send message to the TN orchestrator
-                        transport_success, transport_msg = \
-                            self.tn_orch.request_slice(
-                                **{'s_id': request_service['s_id']})
-
-                        # If there was an error at the TN orchestrator
-                        if not transport_success:
-                            self._log('Failed requesting Transport Slice')
-                            # Inform the user about the failure
-                            self.send_msg(self.request_nack, transport_msg)
-                            # Finish here
-                            continue
-
-                        # Fill in the slice info
-                        for s_id in slice_info:
-                            slice_info[s_id]['tn'] = \
-                                transport_msg.get(s_id, "Not reported by TN")
-
-                    # If debugging
-                    else:
-                        # Fill in the slice info with a stub
-                        for s_id in slice_info:
-                            slice_info[s_id].update({'tn': 'stub'})
-
-                    # If doing the RAN
-                    if self.do_radio:
-                        self._log('Send message to RAN orchestrator')
-
-                        # Otherwise, send message to the RAN orchestrator
-                        radio_success, radio_msg = \
-                            self.ran_orch.request_slice(
-                                **{'s_id': request_service['s_id']})
-
-                        # If there was an error at the RAN orchestrator
-                        if not radio_success:
-                            self._log('Failed requesting Radio Slice')
-                            # Inform the user about the failure
-                            self.send_msg(self.request_nack, radio_msg)
-                            # Finish here
-                            continue
-
-                        # Fill in the slice info
-                        for s_id in slice_info:
-                            slice_info[s_id]['ran'] = \
-                                radio_msg.get(s_id, "Not reported by RAN")
-
-                    # If debugging
-                    else:
-                        # Fill in the slice info with a stub
-                        for s_id in slice_info:
-                            slice_info[s_id].update({'ran': 'stub'})
-
-                    # Inform the user about the slice information
-                    self.send_msg(self.request_ack, slice_info)
-                    # Measure elapsed time
-                    self._log('Get time:', (time() - st)*1000, 'ms')
-
-
-                # Update service transaction
-                update_service = transaction.get(self.update_msg, None)
+                # Service transaction, update service
+                update_transaction = transactions.get(self.update_msg, None)
 
                 # If the flag exists
-                if update_service is not None:
-                    self._log('Update Service Transaction', head=True)
+                if update_transaction is not None:
+                    self._update_service(update_transaction)
 
-                    self._log("Not implemented yet.")
-
-                    continue
-
-                # Service transaction , remove service
-                delete_service = transaction.get(self.delete_msg, None)
+                # Service transaction, delete service
+                delete_transaction = transactions.get(self.delete_msg, None)
 
                 # If the flag exists
-                if delete_service is not None:
-                    self._log('Delete Service Transaction', head=True)
-                    # If missing the slice ID:
-                    if 's_id' not in delete_service or not \
-                            delete_service['s_id']:
-                        self._log("Missing Service ID.")
-                        # Send message
-                        self.send_msg(self.delete_nack, "Missing Service ID")
-                        # Leave if clause
-                        continue
-
-                    # If this service doesn't exist
-                    elif delete_service['s_id'] not in self.s_ids:
-                        self._log('Service ID does not exist')
-                        # Send message
-                        self.send_msg(self.delete_nack,
-                                      'The service does not exist: ' + \
-                                      delete_service['s_id'])
-                        # Leave if clause
-                        continue
-
-                    self._log('Service ID:', delete_service['s_id'])
-
-                    # If doing the CN
-                    if self.do_core:
-                        self._log('Send message to CN orchestrator')
-
-                        # Otherwise, send message to the CN orchestrator
-                        core_success, core_msg = self.cn_orch.delete_slice(
-                            **{'s_id': delete_service['s_id']})
-
-                        # If the core allocation failed
-                        if not core_success:
-                            self._log('Failed deleting Core Slice')
-                            # Inform the user about the failure
-                            self.send_msg(self.delete_nack, core_msg)
-                            # Finish here
-                            continue
-
-                    # In case of testing
-                    else:
-                        self._log('Skipping core')
-
-                    #TODO: The RAN will come here.
-
-                    # If doing the TN
-                    if self.do_transport:
-                        self._log('Send message to the TN orchestrator')
-                        # Otherwise, send message to the TN orchestrator
-                        transport_success, transport_msg = \
-                          self.tn_orch.delete_slice(
-                            **{'s_id': delete_service['s_id']})
-
-                        # If the TN allocation failed
-                        if not tn_success:
-                            self._log('Failed deleting Transport Slice')
-                            # Inform the user about the failure
-                            self.send_msg(self.delete_nack, transport_msg)
-                            # Finish here
-                            continue
-
-                    # In case of testing
-                    else:
-                        self._log('Skipping TN')
-
-
-                    # Remove it to the list of service IDs
-                    self.s_ids.remove(delete_service['s_id'])
-
-                    # Inform the user about the removal success
-                    self.send_msg(self.delete_ack,
-                                  {'s_id': delete_service['s_id']})
+                if delete_transaction is not None:
+                    self._delete_service(delete_transaction)
 
                 # Check for unknown messages
-                unknown_msg = [x for x in transaction  if x not in
+                unknown_msg = [x for x in transactions if x not in
                                 [self.create_msg, self.request_msg,
                                  self.update_msg, self.delete_msg] ]
+
                 # If there is at least an existing unknown message
                 if unknown_msg:
                     self._log('Unknown message', head=True)
@@ -652,7 +369,7 @@ class hyperstrator_server(Thread):
                     msg = {self.error_msg: "Unknown message:" + \
                            str(unknown_msg[0])}
                     # Send message
-                    self.send_msg(self.error_msg, msg)
+                    self._send_msg(self.error_msg, msg)
 
         # Terminate zmq
         self.socket.close()
@@ -663,6 +380,339 @@ class hyperstrator_server(Thread):
         print('Exiting')
         self.shutdown_flag.set()
         self.join()
+
+    def _create_service(self, create_transaction):
+        # Start time counter
+        st = time()
+
+        self._log('Create Service Transaction', head=True)
+        # Create a Service ID
+        s_id = str(uuid4())
+
+        self._log('Service ID:', s_id)
+
+        # If allocating CN slices
+        if self.do_core:
+            self._log('Send message to the CN orchestrator')
+            # Otherwise, send message to the CN orchestrator
+            core_success, core_msg = self.cn_orch.create_slice(
+                **{
+                    's_id': s_id,
+                    'requirements': create_transaction['requirements'],
+                    'distribution': create_transaction['distribution']
+                    #'service': create_transaction['service']
+                })
+
+            # If the core allocation failed
+            if not core_success or 'source' not in core_msg:
+                self._log('Failed creating Core Slice')
+                # Inform the user about the failure
+                self._send_msg(
+                    self.create_nack,
+                    core_msg if not core_success else
+                    "Malformatted message from CN orchestrator.")
+                # Measured elapsed time
+                self._log('Failed core, took:',
+                      (time() - st)*1000, 'ms')
+                # Finish the main loop here
+                return
+
+            # Otherwise, the CN allocation succeeded
+            self._log('Succeeded creating a CN slice')
+
+        # In case of tests
+        else:
+            self._log('Skipping CN')
+            # Use a fake source IP
+            core_msg = {'s_id': s_id, 'source': '20.0.0.1'}
+
+
+        # If allocating RAN slices
+        if self.do_radio:
+            self._log('Send message to the RAN orchestrator')
+            # Otherwise, send message to the CN orchestrator
+            radio_success, radio_msg = self.ran_orch.create_slice(
+                **{
+                    's_id': s_id,
+                    'requirements': create_transaction['requirements']
+                    #'service': create_transaction['service']
+                })
+
+            # If the radio allocation failed
+            if not radio_success or 'destination' not in radio_msg:
+                self._log('Failed creating Radio Slice')
+                # Inform the user about the failure
+                self._send_msg(
+                    self.create_nack,
+                    radio_msg if not radio_success else
+                    "Malformatted message from RAN orchestrator.")
+                # Measured elapsed time
+                self._log('Failed radio, took:',
+                      (time() - st)*1000, 'ms')
+                # Finish the main loop here
+                return
+
+            # Otherwise, the RAN allocation succeeded
+            self._log('Succeeded creating a RAN slice')
+
+        # In case of tests
+        else:
+            self._log('Skipping RAN')
+            # Use a fake source IP
+            radio_msg = {'s_id': s_id, 'destination': '10.30.0.179'}
+
+        # If allocating TN slices
+        if self.do_transport:
+            self._log('Send message to the TN orchestrator')
+            # Send UUID and requirements to the TN orchestrator
+            transport_success, transport_msg = \
+                self.tn_orch.create_slice(
+                **{
+                    's_id': s_id,
+                    'requirements': create_transaction['requirements'],
+                    'source': core_msg['source'],
+                    'destination': radio_msg['destination']
+                })
+
+            # If the transport allocation failed
+            if not transport_success:
+                self._log('Failed creating Transport Slice')
+                # Inform the user about the failure
+                self._send_msg(
+                    self.create_nack,
+                    transport_msg if not transport_success else
+                    "Malformatted message from TN orchestrator.")
+                # Measured elapsed time
+                self._log('Failed transport, took:',
+                      (time() - st)*1000, 'ms')
+                # Finish here
+                return
+
+            # Otherwise, the transport allocation succeeded
+            self._log('Succeeded creating a TN Slice')
+
+        # In case of tests
+        else:
+            self._log('Skipping TN')
+            # Use a fake return message
+            transport_msg = {'s_id': s_id}
+
+        # Append it to the list of service IDs
+        self.s_ids.append(s_id)
+
+        # Inform the user about the configuration success
+        self._send_msg(self.create_ack, {
+            's_id': s_id
+        })
+
+        self._log('Creation time:', (time() - st)*1000, 'ms')
+
+    def _request_service(self, request_transaction):
+        # Start time counter
+        st = time()
+
+        self._log('Request Service Transaction', head=True)
+        # If missing the slice ID:
+        if 's_id' not in request_transaction:
+            self._log("Missing Service ID.")
+            # Send message
+            self._send_msg(self.request_nack, "Missing Service ID")
+            # Leave if clause
+            return
+
+        # If there is an S_ID but it doesn't exist
+        elif request_transaction['s_id'] and \
+                (request_transaction['s_id'] not in self.s_ids):
+            self._log('Service ID does not exist')
+            # Send message
+            self._send_msg(self.request_nack,
+                          'The service does not exist: ' + \
+                          request_transaction['s_id'])
+            # Leave if clause
+            return
+
+        # If gathering information about a slice
+        if request_transaction['s_id']:
+            self._log('Service ID:', request_transaction['s_id'])
+       # If set to gather information about all slices
+        else:
+            self._log('Gather information about all Service IDs')
+
+        # Container to hold information about the slices
+        slice_info = dict((s_id, {}) for s_id in self.s_ids) \
+                if not request_transaction['s_id'] else \
+                {request_transaction['s_id']: {}}
+
+        # If doing the CN
+        if self.do_core:
+            self._log('Send message to CN orchestrator')
+
+            # Otherwise, send message to the CN orchestrator
+            core_success, core_msg = self.cn_orch.request_slice(
+                **{'s_id': request_transaction['s_id']})
+
+            # If there was an error at the CN orchestrator
+            if not core_success:
+                self._log('Failed requesting Core Slice')
+                # Inform the user about the failure
+                self._send_msg(self.request_nack, core_msg)
+                # Finish here
+                return
+
+            # Fill in the slice info
+            for s_id in slice_info:
+                slice_info[s_id]['cn'] = \
+                    core_msg.get(s_id, "Not reported by CN")
+
+        # If debugging
+        else:
+            # Fill in the slice info with a stub
+            for s_id in slice_info:
+                slice_info[s_id].update({'cn': 'stub'})
+
+        # If doing the TN
+        if self.do_transport:
+            self._log('Send message to TN orchestrator')
+
+            # Otherwise, send message to the TN orchestrator
+            transport_success, transport_msg = \
+                self.tn_orch.request_slice(
+                    **{'s_id': request_transaction['s_id']})
+
+            # If there was an error at the TN orchestrator
+            if not transport_success:
+                self._log('Failed requesting Transport Slice')
+                # Inform the user about the failure
+                self._send_msg(self.request_nack, transport_msg)
+                # Finish here
+                return
+
+            # Fill in the slice info
+            for s_id in slice_info:
+                slice_info[s_id]['tn'] = \
+                    transport_msg.get(s_id, "Not reported by TN")
+
+        # If debugging
+        else:
+            # Fill in the slice info with a stub
+            for s_id in slice_info:
+                slice_info[s_id].update({'tn': 'stub'})
+
+        # If doing the RAN
+        if self.do_radio:
+            self._log('Send message to RAN orchestrator')
+
+            # Otherwise, send message to the RAN orchestrator
+            radio_success, radio_msg = \
+                self.ran_orch.request_slice(
+                    **{'s_id': request_transaction['s_id']})
+
+            # If there was an error at the RAN orchestrator
+            if not radio_success:
+                self._log('Failed requesting Radio Slice')
+                # Inform the user about the failure
+                self._send_msg(self.request_nack, radio_msg)
+                # Finish here
+                return
+
+            # Fill in the slice info
+            for s_id in slice_info:
+                slice_info[s_id]['ran'] = \
+                    radio_msg.get(s_id, "Not reported by RAN")
+
+        # If debugging
+        else:
+            # Fill in the slice info with a stub
+            for s_id in slice_info:
+                slice_info[s_id].update({'ran': 'stub'})
+
+        # Inform the user about the slice information
+        self._send_msg(self.request_ack, slice_info)
+        # Measure elapsed time
+        self._log('Get time:', (time() - st)*1000, 'ms')
+
+    def _update_service(self, update_transaction):
+        self._log('Update Service Transaction', head=True)
+
+        self._log("Not implemented yet.")
+
+        return
+
+    def _delete_service(self, delete_transaction):
+        # Start time counter
+        st = time()
+
+        self._log('Delete Service Transaction', head=True)
+        # If missing the slice ID:
+        if 's_id' not in delete_transaction or not \
+                delete_transaction['s_id']:
+            self._log("Missing Service ID.")
+            # Send message
+            self._send_msg(self.delete_nack, "Missing Service ID")
+            # Leave if clause
+            return
+
+        # If this service doesn't exist
+        elif delete_transaction['s_id'] not in self.s_ids:
+            self._log('Service ID does not exist')
+            # Send message
+            self._send_msg(self.delete_nack,
+                          'The service does not exist: ' + \
+                          delete_transaction['s_id'])
+            # Leave if clause
+            return
+
+        self._log('Service ID:', delete_transaction['s_id'])
+
+        # If doing the CN
+        if self.do_core:
+            self._log('Send message to CN orchestrator')
+
+            # Otherwise, send message to the CN orchestrator
+            core_success, core_msg = self.cn_orch.delete_slice(
+                **{'s_id': delete_transaction['s_id']})
+
+            # If the core allocation failed
+            if not core_success:
+                self._log('Failed deleting Core Slice')
+                # Inform the user about the failure
+                self._send_msg(self.delete_nack, core_msg)
+                # Finish here
+                return
+
+        # In case of testing
+        else:
+            self._log('Skipping core')
+
+        #TODO: The RAN will come here.
+
+        # If doing the TN
+        if self.do_transport:
+            self._log('Send message to the TN orchestrator')
+            # Otherwise, send message to the TN orchestrator
+            transport_success, transport_msg = \
+              self.tn_orch.delete_slice(
+                **{'s_id': delete_transaction['s_id']})
+
+            # If the TN allocation failed
+            if not tn_success:
+                self._log('Failed deleting Transport Slice')
+                # Inform the user about the failure
+                self._send_msg(self.delete_nack, transport_msg)
+                # Finish here
+                return
+
+        # In case of testing
+        else:
+            self._log('Skipping TN')
+
+
+        # Remove it to the list of service IDs
+        self.s_ids.remove(delete_transaction['s_id'])
+
+        # Inform the user about the removal success
+        self._send_msg(self.delete_ack,
+                      {'s_id': delete_transaction['s_id']})
 
 if __name__ == "__main__":
     # Clear screen
@@ -679,9 +729,9 @@ if __name__ == "__main__":
             request_msg='sr_rs',
             update_msg='sr_us',
             delete_msg='sr_ds',
-            do_radio=False,
-            do_transport=True,
-            do_core=True)
+            do_radio=True,
+            do_transport=False,
+            do_core=False)
         # Start the Hyperstrator Thread
         hyperstrator_thread.start()
         # Pause the main thread

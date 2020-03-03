@@ -23,7 +23,7 @@ class opw_controller(base_controller):
         s_id = str(kwargs.get('s_id', None))
 
         # Return state
-        return True, "This is a stub"
+        return True, {"s_id": s_id, "destination": "10.30.0.179"}
 
 
     def request_slice(self, **kwargs):
@@ -31,7 +31,7 @@ class opw_controller(base_controller):
        s_id = kwargs.get('s_id', None)
 
        # Return state
-       return True, "This is a stub"
+       return True, {s_id: {"start": 0, "end": 9, "length": 10}}
 
 
     def update_slice(self, **kwargs):

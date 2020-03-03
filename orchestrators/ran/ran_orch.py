@@ -23,7 +23,7 @@ class radio_access_network_orchestrator(base_orchestrator):
             host_key="OPW_host",
             port_key="OPW_port",
             default_host="0.0.0.0",
-            default_port="2100",
+            default_port="3300",
             request_key="opw_req",
             reply_key="opw_rep",
             create_msg='owc_crs',
@@ -86,39 +86,39 @@ class radio_access_network_orchestrator(base_orchestrator):
         # Create container to hold slice information
         info = {}
         # Iterate over all virtual radios
-        for virtual_radio in s_ids.keys():
+        for virtual_radio in self.s_ids.keys():
             # If going for a specific S_ID but it does not match
             if (s_id) and (s_id != virtual_radio):
                 continue
 
             # Log event and return
-            self._log("Found virtual radio:", vr)
+            self._log("Found virtual radio:", virtual_radio)
             # Send message to OpenWifi RAN controller
             self._log('Delegating it to the OpenWiFi Controller')
 
             # TODO append information from the slice duration and length
-            info[s_id] = {
-                    "service": s_ids[s_id]["service"],
-                    "MAC": s_ids[s_id]["MAC"][0],
-                    "slice": { "index": s_ids[s_id]["slice"]}
+            info[virtual_radio] = {
+                    "service": self.s_ids[virtual_radio]["service"],
+                    "MAC": self.s_ids[virtual_radio]["MAC"][0],
+                    "slice": { "index": self.s_ids[virtual_radio]["slice"]}
             }
 
             # Send the message to create a slice
-            success, msg = self.opw_ctl.request_slice(**{'s_id': s_id})
+            success, msg = self.opw_ctl.request_slice(**{'s_id': virtual_radio})
 
             # If the Controller answered correctly
-            if success:
+            if success and (virtual_radio in msg):
                  # Update info with controller-specific data
-                info[s_id]['slice'].update({
-                    "start": msg.get[s_id]["start"],
-                    "end": msg.get[s_id]["end"],
-                    "length": msg.get[s_id]["length"]})
+                info[virtual_radio]['slice'].update({
+                    "start": msg[virtual_radio].get("start", "Not reported"),
+                    "end": msg[virtual_radio].get("end", "Not reported"),
+                    "length": msg[virtual_radio].get("length", "Not reported")
+                })
 
             # Otherwise, include the error
             else:
                 # Return error message
-                info[s_id]['slice'].update({"info": msg})
-
+                info[virtual_radio]['slice'].update({"info": msg})
 
         # If there's an S_ID but the result was empty
         return (False, "Virtual radio missing.") \
@@ -161,7 +161,7 @@ if __name__ == "__main__":
             update_msg='rn_uc',
             delete_msg='rn_dc',
             host='0.0.0.0',
-            port=2300)
+            port=2100)
 
         # Start the Radio Access Network Orchestrator
         radio_access_network_orchestrator_thread.start()
