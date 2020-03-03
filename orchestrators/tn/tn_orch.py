@@ -75,8 +75,7 @@ class tn_orchestrator(base_orchestrator):
         st = time()
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
-        source = kwargs.get('source', None)
-        destination = kwargs.get('destination', None)
+        source, destination = self.get_address_params(kwargs)
         requirements = kwargs.get('requirements', None)
 
         # Append it to the list of service IDs
@@ -270,6 +269,12 @@ class tn_orchestrator(base_orchestrator):
             'throughput': requirements.get('throughput')
             }
         return route
+
+    def get_address_params(self, kwargs):
+        source = self.convert_cidr_to_netmask(kwargs.get('source', None))[0]
+        destination = self.convert_cidr_to_netmask(kwargs.get('destination', None))[0]
+        return source, destination
+
 
     def convert_cidr_to_netmask(self, address):
         if "/" not in address:
