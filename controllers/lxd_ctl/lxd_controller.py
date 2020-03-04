@@ -117,7 +117,8 @@ class lxd_controller(base_controller):
                    'config': {
                      'limits.cpu': s_cpu,
                      'limits.memory': s_ram + "GB"},
-                   'source': {'type': 'image', 'alias': s_distro}}
+                   'source': {'type': 'image', 'alias': s_distro},
+                   'profiles': ['hoen']}
 
         # If attaching an physical ethernet port to it
         if grab_ethernet:
