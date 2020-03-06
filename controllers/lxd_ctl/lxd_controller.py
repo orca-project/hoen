@@ -118,17 +118,22 @@ class lxd_controller(base_controller):
                      'limits.cpu': s_cpu,
                      'limits.memory': s_ram + "GB"},
                    'source': {'type': 'image', 'alias': s_distro},
-                   'profiles': ['hoen']}
+                   'profiles': ['hoen'],
+                   'devices': {
+                       "repo": {"type": "disk",
+                                "source": os.getcwd() + "/services/", #TODO from type of service
+                                "path": "/root/services/"}
+                   }}
 
         # If attaching an physical ethernet port to it
         if grab_ethernet:
             # Add new entry to the profile configuration
-            profile['devices'] = {"oth0": {
+            profile['devices'].update({"oth0": {
                 "type": "nic",
                 "nictype": "physical",
                 "parent": available_interface,
                 "name": "oth0"}
-            }
+            })
 
         # Try to create a new container
         try:
