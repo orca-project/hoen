@@ -20,7 +20,7 @@ from pylxd import Client
 
 # Supress pylxd warnings
 os.environ["PYLXD_WARNINGS"] = "none"
-grab_ethernet = True
+grab_ethernet = False
 
 class lxd_controller(base_controller):
 
@@ -34,37 +34,25 @@ class lxd_controller(base_controller):
 
         self._log("Found", len(self.interface_list), "Ethernet ports")
 
-    def prepare_distro_image(self, image_name="ubuntu-19.04-plain"):
+    def prepare_distro_image(self, image_name="ubuntu-19.04"):
         # Image server locations
         #  image_server = "https://images.linuxcontainers.org"
         image_server = "https://cloud-images.ubuntu.com/releases/"
 
-        # Split the name for later use
-        name_split = image_name.split('-')
-        # If missing the type of image, use vanilla
-        if len(name_split) == 2:
-            # And update the name & split
-            image_name += "-plain"
-            name_split += ["plain"]
-
         # Check if we have the right type of distributions
-        if name_split[0].lower() != 'ubuntu':
+        if image_name.split("-")[0].lower() != 'ubuntu':
             raise ValueError('Only supports Ubuntu distributions:', image_name)
 
         # Check if the image is stored in the local repository
         if image_name not in \
-                [x.aliases[0]['name'] for x in self.lxd_client.images.all() if x.aliases]:
+                [x.aliases[0]['name'] for x in \
+                    self.lxd_client.images.all() if x.aliases]:
+            # Output status message
             self._log("Downloading ", image_name)
 
-            # If using a custom image #TODO
-            if  name_split[2].lower() != "plain":
-                raise ValueError('Not dealing with custom images at the moment:', image_name)
-
-            # Get vanilla image
-            else:
-                # Try to get the new image
-                image = self.lxd_client.images.create_from_simplestreams(
-                    image_server, name_split[1])
+            # Try to get the new image
+            image = self.lxd_client.images.create_from_simplestreams(
+                image_server, image_name.split("-")[1])
 
             # Check whether we have an alias for it already
             if 'name' not in image.aliases:
@@ -73,13 +61,14 @@ class lxd_controller(base_controller):
 
         # Log event and return possible new name
         self._log("Base image ready!")
+
         return image_name
 
 
     def create_slice(self, **kwargs):
        # Extract parameters from keyword arguments
         s_id = str(kwargs.get('s_id', None))
-        s_distro = kwargs.get('s_distro', "ubuntu-19.04-plain")
+        s_ser = kwargs.get('service', "best-effort")
         # TODO: Ideally the CN orchestrator would specify the resources
         s_cpu = str(kwargs.get('s_cpu', 1))
         s_ram = str(int(kwargs.get('s_ram', 1.0)))
@@ -104,7 +93,7 @@ class lxd_controller(base_controller):
 
         try:
             #  Prepare image of the chosen distribution
-            s_distro = self.prepare_distro_image(s_distro)
+            s_distro = self.prepare_distro_image()
 
         except Exception as e:
             #  Log event and return
@@ -170,7 +159,8 @@ class lxd_controller(base_controller):
         # In case it worked out fine
         else:
             # Append it to the service list
-            self.s_ids[s_id].update({"container": container})
+            self.s_ids[s_id].update({"container": container,
+                                     "service": s_ser})
 
             # If attaching an physical ethernet port to it
             if grab_ethernet:
@@ -189,9 +179,6 @@ class lxd_controller(base_controller):
 
         # Container to hold the requested information
         msg = {}
-        # Pick the correct interface
-        interface = "oth0" if grab_ethernet else "eth0"
-
         # Iterate over all containers
         for container in self.lxd_client.containers.all():
             # If going for a specific S_ID but it does not match
@@ -209,10 +196,22 @@ class lxd_controller(base_controller):
                 'memory': {"limit": container.config.get('limits.memory', ""),
                            "usage": container.state().memory['usage']},
                  'cpu': {"limit":  container.config.get('limits.cpu', ""),
-                         "usage": container.state().cpu['usage']},
-                 "network": {interface: \
-                        container.state().network[interface]['counters']}
-                 }
+                         "usage": container.state().cpu['usage']}}
+
+            if container.name.split('-',1)[-1] in self.s_ids:
+                # Add it to the message
+                msg[container.name.split('-',1)[-1]].update(
+                    {"service": \
+                         self.s_ids[container.name.split('-',1)[-1]]["service"]
+                     })
+
+            # If there is an external Ethernet interface
+            if grab_ethernet:
+                # Add it to the message
+                msg[container.name.split('-',1)[-1]].update(
+                    {"network":
+                     {"oth0": container.state().network["oth0"]['counters']}
+                })
 
         # If there's an S_ID but the result was empty
         return (False, "Container missing.") \

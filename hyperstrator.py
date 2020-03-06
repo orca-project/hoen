@@ -398,8 +398,8 @@ class hyperstrator_server(Thread):
             core_success, core_msg = self.cn_orch.create_slice(
                 **{
                     's_id': s_id,
-                    'requirements': create_transaction['requirements'],
-                    'distribution': create_transaction['distribution']
+                    'service': create_transaction['service'],
+                    'requirements': create_transaction['requirements']
                     #'service': create_transaction['service']
                 })
 
@@ -434,6 +434,7 @@ class hyperstrator_server(Thread):
             radio_success, radio_msg = self.ran_orch.create_slice(
                 **{
                     's_id': s_id,
+                    'service': create_transaction['service'],
                     'requirements': create_transaction['requirements']
                     #'service': create_transaction['service']
                 })
@@ -747,9 +748,9 @@ if __name__ == "__main__":
             request_msg='sr_rs',
             update_msg='sr_us',
             delete_msg='sr_ds',
-            do_radio=True,
-            do_transport=False,
-            do_core=False)
+            do_radio=False,
+            do_transport=True,
+            do_core=True)
         # Start the Hyperstrator Thread
         hyperstrator_thread.start()
         # Pause the main thread

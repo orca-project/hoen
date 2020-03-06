@@ -43,12 +43,14 @@ def parse_cli_args():
 
     # Add CLI arguments
     parser_create.add_argument(
-        '-d', '--distro',
-        metavar='Type of Linux Distribution',
+        '-s', '--service',
+        metavar='SERVICE',
         type=str,
-        default='ubuntu-19.04-plain',
+        choices=["best-effort", "embb", "urllc"],
+        default='best-effort',
         #  required=True, # I wonder whether this arguments must be required
-        help='Source Address')
+        help='Type of Service')
+
     parser_create.add_argument(
         '-t', '--throughput',
         type=float,
@@ -151,7 +153,7 @@ def service_create(socket, **kwargs):
 
     # Send service request message to the hyperstrator
     socket.send_json({
-        create_msg: {'distribution': kwargs['distro'],
+        create_msg: {'service': kwargs['service'],
                      'requirements': {'throughout': kwargs['throughput'],
                                       'latency': kwargs['latency']}
                      }})

@@ -37,20 +37,20 @@ class core_network_orchestrator(base_orchestrator):
         s_id = kwargs.get('s_id', None)
         # Get the slice requirements
         s_req = kwargs.get('requirements', None)
-        # Get the slice distribution
-        s_dis = kwargs.get('distribution', "ubuntu-19.10-plain")
+        # Get the service
+        s_ser = kwargs.get('service', "best-effort")
 
         # Append it to the list of service IDs
         self.s_ids[s_id] = {"requirements": s_req,
-                            "distribution": s_dis}
+                            "service": s_ser}
 
         # Send message to LXD CN controller
-        self._log("Distribution:", s_dis, 'Requirements:', str(s_req))
+        self._log("Service:", s_ser, 'Requirements:', str(s_req))
         self._log('Delegating it to the LXD Controller')
 
         # Send the message to create a slice
         success, msg = self.lxd_ctl.create_slice(
-                **{'s_id': s_id, 's_distro': s_dis })
+                **{'s_id': s_id, 'service': s_ser })
 
         # Inform the user about the creation
         return success, msg
@@ -79,11 +79,11 @@ class core_network_orchestrator(base_orchestrator):
         s_id = kwargs.get('s_id', None)
         # Get the slice requirements
         s_req = self.s_ids[s_id]['requirements']
-        # Get the slice distribution
-        s_dis = self.s_ids[s_id]['distribution']
+        # Get the slice service
+        s_ser = self.s_ids[s_id]['service']
 
         # Send message to LXD SDN controller
-        self._log("Distribution:", s_dis, 'Requirements:', str(s_req))
+        self._log("Service:", s_ser, 'Requirements:', str(s_req))
         self._log('Delegating it to the LXD Controller')
 
         # Send message to remove slice

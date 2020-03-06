@@ -33,7 +33,7 @@ class radio_access_network_orchestrator(base_orchestrator):
 
         # Dictionary mapping UE's MAC addresses
         self.service_to_mac = {
-            'be': '14:AB:C5:42:B7:33',
+            'best-effort': '14:AB:C5:42:B7:33',
             'urllc': 'B8:27:EB:BE:C1:F1',
             'emmb': '88:29:9C:02:24:EF'
         }
@@ -45,7 +45,7 @@ class radio_access_network_orchestrator(base_orchestrator):
         # Get the slice requirements
         s_req = kwargs.get('requirements', None)
         # Get the type of service
-        s_ser = kwargs.get('service', 'be')
+        s_ser = kwargs.get('service', 'best-effort')
 
         # Check whether the type of service is known
         if s_ser not in self.service_to_mac.keys():
