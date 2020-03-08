@@ -54,12 +54,10 @@ def parse_cli_args():
     parser_create.add_argument(
         '-t', '--throughput',
         type=float,
-        default=1.0,
         help='Required throughput [Mbps]')
     parser_create.add_argument(
         '-l', '--latency',
         type=float,
-        default=10.0,
         help='Required latency [ms]')
 
 

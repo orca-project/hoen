@@ -34,13 +34,13 @@ class lxd_controller(base_controller):
 
         self._log("Found", len(self.interface_list), "Ethernet ports")
 
-    def prepare_distro_image(self, image_name="ubuntu-19.04"):
+    def prepare_distro_image(self, image_name="hoen-1.0"):
         # Image server locations
         #  image_server = "https://images.linuxcontainers.org"
         image_server = "https://cloud-images.ubuntu.com/releases/"
 
         # Check if we have the right type of distributions
-        if image_name.split("-")[0].lower() != 'ubuntu':
+        if image_name.split("-")[0].lower() != 'ubuntu' and image_name.split("-")[0].lower() != 'hoen':
             raise ValueError('Only supports Ubuntu distributions:', image_name)
 
         # Check if the image is stored in the local repository
@@ -135,15 +135,18 @@ class lxd_controller(base_controller):
             # If attaching an physical ethernet port to it
             if grab_ethernet:
                 # Set the interface's IPenp0s31f6
-                interface_ip = "10.0.{0}.1/24".format(index)
+                interface_ip = "10.0.{0}.1/24".format(int(available_interface[3]))
                 container.execute(
                         ["ip", "addr", "add", interface_ip, "dev", "oth0"])
 
                 self._log("Configured IP:", interface_ip)
 
-            # TODO: Dirty awful way, hate it. It should be a docker.
-            #  Thread(target=container.execute,
-                   #  args=(['python3', '-m', 'http.server'],)).start()
+                # Install routes to allow different network communication
+                container.execute(
+                        ["ip", "route", "add", "default", "dev", "oth0"])
+
+                # Start docker service
+                self.start_service(container, s_ser)
 
         # In case of issues
         except Exception as e:
@@ -172,6 +175,26 @@ class lxd_controller(base_controller):
             return True, {
                 's_id': s_id,
                 "source": interface_ip if grab_ethernet else "127.0.0.1"}
+
+    def start_service(self, container, s_ser):
+        if s_ser == "best-effort":
+            container.execute(
+                    ["docker", "run", "-d", "-p", "21:21", "-v", 
+                    "/root/services:/srv", "-p" "4559-4564:4559-4564", 
+                    "-e", "FTP_USER=orca", "-e", "FTP_PASSWORD=orca", 
+                    "docker.io/panubo/vsftpd:lastest"])
+        if s_ser == "embb":
+            container.execute(
+                    ["docker", "run", "-d", "-p", "5000:5000", "-v", 
+                    "/root/services/:/root/services/", "hoen-video-server"])
+        if s_ser == "urllc":
+            container.execute(
+                    ["docker", "run", "-d", "-p", "9000:9000", "hoen-urllc"])
+
+        # Running iperf3 for any service just for testing
+        container.execute(
+                ["docker", "run", "-d", "-p", "5201:5201", "networkstatic/iperf3", "-s"])
+
 
     def request_slice(self, **kwargs):
       # Extract parameters from keyword arguments
