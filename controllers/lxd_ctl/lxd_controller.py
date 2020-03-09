@@ -6,7 +6,7 @@ from sys import path
 path.append('..')
 
 # Import the Template Controller
-from base_controller.base_controller import base_controller
+from base_controller.base_controller import base_controller, cls
 # Import OS
 import os
 # Import signal
@@ -297,6 +297,8 @@ class lxd_controller(base_controller):
             return True, {"s_id": s_id}
 
 if __name__ == "__main__":
+    # Clear screen
+    cls()
     # Handle keyboard interrupt (SIGINT)
     try:
         # Instantiate the LXD Controller

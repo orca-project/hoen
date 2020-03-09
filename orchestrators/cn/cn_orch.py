@@ -5,14 +5,9 @@ from sys import path
 path.append('..')
 
 # Import the Template Orchestrator
-from base_orchestrator.base_orchestrator import base_orchestrator, ctl_base
-# Import the System and Name methods from the OS module
-from os import system, name
+from base_orchestrator.base_orchestrator import base_orchestrator, ctl_base, cls
 # Import signal
 import signal
-
-def cls():
-    system('cls' if name=='nt' else 'clear')
 
 class core_network_orchestrator(base_orchestrator):
 

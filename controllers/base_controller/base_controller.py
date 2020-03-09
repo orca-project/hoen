@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # Import the environ object from the OS module
-from os import environ
+from os import environ, system, name
 # Import the Thread and Lock objects from the threading module
 from threading import Thread, Lock, Event
 # Import the Pause method of the Signal module
@@ -19,6 +19,10 @@ else:
 
 # Received delay of 10 sec
 RECV_DELAY = 10*1000
+
+def cls():
+    system('cls' if name=='nt' else 'clear')
+
 
 class base_controller(Thread):
 
