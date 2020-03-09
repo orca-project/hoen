@@ -187,6 +187,8 @@ class lxd_controller(base_controller):
                 "source": interface_ip if grab_ethernet else "127.0.0.1"}
 
     def start_service(self, container, s_ser):
+        self._log("Starting Docker Service")
+
         if s_ser == "best-effort":
             container.execute(
                     ["docker", "run", "-d", "-p", "21:21", "-v",
