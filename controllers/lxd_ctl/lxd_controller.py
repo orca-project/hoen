@@ -6,7 +6,7 @@ from sys import path
 path.append('..')
 
 # Import the Template Controller
-from base_controller.base_controller import base_controller
+from base_controller.base_controller import base_controller, cls
 # Import OS
 import os
 # Import signal
@@ -187,6 +187,8 @@ class lxd_controller(base_controller):
                 "source": interface_ip if grab_ethernet else "127.0.0.1"}
 
     def start_service(self, container, s_ser):
+        self._log("Starting Docker Service")
+
         if s_ser == "best-effort":
             container.execute(
                     ["docker", "run", "-d", "-p", "21:21", "-v",
@@ -295,6 +297,8 @@ class lxd_controller(base_controller):
             return True, {"s_id": s_id}
 
 if __name__ == "__main__":
+    # Clear screen
+    cls()
     # Handle keyboard interrupt (SIGINT)
     try:
         # Instantiate the LXD Controller
