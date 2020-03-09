@@ -40,7 +40,7 @@ class lxd_controller(base_controller):
         image_server = "https://cloud-images.ubuntu.com/releases/"
 
         # Check if we have the right type of distributions
-        if image_name.split("-")[0].lower() != 'ubuntu' and image_name.split("-")[0].lower() != 'hoen':
+        if image_name.split("-")[0].lower() not  in ['ubuntu','hoen']:
             raise ValueError('Only supports Ubuntu distributions:', image_name)
 
         # Check if the image is stored in the local repository
@@ -92,8 +92,18 @@ class lxd_controller(base_controller):
                 return False, 'Not enough resources!'
 
         try:
-            #  Prepare image of the chosen distribution
-            s_distro = self.prepare_distro_image()
+
+            # Get the latest hoen immage
+            hoen_images = sorted([x.aliases[0]['name'] for x in
+                                  self.lxd_client.images.all() if x.aliases and
+                                  x.aliases[0]["name"].startswith("hoen")])
+
+            # If there aren't any HOEN images available
+            if not hoen_images:
+                raise ValueError("Missing HOEN images.")
+
+            #  Prepare image of the last HOEN image
+            s_distro = self.prepare_distro_image(hoen_images[-1])
 
         except Exception as e:
             #  Log event and return
@@ -179,13 +189,13 @@ class lxd_controller(base_controller):
     def start_service(self, container, s_ser):
         if s_ser == "best-effort":
             container.execute(
-                    ["docker", "run", "-d", "-p", "21:21", "-v", 
-                    "/root/services:/srv", "-p" "4559-4564:4559-4564", 
-                    "-e", "FTP_USER=orca", "-e", "FTP_PASSWORD=orca", 
+                    ["docker", "run", "-d", "-p", "21:21", "-v",
+                    "/root/services:/srv", "-p" "4559-4564:4559-4564",
+                    "-e", "FTP_USER=orca", "-e", "FTP_PASSWORD=orca",
                     "docker.io/panubo/vsftpd:lastest"])
         if s_ser == "embb":
             container.execute(
-                    ["docker", "run", "-d", "-p", "5000:5000", "-v", 
+                    ["docker", "run", "-d", "-p", "5000:5000", "-v",
                     "/root/services/:/root/services/", "hoen-video-server"])
         if s_ser == "urllc":
             container.execute(
