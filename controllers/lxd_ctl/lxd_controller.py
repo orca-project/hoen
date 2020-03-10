@@ -16,11 +16,13 @@ from psutil import net_if_addrs
 # Import the Client class from the pylxd module
 from pylxd import Client
 
+from time import time
+
 #  from threading import Thread
 
 # Supress pylxd warnings
 os.environ["PYLXD_WARNINGS"] = "none"
-grab_ethernet = False
+grab_ethernet = True
 
 class lxd_controller(base_controller):
 
@@ -114,6 +116,7 @@ class lxd_controller(base_controller):
         # Default container profile configuration
         profile = {'name':  "id-" + s_id,
                    'config': {
+                     'security.nesting': 'true',
                      'limits.cpu': s_cpu,
                      'limits.memory': s_ram + "GB"},
                    'source': {'type': 'image', 'alias': s_distro},
@@ -188,24 +191,16 @@ class lxd_controller(base_controller):
 
     def start_service(self, container, s_ser):
         self._log("Starting Docker Service")
+        t = time()
 
-        if s_ser == "best-effort":
-            container.execute(
-                    ["docker", "run", "-d", "-p", "21:21", "-v",
-                    "/root/services:/srv", "-p" "4559-4564:4559-4564",
-                    "-e", "FTP_USER=orca", "-e", "FTP_PASSWORD=orca",
-                    "docker.io/panubo/vsftpd:lastest"])
-        if s_ser == "embb":
-            container.execute(
-                    ["docker", "run", "-d", "-p", "5000:5000", "-v",
-                    "/root/services/:/root/services/", "hoen-video-server"])
-        if s_ser == "urllc":
-            container.execute(
-                    ["docker", "run", "-d", "-p", "9000:9000", "hoen-urllc"])
-
+        # Ensure docker daemon is already started
+        container.execute(["systemctl", "start", "docker"])
+        # Run required service
+        container.execute(["docker", "start", s_ser])
         # Running iperf3 for any service just for testing
-        container.execute(
-                ["docker", "run", "-d", "-p", "5201:5201", "networkstatic/iperf3", "-s"])
+        container.execute(["docker", "start", "test"])
+
+        self._log("Docker services started in", round(time() - t, 3), "seconds")
 
 
     def request_slice(self, **kwargs):
