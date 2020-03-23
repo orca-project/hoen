@@ -94,7 +94,7 @@ kernelHandle () {
 
 service network-manager stop
 echo "Stopped NM"
-kernelHandle > /root/log/kml.out &
+kernelHandle 
 echo "Configured interface"
 sleep 20
 ifconfig sdr0 192.168.13.1
@@ -103,6 +103,6 @@ ip route add default via 134.226.55.211 dev eth0
 echo "Set default route"
 service isc-dhcp-server restart
 echo "Restarted DHCP server"
-nohup hostapd openwifi/hostapd-openwifi.conf > /root/log/apd.out &
-echo "Started AP"
 sleep 5
+hostapd -B openwifi/hostapd-openwifi.conf 
+echo "Started AP"
