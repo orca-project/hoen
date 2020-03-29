@@ -460,7 +460,8 @@ class hyperstrator_server(Thread):
         else:
             self._log('Skipping RAN')
             # Use a fake source IP
-            radio_msg = {'s_id': s_id, 'destination': '10.30.0.179'}
+            #radio_msg = {'s_id': s_id, 'destination': '10.30.0.179'}
+            radio_msg = {'s_id': s_id, 'destination': '10.20.0.1'}
 
         # If allocating TN slices
         if self.do_transport:

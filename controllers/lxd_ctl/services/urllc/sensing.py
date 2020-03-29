@@ -50,6 +50,8 @@ class sensing(Thread):
         self.direction = ''
 
         self.references = 5 * [kwargs.get('reference', 600)]
+        self.referneces = [600, 600, 600, 600, 800]
+        
         self.speed = kwargs.get('speed', 35)
         self.turn = 44
 
