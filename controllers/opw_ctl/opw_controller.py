@@ -42,9 +42,12 @@ class opw_controller(base_controller):
             # Load mac80211 kernel module
             a = bash("modprobe mac80211")
             self._log("Loaded 'mac80211' kernel module", a.stdout, a.stderr)
-            # Remove SDR kernel module
-            a = bash("rmmod sdr")
-            self._log("Removed 'sdr' kernel module", a.stdout, a.stderr)
+
+            # If the SDR kernel module is loaded
+            if bool(bash("lsmod | grep sdr")):
+                # Remove SDR kernel module
+                a = bash("rmmod sdr")
+                self._log("Removed 'sdr' kernel module", a)
 
             # List of custom kernel modules
             module_list = {"first_batch": ["xilinx_dma", "tx_intf",
@@ -76,56 +79,74 @@ class opw_controller(base_controller):
 
             # Iterate over the first batch
             for submodule in module_list['first_batch']:
-                # Removing current version of the module
-                a = bash("rmmod {0}".format(submodule))
+                # Check whether the module is loaded
+                if bool(bash("lsmod | grep {0}".format(submodule))):
+                    # Removing current version of the module
+                    bash("rmmod {0}".format(submodule))
+                cf = "insmod {0}/{1}.ko".format(openwifi_path, submodule)
+                print(cf)
                 # Installing new version of the module
-                b = bash("insmod '{0}/{1}.ko'".format(openwifi_path, submodule))
+                b = bash(cf)
                 # Check installation of kernel module
+                sleep(1)
                 if not bash("lsmod | grep {0}".format(submodule)).code:
                     self._log("Loaded", submodule, "kernel module")
 
                 else:
                     self._log("Not loaded", submodule, "kernel module")
-                print(submodule, a.stdout, a.stderr, b.stdout, b.stderr)
+                print(submodule, b)
 
             for parameter in device_config["first_batch"].keys():
                 # Update the parameter value
-                a = bash("echo {0} > {1}/{2}".format(
+                cf = "echo {0} > {1}/{2}".format(
                          device_config["first_batch"][parameter],
                          fpga_dev_path,
-                         parameter))
-
+                         parameter)
+                print(cf)
+                a = bash(cf)
+                bash("sync")
+                sleep(0.5)
                 print(parameter, a.stdout, a.stderr)
 
             # Load filter response values
             a = bash("cat {0}/openwifi_ad9361_fir.ftr >" +
-                 "{1}/filter_fir_config".format(fpga_dev_path, openwifi_path))
+                 "{1}/filter_fir_config".format(openwifi_path, fpga_dev_path))
 
             print(a.stdout)
 
             for parameter in device_config["second_batch"].keys():
                 # Update the parameter value
-                a = bash("echo {0} > {1}/{2}".format(
-                         device_config["second_batch"][parameter],
-                         fpga_dev_path,
-                         parameter))
-
+                cf = "echo {0} > {1}/{2}".format(
+                    device_config["second_batch"][parameter],
+                    fpga_dev_path,
+                    parameter)
+                print(cf)
+                a = bash(cf)
+                bash("sync")
+                sleep(0.5)
                 print(parameter, a.stdout, a.stderr)
 
             # Iterate over the second batch
             for submodule in module_list['second_batch']:
-                # Removing current version of the module
-                a = bash("rmmod {0}".format(submodule))
+                # Check whether the module is loaded
+                if bool(bash("lsmod | grep {0}".format(submodule))):
+                    # Removing current version of the module
+                    bash("rmmod {0}".format(submodule))
+
+                cf = "insmod {0}/{1}.ko".format(openwifi_path, submodule)
+                print(cf)
                 # Installing new version of the module
-                b = bash("insmod {0}/{1}.ko".format(openwifi_path, submodule))
+                b = bash(cf)
+                sleep(1)
                 # Check installation of kernel module
                 if not bash("lsmod | grep {0}".format(submodule)).code:
                     self._log("Loaded", submodule, "kernel module")
 
-                print(submodule, a.stdout, a.stderr, b.stdout, b.stderr)
+                print(submodule, b)
 
             # Sleep for 10 seconds and log event
-            sleep(10)
+            self._log("Waiting for configurations to take effect")
+            sleep(20)
             self._log("Configured kernel modules and FPGA")
 
         # If configuring routing and networking
@@ -146,7 +167,7 @@ class opw_controller(base_controller):
             self._log("Restarted DHCP server", a.stdout, a.stderr)
 
             # Sleep for 5 seconds and log event
-            sleep(5)
+            sleep(10)
             self._log("Configured routing and networking")
 
         # If starting the access point
