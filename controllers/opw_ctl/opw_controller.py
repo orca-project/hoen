@@ -32,22 +32,23 @@ class opw_controller(base_controller):
         openwifi_path = kwargs.get("openwifi_path", "/root/openwifi")
 
         # Stop Network Manager
-        bash("service network manager stop")
+        bash("service network-manager stop")
         self._log("Stopped Network Manager")
 
         # If loading kernel modules
         if do_modules:
             fpga_dev_path = "/sys/bus/iio/devices/iio:device2"
+            filter_file = "openwifi_ad9361_fir.ftr"
 
             # Load mac80211 kernel module
-            a = bash("modprobe mac80211")
-            self._log("Loaded 'mac80211' kernel module", a.stdout, a.stderr)
+            bash("modprobe mac80211")
+            self._log("Loaded 'mac80211' kernel module")
 
             # If the SDR kernel module is loaded
             if bool(bash("lsmod | grep sdr")):
                 # Remove SDR kernel module
-                a = bash("rmmod sdr")
-                self._log("Removed 'sdr' kernel module", a)
+                bash("rmmod sdr")
+                self._log("Removed 'sdr' kernel module")
 
             # List of custom kernel modules
             module_list = {"first_batch": ["xilinx_dma", "tx_intf",
@@ -83,10 +84,8 @@ class opw_controller(base_controller):
                 if bool(bash("lsmod | grep {0}".format(submodule))):
                     # Removing current version of the module
                     bash("rmmod {0}".format(submodule))
-                cf = "insmod {0}/{1}.ko".format(openwifi_path, submodule)
-                print(cf)
                 # Installing new version of the module
-                b = bash(cf)
+                bash("insmod {0}/{1}.ko".format(openwifi_path, submodule))
                 # Check installation of kernel module
                 sleep(1)
                 if not bash("lsmod | grep {0}".format(submodule)).code:
@@ -94,37 +93,31 @@ class opw_controller(base_controller):
 
                 else:
                     self._log("Not loaded", submodule, "kernel module")
-                print(submodule, b)
 
+            # Iterate over the first batch of parameters
             for parameter in device_config["first_batch"].keys():
                 # Update the parameter value
-                cf = "echo {0} > {1}/{2}".format(
+                bash("echo {0} > {1}/{2}".format(
                          device_config["first_batch"][parameter],
                          fpga_dev_path,
-                         parameter)
-                print(cf)
-                a = bash(cf)
+                         parameter))
                 bash("sync")
                 sleep(0.5)
-                print(parameter, a.stdout, a.stderr)
 
+            # Filter file string
+            filter_str = "cat {0}/{1} > {2}/filter_fir_config"
             # Load filter response values
-            a = bash("cat {0}/openwifi_ad9361_fir.ftr >" +
-                 "{1}/filter_fir_config".format(openwifi_path, fpga_dev_path))
+            bash(filter_str.format(openwifi_path, filter_file, fpga_dev_path))
 
-            print(a.stdout)
-
+            # Iterate over the second batch of parameters
             for parameter in device_config["second_batch"].keys():
                 # Update the parameter value
-                cf = "echo {0} > {1}/{2}".format(
+                bash("echo {0} > {1}/{2}".format(
                     device_config["second_batch"][parameter],
                     fpga_dev_path,
-                    parameter)
-                print(cf)
-                a = bash(cf)
+                    parameter))
                 bash("sync")
                 sleep(0.5)
-                print(parameter, a.stdout, a.stderr)
 
             # Iterate over the second batch
             for submodule in module_list['second_batch']:
@@ -133,53 +126,51 @@ class opw_controller(base_controller):
                     # Removing current version of the module
                     bash("rmmod {0}".format(submodule))
 
-                cf = "insmod {0}/{1}.ko".format(openwifi_path, submodule)
-                print(cf)
                 # Installing new version of the module
-                b = bash(cf)
+                bash("insmod {0}/{1}.ko".format(openwifi_path, submodule))
                 sleep(1)
                 # Check installation of kernel module
                 if not bash("lsmod | grep {0}".format(submodule)).code:
                     self._log("Loaded", submodule, "kernel module")
 
-                print(submodule, b)
-
             # Sleep for 10 seconds and log event
             self._log("Waiting for configurations to take effect")
-            sleep(20)
+            sleep(10)
             self._log("Configured kernel modules and FPGA")
 
         # If configuring routing and networking
         if do_network:
             # Configure the SDR interface's IP
-            a= bash("ifconfig {0} {1} netmask 255.255.255.0".format(sdr_dev,
+            bash("ifconfig {0} {1} netmask 255.255.255.0".format(sdr_dev,
                                                                  lan_ip))
-            self._log("Set {0} interface IP's to: {1}".format(sdr_dev, lan_ip),
-                      a.stdout, a.stderr)
+            self._log("Set {0} interface IP's to: {1}".format(sdr_dev, lan_ip))
 
             # Set the default route through eth0
-            a = bash("ip route add default via {0} dev eth0".format(gw_ip))
-            self._log("Set default gateway to: {0}".format(gw_ip), a.stdout,
-                      a.stderr)
+            bash("ip route add default via {0} dev eth0".format(gw_ip))
+            self._log("Set default gateway to: {0}".format(gw_ip))
 
             # Restart DHCP server
-            a = bash("service isc-dhcp-server restart")
-            self._log("Restarted DHCP server", a.stdout, a.stderr)
+            bash("service isc-dhcp-server restart")
+            self._log("Restarted DHCP server")
 
             # Sleep for 5 seconds and log event
-            sleep(10)
+            sleep(5)
             self._log("Configured routing and networking")
 
         # If starting the access point
         if do_ap:
+            # If there is a Host AP Daemon running in the background
+            if bool(bash("ps -aux | grep [h]ostapd")):
+                # Kill the process
+                bash("killall hostapd")
+                self._log("Stopped existing hostapd instances")
+
             # Start Host AP Daemon in the background and log event
-            a = bash("hostapd -B {0}".format(ap_config_path))
+            apd = bash("hostapd -B {0}".format(ap_config_path)).code
 
-            apd = a.code
             # Log event
-            self._log(a.stdout, a.stderr, "Configured access point" if apd else \
+            self._log("Configured access point" if not apd else \
                       "Access point not initialised.")
-
 
 
     def create_slice(self, **kwargs):
@@ -226,8 +217,8 @@ if __name__ == "__main__":
             request_msg='owc_rrs',
             update_msg='owc_urs',
             delete_msg='owc_drs',
-            do_modules=True,
-            do_network=True,
+            do_modules=False,
+            do_network=False,
             do_ap=True,
             host='0.0.0.0',
             port=3100)
