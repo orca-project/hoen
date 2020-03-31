@@ -16,6 +16,10 @@ from time import sleep
 # Import the bash method from the bash module
 from bash import bash
 
+# Import datetime and timedelta from the Datetime module
+from datetime import datetime, timedelta
+
+
 class opw_controller(base_controller):
 
     def post_init(self, **kwargs):
@@ -176,8 +180,39 @@ class opw_controller(base_controller):
     def create_slice(self, **kwargs):
        # Extract parameters from keyword arguments
         s_id = str(kwargs.get('s_id', None))
-
+        #  s_ser = kwargs.get('service', "best-effort")
+        s_mac = kwargs.get('mac_addres', None)
+        s_air = keargs.get
         # Return state
+
+        # check if the MAC is somewhere else firs
+        # check if we have enough resources
+
+
+
+        lease_template = 'lease {0} {\n  starts 2 {1};' + \
+        '\n  ends 2 {2};\n  tstp 2 {2};\n  cltt 2 {2};' + \
+        '\n  binding state active;\n  next binding state free;' + \
+        '\n  rewind binding state free;\n  hardware ethernet {3};' + \
+        '\n  client-hostname "client";\n}\n'
+
+        # Get the time now, calculate the lease end and format to strings
+        time_now = datetime.now()
+        lease_start = time_now.strftime('%Y/%m/%d %X')
+        lease_end = (time_now+timedelta(minutes=10)).strftime('%Y/%m/%d %X')
+
+        # Fill the lease template with the ne
+        lease = lease_template.format(lease_ip, lease_start, lease_end, s_mac)
+
+        # Include the new lease
+        bash("cat {0} >> /var/lib/dhcp/dhcpd.leases".format(lease))
+
+        # Restart DHCP server to make changes effective
+        bash("service isc-dhcp-server restart")
+
+        # Add MAC address to SDRCTL
+        bash("sdrctl dev sdr0 set addr{0} {1}".format(slice_no, mac_red))
+
         return True, {"s_id": s_id, "destination": "10.30.0.179"}
 
 
@@ -217,8 +252,8 @@ if __name__ == "__main__":
             request_msg='owc_rrs',
             update_msg='owc_urs',
             delete_msg='owc_drs',
-            do_modules=False,
-            do_network=False,
+            do_modules=True,
+            do_network=True,
             do_ap=True,
             host='0.0.0.0',
             port=3100)
