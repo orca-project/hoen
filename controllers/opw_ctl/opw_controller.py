@@ -183,13 +183,31 @@ class opw_controller(base_controller):
         #  s_ser = kwargs.get('service', "best-effort")
         s_mac = kwargs.get('mac_addres', None)
         s_air = keargs.get
-        # Return state
 
-        # check if the MAC is somewhere else firs
+        # If the MAC address is invalid
+        if not s_mac or s_mac is None:
+            return False, "Malformatted MAC address:" + str(s_mac)
+
+        # Check whether the entered MAC address is already being used
+        #existing_mac = False
+        # Iterate over the current slices
+        for s_id in self.s_ids:
+            # If matching the MAC address
+            if s_mac == s_id['mac']:
+                # Toggle flag and break
+                #existing_mac = True
+                #break
+                return False, "MAC address already associated to slice: " + s_id
+
+        # Get MAC address associated with service and map it to 32 bits
+        s_mac_32 = s_mac.replace(":","")[4:]
+
+        # Add MAC address to SDRCTL
+        bash("sdrctl dev sdr0 set addr{0} {1}".format(slice_no, mac_red))
+
+
+
         # check if we have enough resources
-
-
-
         lease_template = 'lease {0} {\n  starts 2 {1};' + \
         '\n  ends 2 {2};\n  tstp 2 {2};\n  cltt 2 {2};' + \
         '\n  binding state active;\n  next binding state free;' + \
@@ -209,9 +227,6 @@ class opw_controller(base_controller):
 
         # Restart DHCP server to make changes effective
         bash("service isc-dhcp-server restart")
-
-        # Add MAC address to SDRCTL
-        bash("sdrctl dev sdr0 set addr{0} {1}".format(slice_no, mac_red))
 
         return True, {"s_id": s_id, "destination": "10.30.0.179"}
 
@@ -252,9 +267,9 @@ if __name__ == "__main__":
             request_msg='owc_rrs',
             update_msg='owc_urs',
             delete_msg='owc_drs',
-            do_modules=True,
-            do_network=True,
-            do_ap=True,
+            do_modules=False,
+            do_network=False,
+            do_ap=False,
             host='0.0.0.0',
             port=3100)
 

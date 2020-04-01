@@ -49,17 +49,18 @@ class radio_access_network_orchestrator(base_orchestrator):
 
         # Check whether the type of service is known
         if s_ser not in self.service_to_mac.keys():
-            return False, "Invalid type of service:" + str(s_ser)
+                return False, "Invalid type of service: " + str(s_ser)
 
-        # Get MAC address associated with service and map it to 32 bits
-        s_mac = self.service_to_mac[s_ser].replace(":","")[4:]
+        # Get MAC address associated with service
+        s_mac = self.service_to_mac[s_ser]
 
         # TODO Calculate the amount of resources
+        i_start = 0
+        i_end   = 49999
+        i_total = 50000
 
         # TODO decide which slice to use
         i_sln = 0
-
-        # TODO Implement function to create new slice
 
         # Send message to OpenWiFi RAN controller
         self._log("Service:", s_ser, 'Requirements:', s_req, "Slice #", i_sln)
@@ -67,14 +68,17 @@ class radio_access_network_orchestrator(base_orchestrator):
 
         # Send the message to create a slice
         success, msg = self.opw_ctl.create_slice(
-            **{'s_id': s_id, 's_mac': s_mac, "i_sln": i_sln})
+            **{'s_id': s_id, 's_mac': s_mac, "i_sln": i_sln,
+               'i_start': i_start, 'i_end': i_end, 'i_total': i_total})
 
-        # Append it to the list of service IDs
-        self.s_ids[s_id] = {"requirements": s_req,
-                            "service": s_ser,
-                            "slice": {"index": i_sln},
-                            "MAC": (self.service_to_mac[s_ser], s_mac),
-                            "destination": msg['destination']}
+        if success:
+            # Append it to the list of service IDs
+            self.s_ids[s_id] = {"requirements": s_req,
+                                "service": s_ser,
+                                "slice": {"index": i_sln},
+                                "MAC": s_mac,
+                                "destination": msg['destination']}
+
 
         # Inform the user about the creation
         return success, msg
