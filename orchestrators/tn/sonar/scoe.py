@@ -33,10 +33,10 @@ class scoe(Thread):
         self.shutdown_flag = Event()
         self._server_bind(host, port)
         catalog = ndb()
-        #agent = catalog.add_local_agent('sonar-req02', '10.0.0.30', 'ith0', 's01', 5)
-        #agent = catalog.add_local_agent('sonar-p01', '10.1.0.1', 'ith0', 's05', 3)
-        agent = catalog.add_local_agent('sonar-local-agent01', '100.1.3.3', 'sth01', 's01', 1)
-        agent = catalog.add_local_agent('sonar-local-agent02', '100.1.3.4', 'sth01', 's05', 4)
+        agent = catalog.add_local_agent('sonar-req02', '10.0.0.30', 'ith0', 's01', 5)
+        agent = catalog.add_local_agent('sonar-p01', '10.1.0.1', 'ith0', 's05', 3)
+        #agent = catalog.add_local_agent('sonar-local-agent01', '100.1.3.3', 'sth01', 's01', 1)
+        #agent = catalog.add_local_agent('sonar-local-agent02', '100.1.3.4', 'sth01', 's05', 4)
 
     # Bind server to socket
     def _server_bind(self, host, port):
@@ -53,6 +53,7 @@ class scoe(Thread):
             try:
                 # Wait for request
                 request = self.socket.recv_json()
+                _time = time.time()
             # If nothing was received during the timeout
             except zmq.Again:
                 # Try again
@@ -78,6 +79,8 @@ class scoe(Thread):
                             }
                 # print('scoe resp: ', resp)
                 self.send_msg(resp)
+                print('scoe time', request.get('type'), time.time() - _time)
+
 
         # Terminate zmq
         self.socket.close()
@@ -152,7 +155,9 @@ class scoe(Thread):
     def configure_flow_rules(self, src_agent, dst_agent):
         engine = PathEngine()
         catalog = ndb()
+        _time = time.time()
         topology = self.get_topology()
+        print('ovs get topology time', time.time() - _time)
         paths = engine.get_paths(topology, src_agent.get('switch'), dst_agent.get('switch'))
         src = []
         for path in paths:
@@ -171,10 +176,12 @@ class scoe(Thread):
                 'switches': switches
                 }
             s_id = str(uuid4())
+            _time = time.time()
             success, msg = self.orch.ovs_ctl.create_slice(
                 **{'s_id': s_id,
                     'route': route
                     })
+            print('ovs LA config. time', time.time() - _time)
             if not success:
                 return None
             addresses = src_host + '-' + dst_agent.get('host')

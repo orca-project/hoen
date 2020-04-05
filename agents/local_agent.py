@@ -59,6 +59,7 @@ class local_agent_server(Thread):
 
     def run(self):
         print('- Started SONAr local agent')
+        _time = time.time()
         t_id = str(uuid4())
         req = {
                 "t_id": t_id,
@@ -68,6 +69,7 @@ class local_agent_server(Thread):
         (status, resp) = self._send_config_msg(req)
         if resp.get('result_code') == 0 and resp.get('type') == 'config_resp':
             self.boot_service(resp)
+            print('boot _time', time.time() - _time)
             self.collect_metrics()
         else:
             print('- Error trying get config information', resp)
@@ -91,7 +93,7 @@ class local_agent_server(Thread):
             (status, resp) = self._send_msg(req)
             print('status', status)
             print('resp', resp)
-            time.sleep(1)
+            time.sleep(0.0001)
 
     def boot_service(self, operation):
         self.management_iface = operation.get('management_iface')
@@ -160,7 +162,7 @@ if __name__ == "__main__":
     cls()
 
     try:
-        sonar_host = '100.1.2.1'
+        sonar_host = '10.0.0.2'
         port = 5500
         local_agent_thread = local_agent_server(sonar_host, port)
         local_agent_thread.start()

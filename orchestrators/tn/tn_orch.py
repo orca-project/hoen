@@ -33,7 +33,7 @@ class tn_orchestrator(base_orchestrator):
             name="OVS",
             host_key="ovs_host",
             port_key="ovs_port",
-            default_host="127.0.0.1",
+            default_host="10.0.0.5",
             default_port="3200",
             request_key="ovs_req",
             reply_key="ovs_rep",
@@ -46,21 +46,22 @@ class tn_orchestrator(base_orchestrator):
         # setting link speeds manually
         # TODO: to create a service to fetch these values automatically from ovsdb or ofconfig
         catalog = ndb()
-        catalog.set_link_capacity('s01','s02', 30)
-        catalog.set_link_capacity('s02','s01', 30)
-        catalog.set_link_capacity('s01','s03', 30)
-        catalog.set_link_capacity('s03','s01', 30)
-        catalog.set_link_capacity('s02','s05', 30)
-        catalog.set_link_capacity('s05','s02', 30)
-        catalog.set_link_capacity('s03','s04', 30)
-        catalog.set_link_capacity('s04','s03', 30)
-        catalog.set_link_capacity('s04','s05', 30)
-        catalog.set_link_capacity('s05','s04', 30)
+        catalog.set_link_capacity('s01','s02', 100)
+        catalog.set_link_capacity('s02','s01', 100)
+        catalog.set_link_capacity('s01','s03', 100)
+        catalog.set_link_capacity('s03','s01', 100)
+        catalog.set_link_capacity('s02','s05', 100)
+        catalog.set_link_capacity('s05','s02', 100)
+        catalog.set_link_capacity('s03','s04', 100)
+        catalog.set_link_capacity('s04','s03', 100)
+        catalog.set_link_capacity('s04','s05', 100)
+        catalog.set_link_capacity('s05','s04', 100)
 
         '''
         Setting known hosts and networks manually.
         It could be automatic if we develop LLDP and ARP functions in the ovs controller...
         ... but it is out of scope.
+        '''
         '''
         catalog.add_network('10.0.4.0/24', 's01', 4)
         catalog.add_network('10.0.5.0/24', 's01', 5)
@@ -68,6 +69,9 @@ class tn_orchestrator(base_orchestrator):
         catalog.add_network('10.0.7.0/24', 's01', 7)
         catalog.add_network('10.20.0.0/24', 's05', 3)
         catalog.add_network('10.30.0.0/24', 's05', 3)
+        '''
+        catalog.add_network('10.0.0.0/24', 's01', 1)
+        catalog.add_network('10.1.0.0/24', 's05', 3)
 
     def create_slice(self, **kwargs):
         catalog = ndb()
@@ -76,6 +80,7 @@ class tn_orchestrator(base_orchestrator):
         s_id = kwargs.get('s_id', None)
         source, destination = self.get_address_params(kwargs)
         requirements = kwargs.get('requirements', None)
+        _last_path = kwargs.get('_last_path', None)
 
         # Append it to the list of service IDs
         self.s_ids[s_id] = requirements
@@ -93,7 +98,7 @@ class tn_orchestrator(base_orchestrator):
         catalog.set_topology(topology)
 
         # Define the route which can support the required QoS
-        route = self.build_route(topology, source, destination, requirements)
+        route = self.build_route(topology, source, destination, requirements, _last_path)
 
         if route is None:
             # Send error message
@@ -106,11 +111,12 @@ class tn_orchestrator(base_orchestrator):
         self._log('Delegating it to the OVS Controller')
 
         # Send the message to create a slice
+        _time = time()
         success, msg = self.ovs_ctl.create_slice(
                 **{'s_id': s_id,
                     'route': route
                     })
-
+        print('create slice _time', time() - _time)
         print('success', (time()-st)*1000, 'ms')
 
         if success:
@@ -140,8 +146,10 @@ class tn_orchestrator(base_orchestrator):
                 return False, 'Route not found for s_id ' + s_id
 
         # Send message to remove slice
+        _time = time()
         success, msg = self.ovs_ctl.delete_slice(**{'s_id': s_id,
                                                     'route': route})
+        print('delete slice _time', time() - _time)
         if success:
             path = route['path']
             for p in range(0, len(path) - 1):
@@ -155,6 +163,7 @@ class tn_orchestrator(base_orchestrator):
 
     # TODO: initial version is using create_slice service. Change it to have its own services.
     def reconfigure_slice(self, **kwargs):
+        _time = time()
         s_id = kwargs.get('s_id', None)
         catalog = ndb()
         old_route = catalog.get_route(s_id)
@@ -168,7 +177,8 @@ class tn_orchestrator(base_orchestrator):
                         'source': source,
                         'destination': destination,
                         'requirements': {'throughput': throughput,
-                                      'latency': latency}
+                                      'latency': latency},
+                        '_last_path': old_route.get('path_string')
                      }
         print('slice args ', slice_args)
         (success, msg) = self.create_slice(**slice_args)
@@ -199,6 +209,7 @@ class tn_orchestrator(base_orchestrator):
                 route_to_delete = self.generate_route_to_delete(old_route, switches)
                 success, msg = self.delete_slice(**{'s_id': s_id,
                                                             'route': route_to_delete})
+        print('recovery time', time() - _time)
         return success, msg
 
 
@@ -223,7 +234,7 @@ class tn_orchestrator(base_orchestrator):
                 break
         return resp
 
-    def build_route(self, topology, src, dst, requirements):
+    def build_route(self, topology, src, dst, requirements, _last_path):
         catalog = ndb()
         engine = PathEngine()
 
@@ -236,7 +247,7 @@ class tn_orchestrator(base_orchestrator):
             return None
 
         # Define the path to apply
-        path = engine.get_path(topology, src_network.get('switch'), dst_network.get('switch'), requirements)
+        path = engine.get_path(topology, src_network.get('switch'), dst_network.get('switch'), requirements, _last_path)
         print('path ', path)
         if path is None:
             return None

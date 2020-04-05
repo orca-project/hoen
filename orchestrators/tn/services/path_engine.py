@@ -6,15 +6,15 @@ from collections import defaultdict
 
 class PathEngine():
 
-    def get_path(self, topology, src, dst, requirements):
+    def get_path(self, topology, src, dst, requirements, _last_path):
         catalog = ndb()
         catalog.init_arrays()
         paths = self.get_paths(topology, src, dst)
         print('paths', paths)
-        path = self.get_capable_path(paths, requirements)
+        path = self.get_capable_path(paths, requirements, _last_path)
         return path
 
-    def get_capable_path(self, paths, requirements):
+    def get_capable_path(self, paths, requirements, _last_path):
         print('requirements', requirements)
         catalog = ndb()
         throughput = 0
@@ -22,7 +22,7 @@ class PathEngine():
             # If our platform can support other QoS in the future, please add them as 'if' below:
             if requirements.get('latency') is not None:
                 print('latency qos')
-                paths = self.get_latency_comply_paths(paths, requirements.get('latency'))
+                paths = self.get_latency_comply_paths(paths, requirements.get('latency'), _last_path)
                 print('paths', paths)
             if requirements.get('throughput') is not None:
                 print('throughput qos')
@@ -39,14 +39,15 @@ class PathEngine():
                 catalog.add_flow_count(path[p], path[p + 1], 1)
         return path
 
-    def get_latency_comply_paths(self, paths, latency):
+    def get_latency_comply_paths(self, paths, latency, _last_path):
         catalog = ndb()
         comply_paths = []
         for path in paths:
             path_string = '-'.join(map(str, path))
             metric = catalog.get_path_latency(path_string)
             if metric is not None and metric.get('max') != -1 and float(metric.get('max')) < float(latency):
-                comply_paths.append(path)
+                if _last_path is None or path_string != _last_path:
+                    comply_paths.append(path)
         return comply_paths
 
     def get_throughput_comply_path(self, paths, throughput):
