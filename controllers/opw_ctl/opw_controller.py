@@ -7,8 +7,6 @@ path.append('..')
 
 # Import the Template Controller
 from base_controller.base_controller import base_controller
-# Import OS
-import os
 # Import signal
 import signal
 # Import the Sleep function from the Time module
@@ -19,6 +17,9 @@ from bash import bash
 # Import datetime and timedelta from the Datetime module
 from datetime import datetime, timedelta
 
+# Import the Lease objects from the ISC DHCP Leases module
+from isc_dhcp_leases import Lease, IscDhcpLeases
+
 
 class opw_controller(base_controller):
 
@@ -28,8 +29,8 @@ class opw_controller(base_controller):
         do_network = kwargs.get("do_network", True)
         do_ap = kwargs.get("do_ap", True)
         # Extra options
-        sdr_dev = kwargs.get("sdr_dev", "sdr0")
-        lan_ip = kwargs.get("lan_ip", "192.168.13.1")
+        self.sdr_dev = kwargs.get("sdr_dev", "sdr0")
+        self.lan_ip = kwargs.get("lan_ip", "192.168.13.1")
         gw_ip = kwargs.get("gw_ip", "134.226.55.211")
         ap_config_path = kwargs.get("ap_path",
                                     "/root/openwifi/hostapd-openwifi.conf")
@@ -145,9 +146,10 @@ class opw_controller(base_controller):
         # If configuring routing and networking
         if do_network:
             # Configure the SDR interface's IP
-            bash("ifconfig {0} {1} netmask 255.255.255.0".format(sdr_dev,
+            bash("ifconfig {0} {1} netmask 255.255.255.0".format(self.sdr_dev,
                                                                  lan_ip))
-            self._log("Set {0} interface IP's to: {1}".format(sdr_dev, lan_ip))
+            self._log("Set {0} interface IP's to: {1}".format(self.sdr_dev,
+                                                              lan_ip))
 
             # Set the default route through eth0
             bash("ip route add default via {0} dev eth0".format(gw_ip))
@@ -177,58 +179,161 @@ class opw_controller(base_controller):
                       "Access point not initialised.")
 
 
+
+        # TODO This ought to change in the future
+        # List of currently support RAN slices
+        self.ran_slice_list = [{"index": 0, "available": True,
+                                "index": 1, "available": True,
+                                #  "index": 2, "available": True,
+                                ]
+
+        # Iterate over existing slices
+        for ran_slice in self.ran_slice_list:
+            # Clear MAC addresses associated with slice
+            cls =  bash("sdrctl dev {0} set addr{1} {2}".format(
+                    self.sdr_dev,
+                    ran_slice['index'],
+                    "00000000")).code
+
+            # Log event
+            self._log("Failed clearing slices #" if cls else "Cleared slice #",
+                      ran_slice["index"])
+
+        # Get list of DHCP leases
+        self.dhcp_leases = IscDhcpLeases('/var/lib/dhcp/dhcpd.leases')
+        # Create a list of possible client IPs
+        self.dhcp_range = set(".".join(self.lan_ip.split(".")[:-1]) + "." +
+                                str(x) for x in range(100,200))
+
+
+
     def create_slice(self, **kwargs):
-       # Extract parameters from keyword arguments
+        # Extract parameters from keyword arguments
         s_id = str(kwargs.get('s_id', None))
-        #  s_ser = kwargs.get('service', "best-effort")
-        s_mac = kwargs.get('mac_addres', None)
-        s_air = keargs.get
+        s_mac = kwargs.get('s_mac', None)
+        i_sln = int(keargs.get('i_sln', 0))
+        slice_config = kwargs.get("slice_config", None)
 
         # If the MAC address is invalid
         if not s_mac or s_mac is None:
             return False, "Malformatted MAC address:" + str(s_mac)
 
-        # Check whether the entered MAC address is already being used
-        #existing_mac = False
         # Iterate over the current slices
-        for s_id in self.s_ids:
-            # If matching the MAC address
-            if s_mac == s_id['mac']:
-                # Toggle flag and break
-                #existing_mac = True
-                #break
-                return False, "MAC address already associated to slice: " + s_id
+        for sid in self.s_ids:
+            # Check whether the entered MAC address is already being used
+            if s_mac == sid['mac']:
+                # Return error
+                return False, "MAC address already associated to slice: " + sid
 
-        # Get MAC address associated with service and map it to 32 bits
-        s_mac_32 = s_mac.replace(":","")[4:]
+        # Check whether there an available slice
+        if not any(x['available'] for x in self.ran_slice_list):
+            # If not, return error
+            return False, "Not available slices, please remove an existing one"
 
-        # Add MAC address to SDRCTL
-        bash("sdrctl dev sdr0 set addr{0} {1}".format(slice_no, mac_red))
+        # Check whether the slice number is valid
+        elif i_sln is not in [x['index'] for x in self.ran_slices]
+            # If not, return error
+            return False, "Invalid slice number:" + str(i_sln)
 
 
+        # If setting a specific configuration for the slice
+        if slice_config is not None:
+            # Get the slice configuration parameters
+            start = int(slice_config.get("i_start", 0))
+            end   = int(slice_config.get("i_end",   49999))
+            total = int(slice_config.get("i_total", 50000))
 
-        # check if we have enough resources
+            # Set the slice configuration
+            bash("sdrctl dev {0} set slice_start{1} {2}".format(self.sdr_dev,
+                                                                i_sln, start))
+            bash("sdrctl dev {0} set slice_end{1}   {2}".format(self.sdr_dev,
+                                                                i_sln, end))
+            bash("sdrctl dev {0} set slice_total{1} {2}".format(self.sdr_dev,
+                                                                i_sln, total))
+
+            # Log event
+            self._log("Set slice", i_sln, " start/end/total to",
+                      start, "/", end, "/", total)
+
+        # Lease template
         lease_template = 'lease {0} {\n  starts 2 {1};' + \
         '\n  ends 2 {2};\n  tstp 2 {2};\n  cltt 2 {2};' + \
         '\n  binding state active;\n  next binding state free;' + \
         '\n  rewind binding state free;\n  hardware ethernet {3};' + \
         '\n  client-hostname "client";\n}\n'
 
+
+        # Container to hold the lease IP
+        lease_ip = ""
+
+        # Get the list of current leases
+        current_leases = self.dhcp_leases.get_current()
+        # If there are current leases
+        if current_leases:
+            # Get the currently used IPs
+            current_ips = [current_leases[mac].ip for mac in current_leases]
+            # Diff that from the IP ranges the get the first in order
+            lease_ip = sorted(self.dhcp_range.difference(current_ips))[0]
+
+        else:
+            # Assign the first IP in the range
+            lease_ip = sorted(self.dhcp_range)[0]
+
         # Get the time now, calculate the lease end and format to strings
         time_now = datetime.now()
         lease_start = time_now.strftime('%Y/%m/%d %X')
         lease_end = (time_now+timedelta(minutes=10)).strftime('%Y/%m/%d %X')
 
-        # Fill the lease template with the ne
+        # Fill the lease template with the times and IP
         lease = lease_template.format(lease_ip, lease_start, lease_end, s_mac)
 
-        # Include the new lease
+        # Append the new lease to the lease list
         bash("cat {0} >> /var/lib/dhcp/dhcpd.leases".format(lease))
+
+        # Log event
+        self._log("Set IP to", lease_ip, ", valid until", lease_end)
 
         # Restart DHCP server to make changes effective
         bash("service isc-dhcp-server restart")
 
-        return True, {"s_id": s_id, "destination": "10.30.0.179"}
+        # Get MAC address associated with service and map it to 32 bits
+        s_mac_32 = s_mac.replace(":","")[4:]
+
+        # Add MAC address to SDRCTL
+        sla = bash("sdrctl dev {0} set addr{1} {2}".format(
+            self.sdr_dev,
+            i_sln,
+            s_mac_32)).code
+
+        if sla:
+            return False, "Slice creation railed."
+
+        # Iterate over the slice slice
+        for i, x in enumerate(self.ran_slices):
+            # If matching the slice number
+            if x["index"] == i_sln:
+                # Toggle flag
+                self.ran_sliced[i]['available'] = False
+
+        # Create a slice entry
+        self.s_ids[s_id] = {"mac": s_mac,
+                            "slice": i_sln,
+                            "destination": lease_ip}
+
+        # If there's a custom slice configuration
+        if slice_config is not None:
+            # Append it to the slice dictionary
+            self.s_ids[s_id].update(
+                {"slice_config":{
+                    "start": int(slice_config.get("i_start", 0)),
+                    "end":   int(slice_config.get("i_end",   49999)),
+                   "total": int(slice_config.get("i_total", 50000))
+            }})
+
+        # Log event
+        self._log("Created slice", s_id)
+
+        return True, {"s_id": s_id, "destination": lease_ip}
 
 
     def request_slice(self, **kwargs):
@@ -269,7 +374,7 @@ if __name__ == "__main__":
             delete_msg='owc_drs',
             do_modules=False,
             do_network=False,
-            do_ap=False,
+            do_ap=True,
             host='0.0.0.0',
             port=3100)
 

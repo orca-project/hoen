@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+<Up>
 # Hack to load parent module
 from sys import path
 path.append('..')
@@ -10,6 +10,7 @@ from base_orchestrator.base_orchestrator import base_orchestrator, ctl_base
 from os import system, name
 # Import signal
 import signal
+
 
 def cls():
     system('cls' if name=='nt' else 'clear')
@@ -69,7 +70,11 @@ class radio_access_network_orchestrator(base_orchestrator):
         # Send the message to create a slice
         success, msg = self.opw_ctl.create_slice(
             **{'s_id': s_id, 's_mac': s_mac, "i_sln": i_sln,
-               'i_start': i_start, 'i_end': i_end, 'i_total': i_total})
+               'slice_config': {
+                   'i_start': i_start,
+                   'i_end': i_end,
+                   'i_total': i_total}
+               })
 
         if success:
             # Append it to the list of service IDs
@@ -136,7 +141,7 @@ class radio_access_network_orchestrator(base_orchestrator):
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
 
-        # Get service infroamtion
+        # Get service information
         s_req = self.s_ids[s_id]["requirements"]
         s_ser = self.s_ids[s_id]["service"]
         i_sln = self.s_ids[s_id]["slice"]["index"]

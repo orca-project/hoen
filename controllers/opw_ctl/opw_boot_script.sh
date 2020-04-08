@@ -4,7 +4,7 @@
 # Default parameters
 lan="192.168.13.1"
 gw="134.226.55.211"
-ap="openwifi/hostapd-openwifi.conf"
+ap="/root/openwifi/hostapd-openwifi.conf"
 ftp=false
 
 
