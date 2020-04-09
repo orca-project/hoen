@@ -316,19 +316,30 @@ class opw_controller(base_controller):
                 self.ran_slice_list[i]['available'] = False
 
         # Create a slice entry
-        self.s_ids[s_id] = {"mac": s_mac,
-                            "slice": i_sln,
-                            "destination": lease_ip}
+        self.s_ids[s_id] = {
+            "mac": s_mac,
+            "ip": lease_ip,
+            "slice": {"number": i_sln}
+        }
 
+        # Container to hold slice configuration
+        config = {}
         # If there's a custom slice configuration
         if slice_config is not None:
-            # Append it to the slice dictionary
-            self.s_ids[s_id].update(
-                {"slice_config":{
-                    "start": int(slice_config.get("i_start", 0)),
-                    "end":   int(slice_config.get("i_end",   49999)),
-                   "total": int(slice_config.get("i_total", 50000))
-            }})
+            # Get the present values and include them in the dictionary
+            config = {
+                "start": int(slice_config.get("i_start", 0)),
+                "end":   int(slice_config.get("i_end",   49999)),
+                "total": int(slice_config.get("i_total", 50000))
+            }
+
+        # Or else, use default values
+        else:
+            config = {"start": 0, "end": 49999, "total": 50000}
+
+        # Include slice configuration into the SID dictionary
+        self.s_ids[s_id]["slice"].update(config)
+
 
         # Log event
         self._log("Created slice", s_id)
@@ -337,11 +348,30 @@ class opw_controller(base_controller):
 
 
     def request_slice(self, **kwargs):
-       # Extract parameters from keyword arguments
-       s_id = kwargs.get('s_id', None)
+        # Extract parameters from keyword arguments
+        s_id = kwargs.get('s_id', None)
 
-       # Return state
-       return True, {s_id: {"start": 0, "end": 9, "length": 10}}
+        # Container to told the requested information
+        msg = {}
+        # Iterate over all slices
+        for ran_slice in self.s_ids:
+            # If requesting info about a specific S_ID but it is not a match
+            if s_id and s_id != ran_slice:
+                continue
+
+            # Log event
+            self._log("Found virtual radio:", ran_slice)
+
+            # Append this information to the output dictionary
+            msg[s_id] = {
+                "mac": self.s_ids[ran_slice]["mac"],
+                "ip": self.s_ids[ran_slice]["destination"],
+                "slice": self.s_ids[ran_slice]["slice"]
+            }
+
+        # Return flag and dictionary in case positive
+        return (False, "Virtual radio missing") if \
+            (s_id and not msg) else (True, msg)
 
 
     def update_slice(self, **kwargs):
@@ -355,6 +385,15 @@ class opw_controller(base_controller):
     def delete_slice(self, **kwargs):
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
+
+        # iterate over all slices
+        for ran_slice in self.s_ids:
+            # If requesting info about a specific S_ID but it is not a match
+            if s_id and s_id != ran_slice:
+                continue
+
+
+
 
         # Return state
         return True, {"s_id": s_id}

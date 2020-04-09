@@ -53,7 +53,7 @@ class radio_access_network_orchestrator(base_orchestrator):
                 return False, "Invalid type of service: " + str(s_ser)
 
         # Get MAC address associated with service
-        s_mac = self.service_to_mac['urllc']
+        s_mac = self.service_to_mac[s_ser]
 
         # TODO Calculate the amount of resources
         i_start = 0
@@ -66,8 +66,6 @@ class radio_access_network_orchestrator(base_orchestrator):
         # Send message to OpenWiFi RAN controller
         self._log("Service:", s_ser, 'Requirements:', s_req, "Slice #", i_sln)
         self._log('Delegating it to the OPW Controller')
-
-        print({'s_id': s_id, 's_mac': s_mac, "i_sln": i_sln})
 
         # Send the message to create a slice
         success, msg = self.opw_ctl.create_slice(
