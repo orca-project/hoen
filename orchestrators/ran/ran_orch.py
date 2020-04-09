@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-<Up>
+
 # Hack to load parent module
 from sys import path
 path.append('..')
@@ -23,8 +23,8 @@ class radio_access_network_orchestrator(base_orchestrator):
             name="OPW",
             host_key="OPW_host",
             port_key="OPW_port",
-            default_host="0.0.0.0",
-            default_port="3300",
+            default_host="127.0.0.1",
+            default_port="3100",
             request_key="opw_req",
             reply_key="opw_rep",
             create_msg='owc_crs',
@@ -53,19 +53,21 @@ class radio_access_network_orchestrator(base_orchestrator):
                 return False, "Invalid type of service: " + str(s_ser)
 
         # Get MAC address associated with service
-        s_mac = self.service_to_mac[s_ser]
+        s_mac = self.service_to_mac['urllc']
 
         # TODO Calculate the amount of resources
         i_start = 0
-        i_end   = 49999
+        i_end   = 19999
         i_total = 50000
 
         # TODO decide which slice to use
-        i_sln = 0
+        i_sln = 1
 
         # Send message to OpenWiFi RAN controller
         self._log("Service:", s_ser, 'Requirements:', s_req, "Slice #", i_sln)
         self._log('Delegating it to the OPW Controller')
+
+        print({'s_id': s_id, 's_mac': s_mac, "i_sln": i_sln})
 
         # Send the message to create a slice
         success, msg = self.opw_ctl.create_slice(

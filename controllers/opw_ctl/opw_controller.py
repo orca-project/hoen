@@ -182,10 +182,10 @@ class opw_controller(base_controller):
 
         # TODO This ought to change in the future
         # List of currently support RAN slices
-        self.ran_slice_list = [{"index": 0, "available": True,
-                                "index": 1, "available": True,
+        self.ran_slice_list = [{"index": 0, "available": True},
+                               {"index": 1, "available": True},
                                 #  "index": 2, "available": True,
-                                ]
+                            ]
 
         # Iterate over existing slices
         for ran_slice in self.ran_slice_list:
@@ -203,7 +203,7 @@ class opw_controller(base_controller):
         self.dhcp_leases = IscDhcpLeases('/var/lib/dhcp/dhcpd.leases')
         # Create a list of possible client IPs
         self.dhcp_range = set(".".join(self.lan_ip.split(".")[:-1]) + "." +
-                                str(x) for x in range(100,200))
+                                str(x) for x in range(110,200))
 
 
 
@@ -211,7 +211,7 @@ class opw_controller(base_controller):
         # Extract parameters from keyword arguments
         s_id = str(kwargs.get('s_id', None))
         s_mac = kwargs.get('s_mac', None)
-        i_sln = int(keargs.get('i_sln', 0))
+        i_sln = int(kwargs.get('i_sln', 0))
         slice_config = kwargs.get("slice_config", None)
 
         # If the MAC address is invalid
@@ -221,19 +221,20 @@ class opw_controller(base_controller):
         # Iterate over the current slices
         for sid in self.s_ids:
             # Check whether the entered MAC address is already being used
-            if s_mac == sid['mac']:
+            if self.s_ids[sid] and (s_mac == self.s_ids[sid]['mac']):
                 # Return error
                 return False, "MAC address already associated to slice: " + sid
 
-        # Check whether there an available slice
-        if not any(x['available'] for x in self.ran_slice_list):
-            # If not, return error
-            return False, "Not available slices, please remove an existing one"
-
         # Check whether the slice number is valid
-        elif i_sln is not in [x['index'] for x in self.ran_slices]
+        if i_sln not in [x['index'] for x in self.ran_slice_list]:
             # If not, return error
             return False, "Invalid slice number:" + str(i_sln)
+
+        # Check whether there an available slice
+        elif not self.ran_slice_list[i_sln]['available']:
+            # If not, return error
+            return False, "Slice #" + str(i_sln) + " is not available."
+
 
 
         # If setting a specific configuration for the slice
@@ -256,12 +257,11 @@ class opw_controller(base_controller):
                       start, "/", end, "/", total)
 
         # Lease template
-        lease_template = 'lease {0} {\n  starts 2 {1};' + \
+        lease_template = 'lease {0} {{\n  starts 2 {1};' + \
         '\n  ends 2 {2};\n  tstp 2 {2};\n  cltt 2 {2};' + \
         '\n  binding state active;\n  next binding state free;' + \
         '\n  rewind binding state free;\n  hardware ethernet {3};' + \
-        '\n  client-hostname "client";\n}\n'
-
+        '\n  client-hostname "client";\n}}\n'
 
         # Container to hold the lease IP
         lease_ip = ""
@@ -288,7 +288,7 @@ class opw_controller(base_controller):
         lease = lease_template.format(lease_ip, lease_start, lease_end, s_mac)
 
         # Append the new lease to the lease list
-        bash("cat {0} >> /var/lib/dhcp/dhcpd.leases".format(lease))
+        bash("echo \"{0}\" >> /var/lib/dhcp/dhcpd.leases".format(lease))
 
         # Log event
         self._log("Set IP to", lease_ip, ", valid until", lease_end)
@@ -309,11 +309,11 @@ class opw_controller(base_controller):
             return False, "Slice creation railed."
 
         # Iterate over the slice slice
-        for i, x in enumerate(self.ran_slices):
+        for i, x in enumerate(self.ran_slice_list):
             # If matching the slice number
             if x["index"] == i_sln:
                 # Toggle flag
-                self.ran_sliced[i]['available'] = False
+                self.ran_slice_list[i]['available'] = False
 
         # Create a slice entry
         self.s_ids[s_id] = {"mac": s_mac,
@@ -374,7 +374,7 @@ if __name__ == "__main__":
             delete_msg='owc_drs',
             do_modules=False,
             do_network=False,
-            do_ap=True,
+            do_ap=False,
             host='0.0.0.0',
             port=3100)
 
