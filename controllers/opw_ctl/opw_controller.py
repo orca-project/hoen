@@ -6,7 +6,7 @@ from sys import path
 path.append('..')
 
 # Import the Template Controller
-from base_controller.base_controller import base_controller
+from base_controller.base_controller import base_controller, cls
 # Import signal
 import signal
 # Import the Sleep function from the Time module
@@ -210,9 +210,8 @@ class opw_controller(base_controller):
     def create_slice(self, **kwargs):
         # Extract parameters from keyword arguments
         s_id = str(kwargs.get('s_id', None))
-        s_mac = kwargs.get('s_mac', None)
-        i_sln = int(kwargs.get('i_sln', 0))
-        slice_config = kwargs.get("slice_config", None)
+        s_mac = str(kwargs.get('s_mac', None))
+        i_sln = int(kwargs.get("slice", {}).get('number', 0))
 
         # If the MAC address is invalid
         if not s_mac or s_mac is None:
@@ -236,25 +235,22 @@ class opw_controller(base_controller):
             return False, "Slice #" + str(i_sln) + " is not available."
 
 
+        # Get the slice configuration parameters
+        i_start = int(kwargs.get("slice", {}).get('start', 0))
+        i_end   = int(kwargs.get("slice", {}).get('end',   49999))
+        i_total = int(kwargs.get("slice", {}).get('total', 50000))
 
-        # If setting a specific configuration for the slice
-        if slice_config is not None:
-            # Get the slice configuration parameters
-            start = int(slice_config.get("i_start", 0))
-            end   = int(slice_config.get("i_end",   49999))
-            total = int(slice_config.get("i_total", 50000))
+        # Set the slice configuration
+        bash("sdrctl dev {0} set slice_start{1} {2}".format(self.sdr_dev,
+                                                            i_sln, i_start))
+        bash("sdrctl dev {0} set slice_end{1}   {2}".format(self.sdr_dev,
+                                                            i_sln, i_end))
+        bash("sdrctl dev {0} set slice_total{1} {2}".format(self.sdr_dev,
+                                                            i_sln, i_total))
 
-            # Set the slice configuration
-            bash("sdrctl dev {0} set slice_start{1} {2}".format(self.sdr_dev,
-                                                                i_sln, start))
-            bash("sdrctl dev {0} set slice_end{1}   {2}".format(self.sdr_dev,
-                                                                i_sln, end))
-            bash("sdrctl dev {0} set slice_total{1} {2}".format(self.sdr_dev,
-                                                                i_sln, total))
-
-            # Log event
-            self._log("Set slice", i_sln, " start/end/total to",
-                      start, "/", end, "/", total)
+        # Log event
+        self._log("Set slice", i_sln, " start/end/total to",
+                  i_start, "/", i_end, "/", i_total)
 
         # Lease template
         lease_template = 'lease {0} {{\n  starts 2 {1};' + \
@@ -319,27 +315,12 @@ class opw_controller(base_controller):
         self.s_ids[s_id] = {
             "mac": s_mac,
             "ip": lease_ip,
-            "slice": {"number": i_sln}
+            "slice": {
+                "number": i_sln,
+                "start": i_start,
+                "end": i_end,
+                "total": i_total}
         }
-
-        # Container to hold slice configuration
-        config = {}
-        # If there's a custom slice configuration
-        if slice_config is not None:
-            # Get the present values and include them in the dictionary
-            config = {
-                "start": int(slice_config.get("i_start", 0)),
-                "end":   int(slice_config.get("i_end",   49999)),
-                "total": int(slice_config.get("i_total", 50000))
-            }
-
-        # Or else, use default values
-        else:
-            config = {"start": 0, "end": 49999, "total": 50000}
-
-        # Include slice configuration into the SID dictionary
-        self.s_ids[s_id]["slice"].update(config)
-
 
         # Log event
         self._log("Created slice", s_id)
@@ -354,19 +335,19 @@ class opw_controller(base_controller):
         # Container to told the requested information
         msg = {}
         # Iterate over all slices
-        for ran_slice in self.s_ids:
+        for virtual_radio in self.s_ids:
             # If requesting info about a specific S_ID but it is not a match
-            if s_id and s_id != ran_slice:
+            if s_id and s_id != virtual_radio:
                 continue
 
             # Log event
-            self._log("Found virtual radio:", ran_slice)
+            self._log("Found virtual radio:", virtual_radio)
 
             # Append this information to the output dictionary
             msg[s_id] = {
-                "mac": self.s_ids[ran_slice]["mac"],
-                "ip": self.s_ids[ran_slice]["destination"],
-                "slice": self.s_ids[ran_slice]["slice"]
+                "mac": self.s_ids[virtual_radio]["mac"],
+                "ip": self.s_ids[virtual_radio]["ip"],
+                "slice": self.s_ids[virtual_radio]["slice"]
             }
 
         # Return flag and dictionary in case positive
@@ -400,6 +381,8 @@ class opw_controller(base_controller):
 
 
 if __name__ == "__main__":
+    # Clear screen
+    cls()
     # Handle keyboard interrupt (SIGINT)
     try:
         # Instantiate the OpenWiFi Controller

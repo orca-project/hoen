@@ -8,6 +8,8 @@ from threading import Thread, Lock, Event
 from time import time, sleep
 # Import the System and Name methods from the OS module
 from os import system, name
+# Import the format exception method from the traceback module
+from traceback import format_exc
 
 # Received delay of 10 sec
 RECV_DELAY = 30*1000
@@ -343,8 +345,12 @@ class base_orchestrator(Thread):
 
                     self._log('Service ID:', create_slice['s_id'])
 
-                    # Create new slice
-                    success, msg = self.create_slice(**create_slice)
+                    try:
+                        # Create new slice
+                        success, msg = self.create_slice(**create_slice)
+                    except Exception:
+                        success = False
+                        msg = str(format_exc())
 
                     # Log event
                     self._log("Created Slice" if success else \
@@ -387,8 +393,12 @@ class base_orchestrator(Thread):
                     else:
                         self._log('Gather information about all Service IDs')
 
-                    # Request a slice
-                    success, msg = self.request_slice(**request_slice)
+                    try:
+                        # Request a slice
+                        success, msg = self.request_slice(**request_slice)
+                    except Exception:
+                        success = False
+                        msg = str(format_exc())
 
                     # Log event
                     self._log("Requested Slice" if success else \
@@ -435,8 +445,12 @@ class base_orchestrator(Thread):
 
                     self._log('Service ID:', delete_slice['s_id'])
 
-                    # Delete a slice
-                    success, msg = self.delete_slice(**delete_slice)
+                    try:
+                        # Delete a slice
+                        success, msg = self.delete_slice(**delete_slice)
+                    except Exception:
+                        success = False
+                        msg = str(format_exc())
 
                     # Log event
                     self._log("Deleted Slice" if success else \

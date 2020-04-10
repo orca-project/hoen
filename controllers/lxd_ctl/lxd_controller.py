@@ -72,8 +72,8 @@ class lxd_controller(base_controller):
         s_id = str(kwargs.get('s_id', None))
         s_ser = kwargs.get('service', "best-effort")
         # TODO: Ideally the CN orchestrator would specify the resources
-        s_cpu = str(kwargs.get('s_cpu', 1))
-        s_ram = str(int(kwargs.get('s_ram', 1.0)))
+        i_cpu = str(kwargs.get('i_cpu', 1))
+        f_ram = str(int(kwargs.get('f_ram', 1.0)))
 
         if grab_ethernet:
             # Try to get an available interface
@@ -117,8 +117,8 @@ class lxd_controller(base_controller):
         profile = {'name':  "id-" + s_id,
                    'config': {
                      'security.nesting': 'true',
-                     'limits.cpu': s_cpu,
-                     'limits.memory': s_ram + "GB"},
+                     'limits.cpu': i_cpu,
+                     'limits.memory': f_ram + "GB"},
                    'source': {'type': 'image', 'alias': s_distro},
                    'profiles': ['hoen'],
                    'devices': {

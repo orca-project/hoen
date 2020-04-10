@@ -8,6 +8,8 @@ from threading import Thread, Lock, Event
 from signal import pause
 # Import the time method from the time module
 from time import time
+# Import the format exception method from the traceback module
+from traceback import format_exc
 
 # Check which ZMQ we should load
 if "EVENTLET_ZMQ" not in environ:
@@ -178,8 +180,12 @@ class base_controller(Thread):
                     self.s_ids[create_slice['s_id']] = {}
                     self._log('Service ID:', create_slice['s_id'])
 
-                    # Create new slice
-                    success, msg = self.create_slice(**create_slice)
+                    try:
+                        # Create new slice
+                        success, msg = self.create_slice(**create_slice)
+                    except Exception:
+                        success = False
+                        msg = str(format_exc())
 
                     # Log event
                     self._log("Created Slice" if success else \
@@ -221,8 +227,12 @@ class base_controller(Thread):
                     else:
                         self._log('Gather information about all Service IDs')
 
-                    # Request a slice
-                    success, msg = self.request_slice(**request_slice)
+                    try:
+                        # Request a slice
+                        success, msg = self.request_slice(**request_slice)
+                    except Exception:
+                        success = False
+                        msg = str(format_exc())
 
                     # Log event
                     self._log("Requested Slice" if success else \
@@ -262,8 +272,12 @@ class base_controller(Thread):
 
                     self._log('Service ID:', delete_slice['s_id'])
 
-                    # Remove a slice
-                    success, msg = self.delete_slice(**delete_slice)
+                    try:
+                        # Remove a slice
+                        success, msg = self.delete_slice(**delete_slice)
+                    except Exception:
+                        success = False
+                        msg = str(format_exc())
 
                     # Log event
                     self._log("Deleted Slice" if success else \

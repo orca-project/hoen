@@ -5,15 +5,12 @@ from sys import path
 path.append('..')
 
 # Import the Template Orchestrator
-from base_orchestrator.base_orchestrator import base_orchestrator, ctl_base
+from base_orchestrator.base_orchestrator import base_orchestrator, ctl_base, cls
 # Import the System and Name methods from the OS module
 from os import system, name
 # Import signal
 import signal
 
-
-def cls():
-    system('cls' if name=='nt' else 'clear')
 
 class radio_access_network_orchestrator(base_orchestrator):
 
@@ -36,7 +33,7 @@ class radio_access_network_orchestrator(base_orchestrator):
         self.service_to_mac = {
             'best-effort': '14:AB:C5:42:B7:33',
             'urllc': 'B8:27:EB:BE:C1:F1',
-            'emmb': '88:29:9C:02:24:EF'
+            'embb': '88:29:9C:02:24:EF'
         }
         #TODO We might loads this from a file and allow reloading it
 
@@ -57,11 +54,11 @@ class radio_access_network_orchestrator(base_orchestrator):
 
         # TODO Calculate the amount of resources
         i_start = 0
-        i_end   = 19999
+        i_end   = 19999 if s_ser == "best-effort" else 49999
         i_total = 50000
 
         # TODO decide which slice to use
-        i_sln = 1
+        i_sln = 0 if s_ser == "best-effort" else 1
 
         # Send message to OpenWiFi RAN controller
         self._log("Service:", s_ser, 'Requirements:', s_req, "Slice #", i_sln)
@@ -69,11 +66,12 @@ class radio_access_network_orchestrator(base_orchestrator):
 
         # Send the message to create a slice
         success, msg = self.opw_ctl.create_slice(
-            **{'s_id': s_id, 's_mac': s_mac, "i_sln": i_sln,
-               'slice_config': {
-                   'i_start': i_start,
-                   'i_end': i_end,
-                   'i_total': i_total}
+            **{'s_id': s_id, 's_mac': s_mac,
+               "slice": {
+                   "number": i_sln,
+                   'start': i_start,
+                   'end': i_end,
+                   'total': i_total}
                })
 
         if success:
@@ -105,11 +103,9 @@ class radio_access_network_orchestrator(base_orchestrator):
             # Send message to OpenWifi RAN controller
             self._log('Delegating it to the OpenWiFi Controller')
 
-            # TODO append information from the slice duration and length
+            # Create entry with orchestrator-only info about the virtual radio
             info[virtual_radio] = {
                     "service": self.s_ids[virtual_radio]["service"],
-                    "MAC": self.s_ids[virtual_radio]["MAC"][0],
-                    "slice": self.s_ids[virtual_radio]["slice"]
             }
 
             # Send the message to create a slice
@@ -118,16 +114,12 @@ class radio_access_network_orchestrator(base_orchestrator):
             # If the Controller answered correctly
             if success and (virtual_radio in msg):
                  # Update info with controller-specific data
-                info[virtual_radio]['slice'].update({
-                    "start": msg[virtual_radio].get("start", "Not reported"),
-                    "end": msg[virtual_radio].get("end", "Not reported"),
-                    "length": msg[virtual_radio].get("length", "Not reported")
-                })
+                info[virtual_radio].update(msg[virtual_radio])
 
             # Otherwise, include the error
             else:
                 # Return error message
-                info[virtual_radio]['slice'].update({"info": msg})
+                info[virtual_radio]['info'] = msg
 
         # If there's an S_ID but the result was empty
         return (False, "Virtual radio missing.") \
