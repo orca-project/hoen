@@ -78,7 +78,7 @@ class radio_access_network_orchestrator(base_orchestrator):
             # Append it to the list of service IDs
             self.s_ids[s_id] = {"requirements": s_req,
                                 "service": s_ser,
-                                "slice": {"index": i_sln},
+                                "slice": {"number": i_sln},
                                 "MAC": s_mac,
                                 "destination": msg['destination']}
 
@@ -135,8 +135,10 @@ class radio_access_network_orchestrator(base_orchestrator):
 
         # Get service information
         s_req = self.s_ids[s_id]["requirements"]
+        # Get the slice service
         s_ser = self.s_ids[s_id]["service"]
-        i_sln = self.s_ids[s_id]["slice"]["index"]
+        # Get the slice number
+        i_sln = self.s_ids[s_id]["slice"]["number"]
 
         # Send message to OpenWiFi RAN controller
         self._log("Service:", s_ser, 'Requirements:', s_req, "Slice #", i_sln)
@@ -145,8 +147,6 @@ class radio_access_network_orchestrator(base_orchestrator):
 
         # Send message to remove slice
         success, msg = self.opw_ctl.delete_slice(**{'s_id': s_id})
-
-        # TODO check whether to remove unused slices
 
         # Inform the user about the removal
         return success, msg

@@ -76,6 +76,7 @@ class core_network_orchestrator(base_orchestrator):
     def delete_slice(self, **kwargs):
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
+
         # Get the slice requirements
         s_req = self.s_ids[s_id]['requirements']
         # Get the slice service

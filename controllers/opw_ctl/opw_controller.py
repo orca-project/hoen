@@ -367,14 +367,39 @@ class opw_controller(base_controller):
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
 
-        # iterate over all slices
-        for ran_slice in self.s_ids:
-            # If requesting info about a specific S_ID but it is not a match
-            if s_id and s_id != ran_slice:
-                continue
+        # Get the slice number
+        i_sln = self.s_ids[s_id]["slice"]["number"]
 
+        # Try to clear the slice
+        cls =  bash("sdrctl dev {0} set addr{1} {2}".format(
+            self.sdr_dev,
+            i_sln,
+            "00000000")).code
 
+        # If the last command failed
+        if cls:
+            return False, "Could not remove MAC from slice #" + str(i_lsn)
 
+        # Set the default slice configuration
+        s = bash("sdrctl dev {0} set slice_start{1} {2}".format(self.sdr_dev,
+                                                            i_sln, 0)).code
+        e = bash("sdrctl dev {0} set slice_end{1}   {2}".format(self.sdr_dev,
+                                                            i_sln, 49999)).code
+        t = bash("sdrctl dev {0} set slice_total{1} {2}".format(self.sdr_dev,
+                                                            i_sln, 50000)).code
+
+        # If any of the precious commands failed
+        if any([s,e,t]):
+            return False, "Failed reverting slice to default parameters."
+
+        # TODO Clear DHCP entry and block traffic.
+
+        # Iterate over the slice slice
+        for i, x in enumerate(self.ran_slice_list):
+            # If matching the slice number
+            if x["index"] == i_sln:
+                # Toggle flag
+                self.ran_slice_list[i]['available'] = True
 
         # Return state
         return True, {"s_id": s_id}

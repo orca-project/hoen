@@ -341,7 +341,7 @@ class base_orchestrator(Thread):
                         continue
 
                     # Append it to the list of service IDs
-                    self.s_ids[create_slice['s_id']] = {}
+                    #  self.s_ids[create_slice['s_id']] = {}
 
                     self._log('Service ID:', create_slice['s_id'])
 
