@@ -151,41 +151,20 @@ class opw_controller(base_controller):
             bash("ip route add default via {0} dev eth0".format(gw_ip))
             self._log("Set default gateway to: {0}".format(gw_ip))
 
-            # Stop DHCP server
-            bash("service isc-dhcp-server stop")
-            # Clear current leases
-            bash("echo '' > /var/lib/dhcp/dhcpd.leases")
-            # Start DHCP server
-            bash("service isc-dhcp-server start")
-
-
-            self._log("Restarted DHCP server")
-
-            # Sleep for 5 seconds and log event
-            sleep(5)
+            # Sleep for 2 seconds and log event
             self._log("Configured routing and networking")
 
-        # If starting the access point
-        if do_ap:
-            # If there is a Host AP Daemon running in the background
-            if bool(bash("ps -aux | grep [h]ostapd")):
-                # Kill the process
-                bash("killall hostapd")
-                self._log("Stopped existing hostapd instances")
 
-            # Run this <count> times or until hostapd starts
-            apd = 0
-            count = 10
-            while (not apd) and (count):
-                # Start Host AP Daemon in the background and log event
-                apd = bash("hostapd -B {0}".format(ap_config_path)).code
+        # Stop DHCP server
+        bash("service isc-dhcp-server stop")
+        # Clear current leases
+        bash("echo '' > /var/lib/dhcp/dhcpd.leases")
+        # Start DHCP server
+        bash("service isc-dhcp-server start")
 
-                # Log event
-                self._log("Configured access point" if not apd else \
-                      "Access point not initialised.")
+        sleep(5)
 
-                count -= 1
-
+        self._log("Restarted DHCP server")
 
         # Create a list of possible client IPs
         self.dhcp_pool = set(".".join(self.lan_ip.split(".")[:-1]) + "." +
@@ -200,6 +179,34 @@ class opw_controller(base_controller):
 
         # Create OMAPI object
         self.omapi = Omapi(omapi_host, omapi_port, omapi_keyname, omapi_key)
+
+
+        # If starting the access point
+        if do_ap:
+            # If there is a Host AP Daemon running in the background
+            if bool(bash("ps -aux | grep [h]ostapd")):
+                # Kill the process
+                bash("killall hostapd")
+                self._log("Stopped existing hostapd instances")
+
+            # Run this 10 times or until hostapd starts
+            for x in range(10):
+                # Start Host AP Daemon in the background and log event
+                apd = bash("hostapd -B {0}".format(ap_config_path)).code
+
+                # If it worked
+                if not apd:
+                    break
+
+                self._log("Trying to start the AP, #", x+1)
+                sleep(1)
+
+            # If we could not configure the AP
+            if apd:
+                raise Exception("Could not configure AP")
+
+            # Log event
+            self._log("Configured access point")
 
 
         # TODO This ought to change in the future
