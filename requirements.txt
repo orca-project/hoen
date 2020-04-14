@@ -7,4 +7,4 @@ flask-cors==3.0.8
 ryu==4.32
 eventlet==0.25.1
 bash==0.6
-isc_dhcp_leases==0.9.1
+pypureomapi==0.8

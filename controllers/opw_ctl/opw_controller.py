@@ -14,12 +14,8 @@ from time import sleep
 # Import the bash method from the bash module
 from bash import bash
 
-# Import datetime and timedelta from the Datetime module
-from datetime import datetime, timedelta
-
-# Import the Lease objects from the ISC DHCP Leases module
-from isc_dhcp_leases import Lease, IscDhcpLeases
-
+# Import the Omapi object from the pypureomapi
+from pypureomapi import Omapi, OmapiErrorNotFound, OmapiError
 
 class opw_controller(base_controller):
 
@@ -147,16 +143,22 @@ class opw_controller(base_controller):
         if do_network:
             # Configure the SDR interface's IP
             bash("ifconfig {0} {1} netmask 255.255.255.0".format(self.sdr_dev,
-                                                                 lan_ip))
+                                                                 self.lan_ip))
             self._log("Set {0} interface IP's to: {1}".format(self.sdr_dev,
-                                                              lan_ip))
+                                                              self.lan_ip))
 
             # Set the default route through eth0
             bash("ip route add default via {0} dev eth0".format(gw_ip))
             self._log("Set default gateway to: {0}".format(gw_ip))
 
-            # Restart DHCP server
-            bash("service isc-dhcp-server restart")
+            # Stop DHCP server
+            bash("service isc-dhcp-server stop")
+            # Clear current leases
+            bash("echo '' > /var/lib/dhcp/dhcpd.leases")
+            # Start DHCP server
+            bash("service isc-dhcp-server start")
+
+
             self._log("Restarted DHCP server")
 
             # Sleep for 5 seconds and log event
@@ -171,13 +173,33 @@ class opw_controller(base_controller):
                 bash("killall hostapd")
                 self._log("Stopped existing hostapd instances")
 
-            # Start Host AP Daemon in the background and log event
-            apd = bash("hostapd -B {0}".format(ap_config_path)).code
+            # Run this <count> times or until hostapd starts
+            apd = 0
+            count = 10
+            while (not apd) and (count):
+                # Start Host AP Daemon in the background and log event
+                apd = bash("hostapd -B {0}".format(ap_config_path)).code
 
-            # Log event
-            self._log("Configured access point" if not apd else \
+                # Log event
+                self._log("Configured access point" if not apd else \
                       "Access point not initialised.")
 
+                count -= 1
+
+
+        # Create a list of possible client IPs
+        self.dhcp_pool = set(".".join(self.lan_ip.split(".")[:-1]) + "." +
+                                str(x) for x in range(110,200))
+
+        # OMAPI Configuration parameters
+        omapi_host = "127.0.0.1"
+        omapi_port = 7911
+        omapi_keyname = b"defomapi"
+        omapi_key = b"SmR3+XVX95vDQ3SaZD1B7xTXYTcwNg/AZn9DAsJS" + \
+            b"9oESudsTQ5bRMaSt bHPyOJchWlXF2Q6CuhSD70eTNl5hOg=="
+
+        # Create OMAPI object
+        self.omapi = Omapi(omapi_host, omapi_port, omapi_keyname, omapi_key)
 
 
         # TODO This ought to change in the future
@@ -198,12 +220,6 @@ class opw_controller(base_controller):
             # Log event
             self._log("Failed clearing slices #" if cls else "Cleared slice #",
                       ran_slice["index"])
-
-        # Get list of DHCP leases
-        self.dhcp_leases = IscDhcpLeases('/var/lib/dhcp/dhcpd.leases')
-        # Create a list of possible client IPs
-        self.dhcp_range = set(".".join(self.lan_ip.split(".")[:-1]) + "." +
-                                str(x) for x in range(110,200))
 
 
 
@@ -252,45 +268,35 @@ class opw_controller(base_controller):
         self._log("Set slice", i_sln, " start/end/total to",
                   i_start, "/", i_end, "/", i_total)
 
-        # Lease template
-        lease_template = 'lease {0} {{\n  starts 2 {1};' + \
-        '\n  ends 2 {2};\n  tstp 2 {2};\n  cltt 2 {2};' + \
-        '\n  binding state active;\n  next binding state free;' + \
-        '\n  rewind binding state free;\n  hardware ethernet {3};' + \
-        '\n  client-hostname "client";\n}}\n'
 
-        # Container to hold the lease IP
-        lease_ip = ""
+        # Check whether the given MAC address has a current DHCP lease
+        try:
+            # Try to check it
+            self.omapi.lookup_by_host(mac=s_mac)
 
-        # Get the list of current leases
-        current_leases = self.dhcp_leases.get_current()
-        # If there are current leases
-        if current_leases:
-            # Get the currently used IPs
-            current_ips = [current_leases[mac].ip for mac in current_leases]
-            # Diff that from the IP ranges the get the first in order
-            lease_ip = sorted(self.dhcp_range.difference(current_ips))[0]
+        # If it doesn't work, great
+        except OmapiErrorNotFound:
+            pass
 
+        # Otherwise, clear it
         else:
-            # Assign the first IP in the range
-            lease_ip = sorted(self.dhcp_range)[0]
+            self.omapi.del_host(s_mac)
 
-        # Get the time now, calculate the lease end and format to strings
-        time_now = datetime.now()
-        lease_start = time_now.strftime('%Y/%m/%d %X')
-        lease_end = (time_now+timedelta(minutes=10)).strftime('%Y/%m/%d %X')
+        # Get the first available IP address
+        lease_ip = self.dhcp_pool.pop()
 
-        # Fill the lease template with the times and IP
-        lease = lease_template.format(lease_ip, lease_start, lease_end, s_mac)
+        # Add host to the DHCP subnet
+        try:
+            self.omapi.add_host(lease_ip, s_mac)
 
-        # Append the new lease to the lease list
-        bash("echo \"{0}\" >> /var/lib/dhcp/dhcpd.leases".format(lease))
+        # If if failed
+        except OmapiError:
+            # Report to the hyperstrator
+            return False, "DHCP lease creation failed."
 
         # Log event
-        self._log("Set IP to", lease_ip, ", valid until", lease_end)
+        self._log("Set", s_mac, "IP to:", lease_ip)
 
-        # Restart DHCP server to make changes effective
-        bash("service isc-dhcp-server restart")
 
         # Get MAC address associated with service and map it to 32 bits
         s_mac_32 = s_mac.replace(":","")[4:]
@@ -367,8 +373,13 @@ class opw_controller(base_controller):
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
 
+        # Get the client's MAC address
+        s_mac= self.s_ids[s_id]["mac"]
         # Get the slice number
         i_sln = self.s_ids[s_id]["slice"]["number"]
+
+        # Remove host from the DHCP subnet
+        self.omapi.del_host(s_mac)
 
         # Try to clear the slice
         cls =  bash("sdrctl dev {0} set addr{1} {2}".format(
@@ -391,8 +402,6 @@ class opw_controller(base_controller):
         # If any of the precious commands failed
         if any([s,e,t]):
             return False, "Failed reverting slice to default parameters."
-
-        # TODO Clear DHCP entry and block traffic.
 
         # Iterate over the slice slice
         for i, x in enumerate(self.ran_slice_list):
@@ -421,7 +430,7 @@ if __name__ == "__main__":
             delete_msg='owc_drs',
             do_modules=False,
             do_network=False,
-            do_ap=False,
+            do_ap=True,
             host='0.0.0.0',
             port=3100)
 
