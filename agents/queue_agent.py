@@ -112,7 +112,7 @@ class queue_agent_server(Thread):
                             if c5 == 0:
                                 count = count + 1
 
-        
+
         if count == total:
             resp = {
                     "t_id": t_id,
@@ -147,7 +147,7 @@ class queue_agent_server(Thread):
             create_queue_command = create_queue_command + ' other-config:max-rate='+ str(max_rate)
         if priority is not None:
             create_queue_command = create_queue_command + ' other-config:priority='+ str(priority)
-        
+
         (c1, o1) = self.run_system_command(create_queue_command)
 
         if c1 == 0:
@@ -215,7 +215,7 @@ class queue_agent_server(Thread):
         for line in lines:
           if len(line.split(': ')) > 1:
             if flag == 0:
-              name = line.split(': ')[1][1:-1]
+              name = line.split(': ')[1].replace('"', '')
               ports[name] = None
               flag = 1
             else:
