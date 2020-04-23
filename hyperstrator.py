@@ -715,7 +715,7 @@ class hyperstrator_server(Thread):
                 **{'s_id': delete_transaction['s_id']})
 
             # If the TN allocation failed
-            if not tn_success:
+            if not transport_success:
                 self._log('Failed deleting Transport Slice')
                 # Inform the user about the failure
                 self._send_msg(self.delete_nack, transport_msg)

@@ -152,7 +152,7 @@ def service_create(socket, **kwargs):
     # Send service request message to the hyperstrator
     socket.send_json({
         create_msg: {'service': kwargs['service'],
-                     'requirements': {'throughout': kwargs['throughput'],
+                     'requirements': {'throughput': kwargs['throughput'],
                                       'latency': kwargs['latency']}
                      }})
 
