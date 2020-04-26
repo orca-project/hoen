@@ -26,8 +26,10 @@ class opw_controller(base_controller):
         do_ap = kwargs.get("do_ap", True)
         # Extra options
         self.sdr_dev = kwargs.get("sdr_dev", "sdr0")
-        self.lan_ip = kwargs.get("lan_ip", "192.168.13.1")
-        gw_ip = kwargs.get("gw_ip", "134.226.55.211")
+        #  self.lan_ip = kwargs.get("lan_ip", "192.168.13.1")
+        self.lan_ip = kwargs.get("lan_ip", "10.0.0.1")
+        #  gw_ip = kwargs.get("gw_ip", "134.226.55.211")
+        gw_dev = kwargs.get("gw_dev", "eth0")
         ap_config_path = kwargs.get("ap_path",
                                     "/root/openwifi/hostapd-openwifi.conf")
         openwifi_path = kwargs.get("openwifi_path", "/root/openwifi")
@@ -148,8 +150,10 @@ class opw_controller(base_controller):
                                                               self.lan_ip))
 
             # Set the default route through eth0
-            bash("ip route add default via {0} dev eth0".format(gw_ip))
-            self._log("Set default gateway to: {0}".format(gw_ip))
+            #  bash("ip route add default via {0} dev eth0".format(gw_ip))
+            bash("ip route add default dev {0}".format(gw_dev))
+            #  self._log("Set default gateway to: {0}".format(gw_ip))
+            self._log("Set default gateway to: {0}".format(gw_dev))
 
             # Sleep for 2 seconds and log event
             self._log("Configured routing and networking")
@@ -435,8 +439,10 @@ if __name__ == "__main__":
             request_msg='owc_rrs',
             update_msg='owc_urs',
             delete_msg='owc_drs',
+            #  do_modules=True,
             do_modules=False,
-            do_network=False,
+            do_network=True,
+            #  do_network=False,
             do_ap=True,
             host='0.0.0.0',
             port=3100)

@@ -31,9 +31,11 @@ class radio_access_network_orchestrator(base_orchestrator):
 
         # Dictionary mapping UE's MAC addresses
         self.service_to_mac = {
-            'best-effort': '14:AB:C5:42:B7:33',
-            'urllc': 'B8:27:EB:BE:C1:F1',
-            'embb': '88:29:9C:02:24:EF'
+            'best-effort': '14:AB:C5:42:B7:33', # New Dell
+            'embb': '14:AB:C5:42:B7:33', # New Dell
+            'urllc': 'B8:27:EB:BE:C1:F1', # RasPi
+            #  'embb': '88:29:9C:02:24:EF' # Phone
+            #  'embb': 'F8:16:54:4C:E1:A4' # Old Dell
         }
         #TODO We might loads this from a file and allow reloading it
 
@@ -52,9 +54,27 @@ class radio_access_network_orchestrator(base_orchestrator):
         # Get MAC address associated with service
         s_mac = self.service_to_mac[s_ser]
 
-        # TODO Calculate the amount of resources
+        # Apply defaults and sanitise input
+        i_thx = s_req.get("throughput", 1)
+        i_thx = float(i_thx) if i_thx is not None else 1
+
+        i_del = s_req.get("latency", 100)
+        i_del = float(i_del) if i_del is not None else 100
+
+        # Calculate the required amount of resources
+        eq_thx = max((i_thx - 0.5786)  / 14.19, 0.01)
+        eq_del = max((148.6 - i_del) / 133.2, 0.01)
+
+        # Get the minimum amount to suffice both delay and throughput
+        req_resources = int(50000 * max(eq_thx, eq_del)) - 1
+
+        # If requiring too many resources
+        if req_resources > 50000:
+            return False, "Unfeasible request."
+
+        # Express the amount of resources in a way that SDRCTL can understand
         i_start = 0
-        i_end   = 19999 if s_ser == "best-effort" else 49999
+        i_end = 44999 if s_ser == "best_effort" else req_resources
         i_total = 50000
 
         # TODO decide which slice to use
