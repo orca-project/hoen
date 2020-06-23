@@ -8,6 +8,9 @@ path.append('..')
 from base_orchestrator.base_orchestrator import base_orchestrator, ctl_base, cls
 # Import the System and Name methods from the OS module
 from os import system, name
+
+import datetime
+
 # Import signal
 import signal
 
@@ -40,6 +43,7 @@ class radio_access_network_orchestrator(base_orchestrator):
         #TODO We might loads this from a file and allow reloading it
 
     def create_slice(self, **kwargs):
+        a = datetime.datetime.now()
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
         # Get the slice requirements
@@ -59,7 +63,7 @@ class radio_access_network_orchestrator(base_orchestrator):
         i_thx = float(i_thx) if i_thx is not None else 1
 
         i_del = s_req.get("latency", 100)
-        i_del = float(i_del) if i_del is not None else 100
+        i_del = float(i_del) if i_del is not None else 200
 
         # Calculate the required amount of resources
         eq_thx = max((i_thx - 0.5786)  / 14.19, 0.01)
@@ -68,8 +72,12 @@ class radio_access_network_orchestrator(base_orchestrator):
         # Get the minimum amount to suffice both delay and throughput
         req_resources = int(50000 * max(eq_thx, eq_del)) - 1
 
+        if req_resources >= 50000 and req_resources <= 51000:
+
+            req_resources = 49999
+
         # If requiring too many resources
-        if req_resources > 50000:
+        if req_resources >= 50000:
             return False, "Unfeasible request."
 
         # Express the amount of resources in a way that SDRCTL can understand
@@ -84,6 +92,10 @@ class radio_access_network_orchestrator(base_orchestrator):
         self._log("Service:", s_ser, 'Requirements:', s_req, "Slice #", i_sln)
         self._log('Delegating it to the OPW Controller')
 
+        b = datetime.datetime.now()
+
+        c = b -a 
+        print(c.microseconds)
         # Send the message to create a slice
         success, msg = self.opw_ctl.create_slice(
             **{'s_id': s_id, 's_mac': s_mac,
@@ -94,6 +106,8 @@ class radio_access_network_orchestrator(base_orchestrator):
                    'total': i_total}
                })
 
+        d = datetime.datetime.now()
+
         if success:
             # Append it to the list of service IDs
             self.s_ids[s_id] = {"requirements": s_req,
@@ -103,6 +117,10 @@ class radio_access_network_orchestrator(base_orchestrator):
                                 "destination": msg['destination']}
 
 
+        e = datetime.datetime.now()
+
+        f = e - d
+        print(f.microseconds)
         # Inform the user about the creation
         return success, msg
 
