@@ -217,21 +217,35 @@ class opw_controller(base_controller):
         # List of currently support RAN slices
         self.ran_slice_list = [{"index": 0, "available": True},
                                {"index": 1, "available": True},
-                                #  "index": 2, "available": True,
+                               {"index": 2, "available": True},
+                               {"index": 3, "available": True},
                             ]
 
         # Iterate over existing slices
         for ran_slice in self.ran_slice_list:
-            # Clear MAC addresses associated with slice
-            cls =  bash("sdrctl dev {0} set addr{1} {2}".format(
+            # Set current slice index
+            idx = bash("sdrctl dev {0} set slice_idx {1}".format(
                     self.sdr_dev,
-                    ran_slice['index'],
+                    ran_slice['index'])).code
+
+            # Clear MAC addresses associated with slice
+            cls = bash("sdrctl dev {0} set addr {1}".format(
+                    self.sdr_dev,
                     "00000000")).code
 
             # Log event
-            self._log("Failed clearing slices #" if cls else "Cleared slice #",
+            self._log("Failed clearing slice #" if cls else "Cleared slice #",
                       ran_slice["index"])
 
+        # Sync all slices
+        sync = bash("sdrctl dev {0} set slice_idx 4".format(self.sdr_dev)).code
+
+        # Output status message and/or exit
+        if not sync:
+            self._log("Synchronised all RAN slices!")
+        else:
+            self._log("Failed synchronising RAN slices.")
+            exit(10)
 
 
     def create_slice(self, **kwargs):
@@ -262,24 +276,6 @@ class opw_controller(base_controller):
             return False, "Slice #" + str(i_sln) + " is not available."
 
 
-        # Get the slice configuration parameters
-        i_start = int(kwargs.get("slice", {}).get('start', 0))
-        i_end   = int(kwargs.get("slice", {}).get('end',   49999))
-        i_total = int(kwargs.get("slice", {}).get('total', 50000))
-
-        # Set the slice configuration
-        bash("sdrctl dev {0} set slice_start{1} {2}".format(self.sdr_dev,
-                                                            i_sln, i_start))
-        bash("sdrctl dev {0} set slice_end{1}   {2}".format(self.sdr_dev,
-                                                            i_sln, i_end))
-        bash("sdrctl dev {0} set slice_total{1} {2}".format(self.sdr_dev,
-                                                            i_sln, i_total))
-
-        # Log event
-        self._log("Set slice", i_sln, " start/end/total to",
-                  i_start, "/", i_end, "/", i_total)
-
-
         # Check whether the given MAC address has a current DHCP lease
         try:
             # Try to check it
@@ -308,17 +304,35 @@ class opw_controller(base_controller):
         # Log event
         self._log("Set", s_mac, "IP to:", lease_ip)
 
+        # Get the slice configuration parameters
+        i_start = int(kwargs.get("slice", {}).get('start', 0))
+        i_end   = int(kwargs.get("slice", {}).get('end',   49999))
+        i_total = int(kwargs.get("slice", {}).get('total', 50000))
+
+        # Set the slice in question
+        bash("sdrctl dev {0} set slice_idx {1}".format(self.sdr_dev, i_sln))
+
+        # Set the slice configuration
+        bash("sdrctl dev {0} set slice_start {1}".format(self.sdr_dev, i_start))
+        bash("sdrctl dev {0} set slice_end {1}".format(self.sdr_dev, i_end))
+        bash("sdrctl dev {0} set slice_total {1}".format(self.sdr_dev, i_total))
+
+        # Log event
+        self._log("Set slice", i_sln, " start/end/total to",
+                  i_start, "/", i_end, "/", i_total)
 
         # Get MAC address associated with service and map it to 32 bits
         s_mac_32 = s_mac.replace(":","")[4:]
 
         # Add MAC address to SDRCTL
-        sla = bash("sdrctl dev {0} set addr{1} {2}".format(
+        sla = bash("sdrctl dev {0} set addr {1}".format(
             self.sdr_dev,
-            i_sln,
             s_mac_32)).code
 
-        if sla:
+        # Sync all commands
+        sync = bash("sdrctl dev {0} set slice_idx 4".format(self.sdr_dev)).code
+
+        if sla or sync:
             return False, "Slice creation railed."
 
         # Iterate over the slice slice
@@ -392,10 +406,12 @@ class opw_controller(base_controller):
         # Remove host from the DHCP subnet
         self.omapi.del_host(s_mac)
 
+        # Set the slice in question
+        bash("sdrctl dev {0} set slice_idx {1}".format(self.sdr_dev, i_sln))
+
         # Try to clear the slice
-        cls =  bash("sdrctl dev {0} set addr{1} {2}".format(
+        cls = bash("sdrctl dev {0} set addr {1}".format(
             self.sdr_dev,
-            i_sln,
             "00000000")).code
 
         # If the last command failed
@@ -403,15 +419,21 @@ class opw_controller(base_controller):
             return False, "Could not remove MAC from slice #" + str(i_lsn)
 
         # Set the default slice configuration
-        s = bash("sdrctl dev {0} set slice_start{1} {2}".format(self.sdr_dev,
-                                                            i_sln, 0)).code
-        e = bash("sdrctl dev {0} set slice_end{1}   {2}".format(self.sdr_dev,
-                                                            i_sln, 49999)).code
-        t = bash("sdrctl dev {0} set slice_total{1} {2}".format(self.sdr_dev,
-                                                            i_sln, 50000)).code
+        s = bash("sdrctl dev {0} set slice_start {1}".format(
+            self.sdr_dev,
+            0)).code
+        e = bash("sdrctl dev {0} set slice_end {1}".format(
+            self.sdr_dev,
+            49999)).code
+        t = bash("sdrctl dev {0} set slice_total {1}".format(
+            self.sdr_dev,
+            50000)).code
+
+        # Sync all commands
+        sync = bash("sdrctl dev {0} set slice_idx 4".format(self.sdr_dev)).code
 
         # If any of the precious commands failed
-        if any([s,e,t]):
+        if any([s,e,t, sync]):
             return False, "Failed reverting slice to default parameters."
 
         # Iterate over the slice slice

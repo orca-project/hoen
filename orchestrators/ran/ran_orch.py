@@ -32,10 +32,19 @@ class radio_access_network_orchestrator(base_orchestrator):
             update_msg='owc_urs',
             delete_msg='owc_drs')
 
+        # Dictionary mapping service types to slice numbers
+        self.service_to_queue = {
+            'best-effort': 3,
+            'embb': 1,
+            'urllc': 0
+        }
+
         # Dictionary mapping UE's MAC addresses
         self.service_to_mac = {
+            #  'best-effort': '14:AB:C5:42:B7:33', # New Dell
             'best-effort': '14:AB:C5:42:B7:33', # New Dell
-            'embb': '14:AB:C5:42:B7:33', # New Dell
+            'embb': '86:2B:D6:DA:B7:F8', # Phone
+            #  'embb': '14:AB:C5:42:B7:33', # New Dell
             'urllc': 'B8:27:EB:BE:C1:F1', # RasPi
             #  'embb': '88:29:9C:02:24:EF' # Phone
             #  'embb': 'F8:16:54:4C:E1:A4' # Old Dell
@@ -82,11 +91,11 @@ class radio_access_network_orchestrator(base_orchestrator):
 
         # Express the amount of resources in a way that SDRCTL can understand
         i_start = 0
-        i_end = 44999 if s_ser == "best_effort" else req_resources
+        i_end = 4999 if s_ser == "best_effort" else req_resources
         i_total = 50000
 
-        # TODO decide which slice to use
-        i_sln = 0 if s_ser == "best-effort" else 1
+        # Decide which slice to use
+        i_sln = self.service_to_queue.get(s_ser, 3)
 
         # Send message to OpenWiFi RAN controller
         self._log("Service:", s_ser, 'Requirements:', s_req, "Slice #", i_sln)
@@ -94,7 +103,7 @@ class radio_access_network_orchestrator(base_orchestrator):
 
         b = datetime.datetime.now()
 
-        c = b -a 
+        c = b -a
         print(c.microseconds)
         # Send the message to create a slice
         success, msg = self.opw_ctl.create_slice(
