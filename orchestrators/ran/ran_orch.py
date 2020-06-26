@@ -43,10 +43,9 @@ class radio_access_network_orchestrator(base_orchestrator):
         self.service_to_mac = {
             #  'best-effort': '14:AB:C5:42:B7:33', # New Dell
             'best-effort': '14:AB:C5:42:B7:33', # New Dell
-            'embb': '86:2B:D6:DA:B7:F8', # Phone
             #  'embb': '14:AB:C5:42:B7:33', # New Dell
             'urllc': 'B8:27:EB:BE:C1:F1', # RasPi
-            #  'embb': '88:29:9C:02:24:EF' # Phone
+            'embb': '88:29:9C:02:24:EF' # Phone
             #  'embb': 'F8:16:54:4C:E1:A4' # Old Dell
         }
         #TODO We might loads this from a file and allow reloading it
