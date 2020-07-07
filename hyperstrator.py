@@ -460,7 +460,8 @@ class hyperstrator_server(Thread):
         else:
             self._log('Skipping RAN')
             # Use a fake source IP
-            radio_msg = {'s_id': s_id, 'destination': '10.30.0.179'}
+            #radio_msg = {'s_id': s_id, 'destination': '10.30.0.179'}
+            radio_msg = {'s_id': s_id, 'destination': '10.20.0.1'}
 
         # If allocating TN slices
         if self.do_transport:
@@ -714,7 +715,7 @@ class hyperstrator_server(Thread):
                 **{'s_id': delete_transaction['s_id']})
 
             # If the TN allocation failed
-            if not tn_success:
+            if not transport_success:
                 self._log('Failed deleting Transport Slice')
                 # Inform the user about the failure
                 self._send_msg(self.delete_nack, transport_msg)

@@ -253,7 +253,7 @@ class ovs_ctl(app_manager.RyuApp):
             95534454058: 's02',
             95536781980: 's03',
             95531791552: 's04',
-            95532050795: 's05'            
+            47102661227: 's05'            
         }
 
         self.topology = defaultdict(dict)

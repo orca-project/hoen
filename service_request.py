@@ -5,7 +5,7 @@ import zmq
 # Import the ArgParse modeule
 import argparse
 
-RECV_DELAY = 3*10000
+RECV_DELAY = 6*10000
 
 # Make printing easier. TODO: Implement real logging
 def log(*args, head=False):
@@ -152,7 +152,7 @@ def service_create(socket, **kwargs):
     # Send service request message to the hyperstrator
     socket.send_json({
         create_msg: {'service': kwargs['service'],
-                     'requirements': {'throughout': kwargs['throughput'],
+                     'requirements': {'throughput': kwargs['throughput'],
                                       'latency': kwargs['latency']}
                      }})
 

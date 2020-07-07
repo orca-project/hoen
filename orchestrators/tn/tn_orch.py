@@ -119,7 +119,17 @@ class tn_orchestrator(base_orchestrator):
         return success, msg
 
     def request_slice(self, **kwargs):
-        pass
+        s_id = kwargs.get('s_id', None)
+        catalog = ndb()
+        if s_id is not None:
+            route = catalog.get_route(s_id)
+            if route is not None:
+                msg = {}
+                msg[s_id] = route
+        else:
+            msg = catalog.get_routes()
+        return (False, "Service not found.") \
+            if (s_id and not msg) else (True, msg)
 
     def update_slice(self, **kwargs):
         pass
