@@ -20,7 +20,7 @@ from pylxd import Client
 
 # Supress pylxd warnings
 os.environ["PYLXD_WARNINGS"] = "none"
-grab_ethernet = False
+grab_ethernet = True
 
 class lxd_controller(base_controller):
 
@@ -60,7 +60,7 @@ class lxd_controller(base_controller):
                 image.add_alias(name=image_name, description="")
 
         # Log event and return possible new name
-        self._log("Base image ready!")
+        self._log("Base image ready:", image_name)
 
         return image_name
 
@@ -138,10 +138,11 @@ class lxd_controller(base_controller):
         try:
             # Create a new container with the specified configuration
             container = self.lxd_client.containers.create(profile, wait=True)
-
+            self._log("Created container")
             # Start the container
             container.start(wait=True)
 
+            self._log("Started container")
             # If attaching an physical ethernet port to it
             if grab_ethernet:
                 # Set the interface's IPenp0s31f6
