@@ -12,7 +12,7 @@ from os import system, name
 from traceback import format_exc
 
 # Received delay of 10 sec
-RECV_DELAY = 30*1000
+RECV_DELAY = 60*1000
 
 import signal
 
@@ -341,7 +341,7 @@ class base_orchestrator(Thread):
                         continue
 
                     # Append it to the list of service IDs
-                    #  self.s_ids[create_slice['s_id']] = {}
+                    self.s_ids[create_slice['s_id']] = {}
 
                     self._log('Service ID:', create_slice['s_id'])
 
@@ -351,6 +351,7 @@ class base_orchestrator(Thread):
                     except Exception:
                         success = False
                         msg = str(format_exc())
+                        del self.s_ids[create_slice['s_ids']]
 
                     # Log event
                     self._log("Created Slice" if success else \

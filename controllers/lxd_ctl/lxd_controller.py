@@ -32,11 +32,11 @@ class lxd_controller(base_controller):
 
         # List of external ethernet ports
         self.interface_list = {x: {"available": True} for x in \
-                net_if_addrs().keys() if x.startswith('enp5')}
+                net_if_addrs().keys() if x.startswith('enp')}
 
         self._log("Found", len(self.interface_list), "Ethernet ports")
 
-    def prepare_distro_image(self, image_name="hoen-1.0"):
+    def prepare_distro_image(self, image_name="hoen-3.0"):
         # Image server locations
         #  image_server = "https://images.linuxcontainers.org"
         image_server = "https://cloud-images.ubuntu.com/releases/"
@@ -127,6 +127,7 @@ class lxd_controller(base_controller):
                                 "path": "/root/services/"}
                    }}
 
+
         # If attaching an physical ethernet port to it
         if grab_ethernet:
             # Add new entry to the profile configuration
@@ -137,15 +138,17 @@ class lxd_controller(base_controller):
                 "name": "oth0"}
             })
 
+
         # Try to create a new container
         try:
             # Create a new container with the specified configuration
             container = self.lxd_client.containers.create(profile, wait=True)
             self._log("Created container")
+
             # Start the container
             container.start(wait=True)
-
             self._log("Started container")
+
             # If attaching an physical ethernet port to it
             if grab_ethernet:
                 # Set the interface's IPenp0s31f6
@@ -159,8 +162,11 @@ class lxd_controller(base_controller):
                 container.execute(
                         ["ip", "route", "add", "default", "dev", "oth0"])
 
-                # Start docker service
-                self.start_service(container, s_ser)
+                self._log("Configured networking")
+
+                if False:
+                    # Start docker service
+                    self.start_service(container, s_ser)
 
         # In case of issues
         except Exception as e:

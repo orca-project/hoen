@@ -20,7 +20,7 @@ else:
     from eventlet.green import zmq
 
 # Received delay of 10 sec
-RECV_DELAY = 10*1000
+RECV_DELAY = 60*1000
 
 def cls():
     system('cls' if name=='nt' else 'clear')
@@ -177,7 +177,7 @@ class base_controller(Thread):
                         continue
 
                     # Append it to the list of service IDs
-                    #  self.s_ids[create_slice['s_id']] = {}
+                    self.s_ids[create_slice['s_id']] = {}
                     self._log('Service ID:', create_slice['s_id'])
 
                     try:
@@ -186,6 +186,7 @@ class base_controller(Thread):
                     except Exception:
                         success = False
                         msg = str(format_exc())
+                        del self.s_idis[create_slice['s_id']]
 
                     # Log event
                     self._log("Created Slice" if success else \
