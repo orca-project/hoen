@@ -12,6 +12,8 @@ from os import system, name
 from signal import pause
 # Import the Time method from the Time module
 from time import time
+# Import the ArgParse module
+import argparse
 
 # Received delay of 10 sec
 RECV_DELAY = 30*10000
@@ -20,6 +22,67 @@ RECV_DELAY = 30*10000
 def cls():
     # Perform action based on the current platform
     system('cls' if name == 'nt' else 'clear')
+
+def parse_cli_args():
+    # Instantiate ArgumentParser object
+    parser = argparse.ArgumentParser(description='End-to-End Hyperstrator')
+    parser.add_argument(
+        '--cn_ip',
+        type=str,
+        default='134.226.55.122',
+        required=False,
+        help='CN orchestrator IP')
+    parser.add_argument(
+        '--cn_port',
+        type=int,
+        default=2300,
+        required=False,
+        help='CN orchestrator port')
+    parser.add_argument(
+        '--tn_ip',
+        type=str,
+        default='134.226.55.106',
+        required=False,
+        help='TN orchestrator IP')
+    parser.add_argument(
+        '--tn_port',
+        type=int,
+        default=2200,
+        required=False,
+        help='TN orchestrator port')
+    parser.add_argument(
+        '--ran_ip',
+        type=str,
+        default='134.226.55.90',
+        required=False,
+        help='RAN orchestrator IP')
+    parser.add_argument(
+        '--ran_port',
+        type=int,
+        default=2100,
+        required=False,
+        help='RAN orchestrator port')
+
+    parser.add_argument(
+        '-c', '--skip_cn',
+        required=False,
+        action='store_true',
+        help='Skip the CN segment')
+    parser.add_argument(
+        '-t', '--skip_tn',
+        required=False,
+        action='store_true',
+        help='Skip the TN segment')
+    parser.add_argument(
+        '-r', '--skip_ran',
+        required=False,
+        action='store_true',
+        help='Skip the RAN segment')
+
+    # Parse CLI arguments
+    arg_dict = vars(parser.parse_args())
+
+    return arg_dict
 
 
 class orch_base(object):
@@ -214,8 +277,8 @@ class hyperstrator_server(Thread):
             name="Core Network",
             host_key="cn_host",
             port_key="cn_port",
-            default_host="134.226.55.122",
-            default_port="2300",
+            default_host=kwargs.get('cn_ip', '134.226.55.122'),
+            default_port=str(kwargs.get('cn_port', 2300)),
             create_msg="cn_cc",
             request_msg="cn_rc",
             update_msg="cn_uc",
@@ -228,8 +291,8 @@ class hyperstrator_server(Thread):
              name="Transport Network",
              host_key="tn_host",
              port_key="tn_port",
-             default_host="134.226.55.106",
-             default_port="2200",
+             default_host=kwargs.get('tn_ip', '134.226.55.106'),
+             default_port=str(kwargs.get('tn_port', 2200)),
              create_msg="tn_cc",
              request_msg="tn_rc",
              update_msg="tn_uc",
@@ -242,8 +305,8 @@ class hyperstrator_server(Thread):
              name="Radio Access Network",
              host_key="ran_host",
              port_key="ran_port",
-             default_host="127.0.0.1",
-             default_port="2100",
+             default_host=kwargs.get('ran_ip', '134.226.55.90'),
+             default_port=str(kwargs.get('ran_port', 2100)),
              create_msg="rn_cc",
              request_msg="rn_rc",
              update_msg="rn_uc",
@@ -289,9 +352,9 @@ class hyperstrator_server(Thread):
         self.delete_nack = "_".join([self.delete_msg.split('_')[-1], "nack"])
 
         # Debug flags
-        self.do_radio = kwargs.get('do_radio', True)
-        self.do_transport= kwargs.get('do_transport', True)
-        self.do_core = kwargs.get('do_core', True)
+        self.skip_radio = kwargs.get('skip_ran', True)
+        self.skip_transport= kwargs.get('skip_tn', True)
+        self.skip_core = kwargs.get('skip_cn', True)
 
     # Bind server to socket
     def _server_bind(self, **kwargs):
@@ -392,7 +455,7 @@ class hyperstrator_server(Thread):
         self._log('Service ID:', s_id)
 
         # If allocating CN slices
-        if self.do_core:
+        if not self.skip_core:
             self._log('Send message to the CN orchestrator')
             # Otherwise, send message to the CN orchestrator
             core_success, core_msg = self.cn_orch.create_slice(
@@ -424,11 +487,11 @@ class hyperstrator_server(Thread):
         else:
             self._log('Skipping CN')
             # Use a fake source IP
-            core_msg = {'s_id': s_id, 'source': '20.0.0.1'}
+            core_msg = {'s_id': s_id, 'source': '30.0.7.1'}
 
 
         # If allocating RAN slices
-        if self.do_radio:
+        if not self.skip_radio:
             self._log('Send message to the RAN orchestrator')
             # Otherwise, send message to the CN orchestrator
             radio_success, radio_msg = self.ran_orch.create_slice(
@@ -450,6 +513,16 @@ class hyperstrator_server(Thread):
                 # Measured elapsed time
                 self._log('Failed radio, took:',
                       (time() - st)*1000, 'ms')
+
+                # Clear up existing network segment slices
+                if not self.skip_core:
+                    core_success, core_msg = self.cn_orch.delete_slice(
+                        **{'s_id': s_id})
+
+                    # If the core delete failed
+                    if not core_success:
+                        self._log('Failed cleaning up Core Slice')
+
                 # Finish the main loop here
                 return
 
@@ -461,10 +534,10 @@ class hyperstrator_server(Thread):
             self._log('Skipping RAN')
             # Use a fake source IP
             #radio_msg = {'s_id': s_id, 'destination': '10.30.0.179'}
-            radio_msg = {'s_id': s_id, 'destination': '10.20.0.1'}
+            radio_msg = {'s_id': s_id, 'destination': '10.0.0.160'}
 
         # If allocating TN slices
-        if self.do_transport:
+        if not self.skip_transport:
             self._log('Send message to the TN orchestrator')
             # Send UUID and requirements to the TN orchestrator
             transport_success, transport_msg = \
@@ -487,6 +560,26 @@ class hyperstrator_server(Thread):
                 # Measured elapsed time
                 self._log('Failed transport, took:',
                       (time() - st)*1000, 'ms')
+
+
+                # Clear up existing network segment slices
+                if not self.skip_core:
+                    core_success, core_msg = self.cn_orch.delete_slice(
+                        **{'s_id': s_id})
+
+                    # If the core delete failed
+                    if not core_success:
+                        self._log('Failed cleaning up Core Slice')
+
+                # Clear up existing network segment slices
+                if not self.skip_radio:
+                    radio_success, radio_msg = self.ran_orch.delete_slice(
+                        **{'s_id': s_id})
+
+                    # If the radio delete failed
+                    if not radio_success:
+                        self._log('Failed cleaning up Radio Slice')
+
                 # Finish here
                 return
 
@@ -546,7 +639,7 @@ class hyperstrator_server(Thread):
                 {request_transaction['s_id']: {}}
 
         # If doing the CN
-        if self.do_core:
+        if not self.skip_core:
             self._log('Send message to CN orchestrator')
 
             # Otherwise, send message to the CN orchestrator
@@ -573,7 +666,7 @@ class hyperstrator_server(Thread):
                 slice_info[s_id].update({'cn': 'stub'})
 
         # If doing the TN
-        if self.do_transport:
+        if not self.skip_transport:
             self._log('Send message to TN orchestrator')
 
             # Otherwise, send message to the TN orchestrator
@@ -601,7 +694,7 @@ class hyperstrator_server(Thread):
                 slice_info[s_id].update({'tn': 'stub'})
 
         # If doing the RAN
-        if self.do_radio:
+        if not self.skip_radio:
             self._log('Send message to RAN orchestrator')
 
             # Otherwise, send message to the RAN orchestrator
@@ -667,7 +760,7 @@ class hyperstrator_server(Thread):
         self._log('Service ID:', delete_transaction['s_id'])
 
         # If doing the CN
-        if self.do_core:
+        if not self.skip_core:
             self._log('Send message to CN orchestrator')
 
             # Otherwise, send message to the CN orchestrator
@@ -687,7 +780,7 @@ class hyperstrator_server(Thread):
             self._log('Skipping CN')
 
         # If doing the RAN
-        if self.do_radio:
+        if not self.skip_radio:
             self._log('Send message to RAN orchestrator')
 
             # Otherwise, send message to the RAN orchestrator
@@ -707,7 +800,7 @@ class hyperstrator_server(Thread):
             self._log('Skipping RAN')
 
         # If doing the TN
-        if self.do_transport:
+        if not self.skip_transport:
             self._log('Send message to the TN orchestrator')
             # Otherwise, send message to the TN orchestrator
             transport_success, transport_msg = \
@@ -738,6 +831,9 @@ if __name__ == "__main__":
     # Clear screen
     cls()
 
+    # Parse CLI arguments
+    kwargs = parse_cli_args()
+
     # Handle keyboard interrupt (SIGINT)
     try:
         # Instantiate the Hyperstrator Server
@@ -749,9 +845,9 @@ if __name__ == "__main__":
             request_msg='sr_rs',
             update_msg='sr_us',
             delete_msg='sr_ds',
-            do_radio=False,
-            do_transport=False,
-            do_core=True)
+            **kwargs
+        )
+
         # Start the Hyperstrator Thread
         hyperstrator_thread.start()
         # Pause the main thread
