@@ -513,6 +513,16 @@ class hyperstrator_server(Thread):
                 # Measured elapsed time
                 self._log('Failed radio, took:',
                       (time() - st)*1000, 'ms')
+
+                # Clear up existing network segment slices
+                if not self.skip_core:
+                    core_success, core_msg = self.cn_orch.delete_slice(
+                        **{'s_id': s_id})
+
+                    # If the core delete failed
+                    if not core_success:
+                        self._log('Failed cleaning up Core Slice')
+
                 # Finish the main loop here
                 return
 
@@ -550,6 +560,26 @@ class hyperstrator_server(Thread):
                 # Measured elapsed time
                 self._log('Failed transport, took:',
                       (time() - st)*1000, 'ms')
+
+
+                # Clear up existing network segment slices
+                if not self.skip_core:
+                    core_success, core_msg = self.cn_orch.delete_slice(
+                        **{'s_id': s_id})
+
+                    # If the core delete failed
+                    if not core_success:
+                        self._log('Failed cleaning up Core Slice')
+
+                # Clear up existing network segment slices
+                if not self.skip_radio:
+                    radio_success, radio_msg = self.ran_orch.delete_slice(
+                        **{'s_id': s_id})
+
+                    # If the radio delete failed
+                    if not radio_success:
+                        self._log('Failed cleaning up Radio Slice')
+
                 # Finish here
                 return
 
