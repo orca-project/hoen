@@ -32,9 +32,10 @@ class lxd_controller(base_controller):
 
         # List of external ethernet ports
         self.interface_list = {x: {"available": True} for x in \
-                net_if_addrs().keys() if x.startswith('enp')}
+                net_if_addrs().keys() if x.startswith('enp') and x != 'enp4s0'}
 
-        self._log("Found", len(self.interface_list), "Ethernet ports")
+        self._log("Found", len(self.interface_list),
+                  "Ethernet ports:", list(self.interface_list.keys()))
 
     def prepare_distro_image(self, image_name="hoen-3.0"):
         # Image server locations
@@ -152,7 +153,7 @@ class lxd_controller(base_controller):
             # If attaching an physical ethernet port to it
             if grab_ethernet:
                 # Set the interface's IPenp0s31f6
-                interface_ip = "10.0.{0}.1/24".format(int(available_interface[3]))
+                interface_ip = "30.0.{0}.1/24".format(int(available_interface[3]))
                 container.execute(
                         ["ip", "addr", "add", interface_ip, "dev", "oth0"])
 
@@ -227,13 +228,14 @@ class lxd_controller(base_controller):
             self._log("Found container:", container.name.split('-',1)[-1])
 
             # Append this information to the output dictionary
-            msg[container.name.split('-',1)[-1]] = \
-                {'distro': container.config["image.os"]+ "-" + \
-                     container.config['image.version'],
+            msg[container.name.split('-',1)[-1]] = {
+                #  'distro': container.config["image.os"]+ "-" + \
+                    #  container.config['image.version'],
                 'memory': {"limit": container.config.get('limits.memory', ""),
-                           "usage": container.state().memory['usage']},
-                 'cpu': {"limit":  container.config.get('limits.cpu', ""),
-                         "usage": container.state().cpu['usage']}}
+                    "usage": container.state().memory['usage']},
+                'cpu': {"limit":  container.config.get('limits.cpu', ""),
+                    "usage": container.state().cpu['usage']}
+            }
 
             if container.name.split('-',1)[-1] in self.s_ids:
                 # Add it to the message
@@ -243,7 +245,8 @@ class lxd_controller(base_controller):
                      })
 
             # If there is an external Ethernet interface
-            if grab_ethernet:
+            if grab_ethernet and container.state().network is not None:
+
                 # Add it to the message
                 msg[container.name.split('-',1)[-1]].update(
                     {"network":
