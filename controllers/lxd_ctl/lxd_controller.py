@@ -161,7 +161,14 @@ class lxd_controller(base_controller):
 
                 # Install routes to allow different network communication
                 container.execute(
-                        ["ip", "route", "add", "default", "dev", "oth0"])
+                    ["ip", "route", "add", "default", "dev", "oth0"]
+                )
+
+                # Set route to radio
+                container.execute(
+                    ['ip','route','add','10.0.0.0/24','via', '10.0.0.1', 'dev',
+                     'oth0']
+                )
 
                 self._log("Configured networking")
 
