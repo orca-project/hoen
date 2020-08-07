@@ -13,17 +13,46 @@ import signal
 from time import sleep
 # Import the bash method from the bash module
 from bash import bash
+# Import the ArgParse module
+import argparse
 
 # Import the Omapi object from the pypureomapi
 from pypureomapi import Omapi, OmapiErrorNotFound, OmapiError
+
+
+def parse_cli_args():
+    # Instantiate ArgumentParser object
+    parser = argparse.ArgumentParser(description='OpenWifi SDR Controller')
+
+    parser.add_argument(
+        '-m', '--skip_moduldes',
+        required=False,
+        action='store_true',
+        help='Skip loading kernel modules')
+    parser.add_argument(
+        '-n', '--skip_network',
+        required=False,
+        action='store_true',
+        help='Skip configuring networking')
+    parser.add_argument(
+        '-a', '--skip_ap',
+        required=False,
+        action='store_true',
+        help='Skip starting Hostapd')
+
+    # Parse CLI arguments
+    arg_dict = vars(parser.parse_args())
+
+    return arg_dict
+
 
 class opw_controller(base_controller):
 
     def post_init(self, **kwargs):
         # Get parameters from keyword arguments
-        do_modules = kwargs.get("do_modules", True)
-        do_network = kwargs.get("do_network", True)
-        do_ap = kwargs.get("do_ap", True)
+        skip_modules = kwargs.get("skip_modules", False)
+        skip_network = kwargs.get("skip_network", False)
+        skip_ap = kwargs.get("skip_ap", False)
         # Extra options
         self.sdr_dev = kwargs.get("sdr_dev", "sdr0")
         #  self.lan_ip = kwargs.get("lan_ip", "192.168.13.1")
@@ -39,7 +68,7 @@ class opw_controller(base_controller):
         self._log("Stopped Network Manager")
 
         # If loading kernel modules
-        if do_modules:
+        if not skip_modules:
             fpga_dev_path = "/sys/bus/iio/devices/iio:device2"
             filter_file = "openwifi_ad9361_fir.ftr"
 
@@ -142,7 +171,7 @@ class opw_controller(base_controller):
             self._log("Configured kernel modules and FPGA")
 
         # If configuring routing and networking
-        if do_network:
+        if not skip_network:
             # Configure the SDR interface's IP
             bash("ifconfig {0} {1} netmask 255.255.255.0".format(self.sdr_dev,
                                                                  self.lan_ip))
@@ -186,7 +215,7 @@ class opw_controller(base_controller):
 
 
         # If starting the access point
-        if do_ap:
+        if not skip_ap:
             # If there is a Host AP Daemon running in the background
             if bool(bash("ps -aux | grep [h]ostapd")):
                 # Kill the process
@@ -450,6 +479,10 @@ class opw_controller(base_controller):
 if __name__ == "__main__":
     # Clear screen
     cls()
+
+    # Parse CLI arguments
+    kwargs = parse_cli_args()
+
     # Handle keyboard interrupt (SIGINT)
     try:
         # Instantiate the OpenWiFi Controller
@@ -461,13 +494,10 @@ if __name__ == "__main__":
             request_msg='owc_rrs',
             update_msg='owc_urs',
             delete_msg='owc_drs',
-            do_modules=True,
-            #  do_modules=False,
-            do_network=True,
-            #  do_network=False,
-            do_ap=True,
             host='0.0.0.0',
-            port=3100)
+            port=3100,
+	    **kwargs
+	)
 
         # Start the OpenWiFi Controller Server
         opw_controller_thread.start()
