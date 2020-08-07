@@ -32,11 +32,12 @@ class lxd_controller(base_controller):
 
         # List of external ethernet ports
         self.interface_list = {x: {"available": True} for x in \
-                net_if_addrs().keys() if x.startswith('enp')}
+                net_if_addrs().keys() if x.startswith('enp') and x != 'enp4s0'}
 
-        self._log("Found", len(self.interface_list), "Ethernet ports")
+        self._log("Found", len(self.interface_list),
+                  "Ethernet ports:", list(self.interface_list.keys()))
 
-    def prepare_distro_image(self, image_name="hoen-1.0"):
+    def prepare_distro_image(self, image_name="hoen-3.0"):
         # Image server locations
         #  image_server = "https://images.linuxcontainers.org"
         image_server = "https://cloud-images.ubuntu.com/releases/"
@@ -62,7 +63,7 @@ class lxd_controller(base_controller):
                 image.add_alias(name=image_name, description="")
 
         # Log event and return possible new name
-        self._log("Base image ready!")
+        self._log("Base image ready:", image_name)
 
         return image_name
 
@@ -127,6 +128,7 @@ class lxd_controller(base_controller):
                                 "path": "/root/services/"}
                    }}
 
+
         # If attaching an physical ethernet port to it
         if grab_ethernet:
             # Add new entry to the profile configuration
@@ -137,18 +139,21 @@ class lxd_controller(base_controller):
                 "name": "oth0"}
             })
 
+
         # Try to create a new container
         try:
             # Create a new container with the specified configuration
             container = self.lxd_client.containers.create(profile, wait=True)
+            self._log("Created container")
 
             # Start the container
             container.start(wait=True)
+            self._log("Started container")
 
             # If attaching an physical ethernet port to it
             if grab_ethernet:
                 # Set the interface's IPenp0s31f6
-                interface_ip = "10.0.{0}.1/24".format(int(available_interface[3]))
+                interface_ip = "30.0.{0}.1/24".format(int(available_interface[3]))
                 container.execute(
                         ["ip", "addr", "add", interface_ip, "dev", "oth0"])
 
@@ -158,8 +163,11 @@ class lxd_controller(base_controller):
                 container.execute(
                         ["ip", "route", "add", "default", "dev", "oth0"])
 
-                # Start docker service
-                self.start_service(container, s_ser)
+                self._log("Configured networking")
+
+                if False:
+                    # Start docker service
+                    self.start_service(container, s_ser)
 
         # In case of issues
         except Exception as e:
@@ -220,13 +228,14 @@ class lxd_controller(base_controller):
             self._log("Found container:", container.name.split('-',1)[-1])
 
             # Append this information to the output dictionary
-            msg[container.name.split('-',1)[-1]] = \
-                {'distro': container.config["image.os"]+ "-" + \
-                     container.config['image.version'],
+            msg[container.name.split('-',1)[-1]] = {
+                #  'distro': container.config["image.os"]+ "-" + \
+                    #  container.config['image.version'],
                 'memory': {"limit": container.config.get('limits.memory', ""),
-                           "usage": container.state().memory['usage']},
-                 'cpu': {"limit":  container.config.get('limits.cpu', ""),
-                         "usage": container.state().cpu['usage']}}
+                    "usage": container.state().memory['usage']},
+                'cpu': {"limit":  container.config.get('limits.cpu', ""),
+                    "usage": container.state().cpu['usage']}
+            }
 
             if container.name.split('-',1)[-1] in self.s_ids:
                 # Add it to the message
@@ -236,7 +245,8 @@ class lxd_controller(base_controller):
                      })
 
             # If there is an external Ethernet interface
-            if grab_ethernet:
+            if grab_ethernet and container.state().network is not None:
+
                 # Add it to the message
                 msg[container.name.split('-',1)[-1]].update(
                     {"network":

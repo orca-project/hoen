@@ -74,6 +74,14 @@ def parse_cli_args():
         required=False,
         help='Request information about this service')
 
+    parser_request.add_argument(
+        '-j', '--json',
+        required=False,
+        action='store_true',
+        help='Strip text and return a JSON string'
+    )
+
+
     # TODO Built parsers, but methods remain unimplemented
     if False:
         parser_update = subparsers.add_parsers(
@@ -202,7 +210,6 @@ def service_request(socket, **kwargs):
     # Try to get the service ID
     s_id = kwargs.get("service_id", "")
 
-    print(s_id, kwargs)
     # Send service release message to the hyperstrator
     socket.send_json({request_msg: {'s_id': s_id}})
 
@@ -220,14 +227,21 @@ def service_request(socket, **kwargs):
 
         # If received an acknowledgement
         if ack is not None:
-            # Print information
-            log('Request Service:', head=True)
-            # For every returned slice
-            for entry in ack:
-                log('Service ID:', entry)
-                log('Info:', ack[entry])
-            # Exit gracefully
-            exit(0)
+            # If returning a human-readable string
+            if not kwargs['json']:
+                # Print information
+                log('Request Service:', head=True)
+                # For every returned slice
+                for entry in ack:
+                    log('Service ID:', entry)
+                    log('Info:', ack[entry])
+                # Exit gracefully
+                exit(0)
+            # If returning a raw JSON
+            else:
+                print(ack)
+                 # Exit gracefully
+                exit(0)
 
         # Check if there's a not acknowledgement
         nack = rep.get(request_nack, None)
