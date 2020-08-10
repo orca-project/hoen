@@ -35,6 +35,21 @@ def parse_cli_args():
     # Require subcommands
     subparsers.required = True
 
+    # Create parser for getting information about the network
+    parser_info = subparsers.add_parser(
+        'info',
+        help='Get information about the network infrastructure')
+
+    # Add CLI arguments
+    parser_info.add_argument(
+        '-n', '--network',
+        metavar='NETWORK',
+        type=str,
+        choices=["ran", "tn", "cn"],
+        nargs='*',
+        required=False,
+        help='Type of Service')
+
     # Create parser for the creation of slices
     parser_create = subparsers.add_parser(
         'create',
@@ -141,6 +156,61 @@ def establish_connection(**kwargs):
             server + ":" + str(port))
 
     return socket
+
+
+def network_info(socket, **kwargs):
+    info_msg = "ni_ri"
+    info_ack = "ri_ack"
+    info_nack = "ri_nack"
+
+    # Try to get the network segment
+    s_ns = kwargs.get("network", "")
+
+    # Send message to the hyperstrator
+    socket.send_json({info_msg: {'s_ns': s_ns}})
+
+    try:
+        # Receive acknowledgment
+         rep = socket.recv_json()
+
+    except zmq.error.Again:
+        log('Could not reach the Hyperstrator server at:',
+            kwargs['server'] + ":" + str(kwargs['port']), head=True)
+
+    else:
+        # Check if there's an acknowledgement
+        ack = rep.get(info_ack, None)
+
+        # If received an acknowledgement
+        if ack is not None:
+            # Print information
+            log('Network Information:', head=True)
+            # For every returned slice
+            for entry in ack:
+                log('Service ID:', entry)
+                log('Info:', ack[entry])
+            # Exit gracefully
+            exit(0)
+
+        # Check if there's a not acknowledgement
+        nack = rep.get(info_nack, None)
+
+        # If received a not acknowledgement
+        if nack is not None:
+            log('Failed to request information about network segment.',
+                head=True)
+            # Print reason
+            log('Reason: ', nack, head=True)
+            # Opsie
+            exit(0)
+
+        # If neither worked
+        if (ack is None) and (nack is None):
+            log('Failed to parse message:', head=True)
+            log('Message:', rep)
+
+
+
 
 
 def service_create(socket, **kwargs):
@@ -301,8 +371,12 @@ if __name__ == "__main__":
     # Establish connection to the hyperstrator
     socket = establish_connection()
 
+    # Retrieve information about the E2E network
+    if 'info' in kwargs['subcommand']:
+        network_info(socket, **kwargs)
+
     # Create new E2E service
-    if 'create' in kwargs['subcommand']:
+    elif 'create' in kwargs['subcommand']:
         service_create(socket, **kwargs)
 
     # Get information on E2E service
