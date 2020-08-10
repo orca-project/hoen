@@ -8,6 +8,9 @@ path.append('..')
 from base_orchestrator.base_orchestrator import base_orchestrator, ctl_base, cls
 # Import the System and Name methods from the OS module
 from os import system, name
+
+import datetime
+
 # Import signal
 import signal
 
@@ -29,15 +32,31 @@ class radio_access_network_orchestrator(base_orchestrator):
             update_msg='owc_urs',
             delete_msg='owc_drs')
 
+        # Dictionary mapping service types to slice numbers
+        self.service_to_queue = {
+            'best-effort': 3,
+            'embb': 1,
+            'urllc': 0
+        }
+
+        # Keep track of the allocated and free radio resources
+        self.radio_resources = [{'queue': None,
+                                 'start': 0,
+                                 'end': 49999}]
+
         # Dictionary mapping UE's MAC addresses
         self.service_to_mac = {
-            'best-effort': '14:AB:C5:42:B7:33',
-            'urllc': 'B8:27:EB:BE:C1:F1',
-            'embb': '88:29:9C:02:24:EF'
+            #  'best-effort': '14:AB:C5:42:B7:33', # New Dell
+            'best-effort': '14:AB:C5:42:B7:33', # New Dell
+            #  'embb': '14:AB:C5:42:B7:33', # New Dell
+            'urllc': 'B8:27:EB:BE:C1:F1', # RasPi
+            'embb': '88:29:9C:02:24:EF' # Phone
+            #  'embb': 'F8:16:54:4C:E1:A4' # Old Dell
         }
         #TODO We might loads this from a file and allow reloading it
 
     def create_slice(self, **kwargs):
+        a = datetime.datetime.now()
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
         # Get the slice requirements
@@ -52,18 +71,75 @@ class radio_access_network_orchestrator(base_orchestrator):
         # Get MAC address associated with service
         s_mac = self.service_to_mac[s_ser]
 
-        # TODO Calculate the amount of resources
-        i_start = 0
-        i_end   = 19999 if s_ser == "best-effort" else 49999
-        i_total = 50000
+        # Apply defaults and sanitise input
+        i_thx = s_req.get("throughput", 1)
+        i_thx = float(i_thx) if i_thx is not None else 1
 
-        # TODO decide which slice to use
-        i_sln = 0 if s_ser == "best-effort" else 1
+        i_del = s_req.get("latency", 100)
+        i_del = float(i_del) if i_del is not None else 200
+
+        # Calculate the required amount of resources
+        eq_thx = max((i_thx - 0.5786)  / 14.19, 0.01)
+        eq_del = max((148.6 - i_del) / 133.2, 0.01)
+
+        # Get the minimum amount to suffice both delay and throughput
+        req_resources = int(50000 * max(eq_thx, eq_del)) - 1
+
+        if req_resources >= 50000 and req_resources <= 51000:
+
+            req_resources = 49999
+
+        # If requiring too many resources
+        if req_resources >= 50000:
+            return False, "Unfeasible request."
+
+        # TODO Dirty way around
+        if s_ser == 'best_effort':
+            req_resources = 49999
+
+        # Try to allocate radio sources
+        allocated = False
+        # Allocate over the list of radio resources
+        for index, resource in enumerate(self.radio_resources):
+            # If there's a free chunk of airtime
+            if resource['queue'] is None and \
+                    resource['end'] - resource['start'] >= req_resources:
+                # Slice it over
+                self.radio_resources.insert(
+                    index+1,
+                    {
+                        'queue': None,
+                        'start': resource['start'] + req_resources,
+                        'end': resource['end']
+                })
+
+                self.radio_resources[index] = {
+                        'queue': self.service_to_queue.get(s_ser, 3),
+                        'start': resource['start'],
+                        'end': req_resources - 1
+                }
+                allocated  = True
+                break
+
+        # If we could not allocate the current request
+        if not allocated:
+            return False, 'Not enough radio resources.'
+
+
+        # Express the amount of resources in a way that SDRCTL can understand
+        i_start = self.radio_resources[index]['start']
+        i_end = self.radio_resources[index]['end']
+        i_total = 50000
+        i_sln = self.radio_resources[index]['queue']
 
         # Send message to OpenWiFi RAN controller
         self._log("Service:", s_ser, 'Requirements:', s_req, "Slice #", i_sln)
         self._log('Delegating it to the OPW Controller')
 
+        b = datetime.datetime.now()
+
+        c = b -a
+        print(c.microseconds)
         # Send the message to create a slice
         success, msg = self.opw_ctl.create_slice(
             **{'s_id': s_id, 's_mac': s_mac,
@@ -74,6 +150,8 @@ class radio_access_network_orchestrator(base_orchestrator):
                    'total': i_total}
                })
 
+        d = datetime.datetime.now()
+
         if success:
             # Append it to the list of service IDs
             self.s_ids[s_id] = {"requirements": s_req,
@@ -83,6 +161,10 @@ class radio_access_network_orchestrator(base_orchestrator):
                                 "destination": msg['destination']}
 
 
+        e = datetime.datetime.now()
+
+        f = e - d
+        print(f.microseconds)
         # Inform the user about the creation
         return success, msg
 
@@ -147,6 +229,11 @@ class radio_access_network_orchestrator(base_orchestrator):
 
         # Send message to remove slice
         success, msg = self.opw_ctl.delete_slice(**{'s_id': s_id})
+
+
+        for index, resource in enumerate(self.radio_resources):
+
+
 
         # Inform the user about the removal
         return success, msg

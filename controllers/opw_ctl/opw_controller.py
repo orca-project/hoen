@@ -13,21 +13,52 @@ import signal
 from time import sleep
 # Import the bash method from the bash module
 from bash import bash
+# Import the ArgParse module
+import argparse
 
 # Import the Omapi object from the pypureomapi
 from pypureomapi import Omapi, OmapiErrorNotFound, OmapiError
+
+
+def parse_cli_args():
+    # Instantiate ArgumentParser object
+    parser = argparse.ArgumentParser(description='OpenWifi SDR Controller')
+
+    parser.add_argument(
+        '-m', '--skip_modules',
+        required=False,
+        action='store_true',
+        help='Skip loading kernel modules')
+    parser.add_argument(
+        '-n', '--skip_network',
+        required=False,
+        action='store_true',
+        help='Skip configuring networking')
+    parser.add_argument(
+        '-a', '--skip_ap',
+        required=False,
+        action='store_true',
+        help='Skip starting Hostapd')
+
+    # Parse CLI arguments
+    arg_dict = vars(parser.parse_args())
+
+    return arg_dict
+
 
 class opw_controller(base_controller):
 
     def post_init(self, **kwargs):
         # Get parameters from keyword arguments
-        do_modules = kwargs.get("do_modules", True)
-        do_network = kwargs.get("do_network", True)
-        do_ap = kwargs.get("do_ap", True)
+        skip_modules = kwargs.get("skip_modules", False)
+        skip_network = kwargs.get("skip_network", False)
+        skip_ap = kwargs.get("skip_ap", False)
         # Extra options
         self.sdr_dev = kwargs.get("sdr_dev", "sdr0")
-        self.lan_ip = kwargs.get("lan_ip", "192.168.13.1")
-        gw_ip = kwargs.get("gw_ip", "134.226.55.211")
+        #  self.lan_ip = kwargs.get("lan_ip", "192.168.13.1")
+        self.lan_ip = kwargs.get("lan_ip", "10.0.0.1")
+        #  gw_ip = kwargs.get("gw_ip", "134.226.55.211")
+        gw_dev = kwargs.get("gw_dev", "eth0")
         ap_config_path = kwargs.get("ap_path",
                                     "/root/openwifi/hostapd-openwifi.conf")
         openwifi_path = kwargs.get("openwifi_path", "/root/openwifi")
@@ -37,7 +68,7 @@ class opw_controller(base_controller):
         self._log("Stopped Network Manager")
 
         # If loading kernel modules
-        if do_modules:
+        if not skip_modules:
             fpga_dev_path = "/sys/bus/iio/devices/iio:device2"
             filter_file = "openwifi_ad9361_fir.ftr"
 
@@ -140,7 +171,7 @@ class opw_controller(base_controller):
             self._log("Configured kernel modules and FPGA")
 
         # If configuring routing and networking
-        if do_network:
+        if not skip_network:
             # Configure the SDR interface's IP
             bash("ifconfig {0} {1} netmask 255.255.255.0".format(self.sdr_dev,
                                                                  self.lan_ip))
@@ -148,8 +179,10 @@ class opw_controller(base_controller):
                                                               self.lan_ip))
 
             # Set the default route through eth0
-            bash("ip route add default via {0} dev eth0".format(gw_ip))
-            self._log("Set default gateway to: {0}".format(gw_ip))
+            #  bash("ip route add default via {0} dev eth0".format(gw_ip))
+            bash("ip route add default dev {0}".format(gw_dev))
+            #  self._log("Set default gateway to: {0}".format(gw_ip))
+            self._log("Set default gateway to: {0}".format(gw_dev))
 
             # Sleep for 2 seconds and log event
             self._log("Configured routing and networking")
@@ -182,7 +215,7 @@ class opw_controller(base_controller):
 
 
         # If starting the access point
-        if do_ap:
+        if not skip_ap:
             # If there is a Host AP Daemon running in the background
             if bool(bash("ps -aux | grep [h]ostapd")):
                 # Kill the process
@@ -213,21 +246,35 @@ class opw_controller(base_controller):
         # List of currently support RAN slices
         self.ran_slice_list = [{"index": 0, "available": True},
                                {"index": 1, "available": True},
-                                #  "index": 2, "available": True,
+                               {"index": 2, "available": True},
+                               {"index": 3, "available": True},
                             ]
 
         # Iterate over existing slices
         for ran_slice in self.ran_slice_list:
-            # Clear MAC addresses associated with slice
-            cls =  bash("sdrctl dev {0} set addr{1} {2}".format(
+            # Set current slice index
+            idx = bash("sdrctl dev {0} set slice_idx {1}".format(
                     self.sdr_dev,
-                    ran_slice['index'],
+                    ran_slice['index'])).code
+
+            # Clear MAC addresses associated with slice
+            cls = bash("sdrctl dev {0} set addr {1}".format(
+                    self.sdr_dev,
                     "00000000")).code
 
             # Log event
-            self._log("Failed clearing slices #" if cls else "Cleared slice #",
+            self._log("Failed clearing slice #" if cls else "Cleared slice #",
                       ran_slice["index"])
 
+        # Sync all slices
+        sync = bash("sdrctl dev {0} set slice_idx 4".format(self.sdr_dev)).code
+
+        # Output status message and/or exit
+        if not sync:
+            self._log("Synchronised all RAN slices!")
+        else:
+            self._log("Failed synchronising RAN slices.")
+            exit(10)
 
 
     def create_slice(self, **kwargs):
@@ -258,24 +305,6 @@ class opw_controller(base_controller):
             return False, "Slice #" + str(i_sln) + " is not available."
 
 
-        # Get the slice configuration parameters
-        i_start = int(kwargs.get("slice", {}).get('start', 0))
-        i_end   = int(kwargs.get("slice", {}).get('end',   49999))
-        i_total = int(kwargs.get("slice", {}).get('total', 50000))
-
-        # Set the slice configuration
-        bash("sdrctl dev {0} set slice_start{1} {2}".format(self.sdr_dev,
-                                                            i_sln, i_start))
-        bash("sdrctl dev {0} set slice_end{1}   {2}".format(self.sdr_dev,
-                                                            i_sln, i_end))
-        bash("sdrctl dev {0} set slice_total{1} {2}".format(self.sdr_dev,
-                                                            i_sln, i_total))
-
-        # Log event
-        self._log("Set slice", i_sln, " start/end/total to",
-                  i_start, "/", i_end, "/", i_total)
-
-
         # Check whether the given MAC address has a current DHCP lease
         try:
             # Try to check it
@@ -304,17 +333,35 @@ class opw_controller(base_controller):
         # Log event
         self._log("Set", s_mac, "IP to:", lease_ip)
 
+        # Get the slice configuration parameters
+        i_start = int(kwargs.get("slice", {}).get('start', 0))
+        i_end   = int(kwargs.get("slice", {}).get('end',   49999))
+        i_total = int(kwargs.get("slice", {}).get('total', 50000))
+
+        # Set the slice in question
+        bash("sdrctl dev {0} set slice_idx {1}".format(self.sdr_dev, i_sln))
+
+        # Set the slice configuration
+        bash("sdrctl dev {0} set slice_start {1}".format(self.sdr_dev, i_start))
+        bash("sdrctl dev {0} set slice_end {1}".format(self.sdr_dev, i_end))
+        bash("sdrctl dev {0} set slice_total {1}".format(self.sdr_dev, i_total))
+
+        # Log event
+        self._log("Set slice", i_sln, " start/end/total to",
+                  i_start, "/", i_end, "/", i_total)
 
         # Get MAC address associated with service and map it to 32 bits
         s_mac_32 = s_mac.replace(":","")[4:]
 
         # Add MAC address to SDRCTL
-        sla = bash("sdrctl dev {0} set addr{1} {2}".format(
+        sla = bash("sdrctl dev {0} set addr {1}".format(
             self.sdr_dev,
-            i_sln,
             s_mac_32)).code
 
-        if sla:
+        # Sync all commands
+        sync = bash("sdrctl dev {0} set slice_idx 4".format(self.sdr_dev)).code
+
+        if sla or sync:
             return False, "Slice creation railed."
 
         # Iterate over the slice slice
@@ -388,10 +435,12 @@ class opw_controller(base_controller):
         # Remove host from the DHCP subnet
         self.omapi.del_host(s_mac)
 
+        # Set the slice in question
+        bash("sdrctl dev {0} set slice_idx {1}".format(self.sdr_dev, i_sln))
+
         # Try to clear the slice
-        cls =  bash("sdrctl dev {0} set addr{1} {2}".format(
+        cls = bash("sdrctl dev {0} set addr {1}".format(
             self.sdr_dev,
-            i_sln,
             "00000000")).code
 
         # If the last command failed
@@ -399,15 +448,21 @@ class opw_controller(base_controller):
             return False, "Could not remove MAC from slice #" + str(i_lsn)
 
         # Set the default slice configuration
-        s = bash("sdrctl dev {0} set slice_start{1} {2}".format(self.sdr_dev,
-                                                            i_sln, 0)).code
-        e = bash("sdrctl dev {0} set slice_end{1}   {2}".format(self.sdr_dev,
-                                                            i_sln, 49999)).code
-        t = bash("sdrctl dev {0} set slice_total{1} {2}".format(self.sdr_dev,
-                                                            i_sln, 50000)).code
+        s = bash("sdrctl dev {0} set slice_start {1}".format(
+            self.sdr_dev,
+            0)).code
+        e = bash("sdrctl dev {0} set slice_end {1}".format(
+            self.sdr_dev,
+            49999)).code
+        t = bash("sdrctl dev {0} set slice_total {1}".format(
+            self.sdr_dev,
+            50000)).code
+
+        # Sync all commands
+        sync = bash("sdrctl dev {0} set slice_idx 4".format(self.sdr_dev)).code
 
         # If any of the precious commands failed
-        if any([s,e,t]):
+        if any([s,e,t, sync]):
             return False, "Failed reverting slice to default parameters."
 
         # Iterate over the slice slice
@@ -424,6 +479,10 @@ class opw_controller(base_controller):
 if __name__ == "__main__":
     # Clear screen
     cls()
+
+    # Parse CLI arguments
+    kwargs = parse_cli_args()
+
     # Handle keyboard interrupt (SIGINT)
     try:
         # Instantiate the OpenWiFi Controller
@@ -435,11 +494,10 @@ if __name__ == "__main__":
             request_msg='owc_rrs',
             update_msg='owc_urs',
             delete_msg='owc_drs',
-            do_modules=False,
-            do_network=False,
-            do_ap=True,
             host='0.0.0.0',
-            port=3100)
+            port=3100,
+	    **kwargs
+	)
 
         # Start the OpenWiFi Controller Server
         opw_controller_thread.start()
