@@ -39,6 +39,11 @@ class radio_access_network_orchestrator(base_orchestrator):
             'urllc': 0
         }
 
+        # Keep track of the allocated and free radio resources
+        self.radio_resources = [{'queue': None,
+                                 'start': 0,
+                                 'end': 49999}]
+
         # Dictionary mapping UE's MAC addresses
         self.service_to_mac = {
             #  'best-effort': '14:AB:C5:42:B7:33', # New Dell
@@ -88,13 +93,44 @@ class radio_access_network_orchestrator(base_orchestrator):
         if req_resources >= 50000:
             return False, "Unfeasible request."
 
-        # Express the amount of resources in a way that SDRCTL can understand
-        i_start = 0
-        i_end = 4999 if s_ser == "best_effort" else req_resources
-        i_total = 50000
+        # TODO Dirty way around
+        if s_ser == 'best_effort':
+            req_resources = 49999
 
-        # Decide which slice to use
-        i_sln = self.service_to_queue.get(s_ser, 3)
+        # Try to allocate radio sources
+        allocated = False
+        # Allocate over the list of radio resources
+        for index, resource in enumerate(self.radio_resources):
+            # If there's a free chunk of airtime
+            if resource['queue'] is None and \
+                    resource['end'] - resource['start'] >= req_resources:
+                # Slice it over
+                self.radio_resources.insert(
+                    index+1,
+                    {
+                        'queue': None,
+                        'start': resource['start'] + req_resources,
+                        'end': resource['end']
+                })
+
+                self.radio_resources[index] = {
+                        'queue': self.service_to_queue.get(s_ser, 3),
+                        'start': resource['start'],
+                        'end': req_resources - 1
+                }
+                allocated  = True
+                break
+
+        # If we could not allocate the current request
+        if not allocated:
+            return False, 'Not enough radio resources.'
+
+
+        # Express the amount of resources in a way that SDRCTL can understand
+        i_start = self.radio_resources[index]['start']
+        i_end = self.radio_resources[index]['end']
+        i_total = 50000
+        i_sln = self.radio_resources[index]['queue']
 
         # Send message to OpenWiFi RAN controller
         self._log("Service:", s_ser, 'Requirements:', s_req, "Slice #", i_sln)
@@ -193,6 +229,11 @@ class radio_access_network_orchestrator(base_orchestrator):
 
         # Send message to remove slice
         success, msg = self.opw_ctl.delete_slice(**{'s_id': s_id})
+
+
+        for index, resource in enumerate(self.radio_resources):
+
+
 
         # Inform the user about the removal
         return success, msg

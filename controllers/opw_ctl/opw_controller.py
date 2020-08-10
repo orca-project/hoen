@@ -25,7 +25,7 @@ def parse_cli_args():
     parser = argparse.ArgumentParser(description='OpenWifi SDR Controller')
 
     parser.add_argument(
-        '-m', '--skip_moduldes',
+        '-m', '--skip_modules',
         required=False,
         action='store_true',
         help='Skip loading kernel modules')
