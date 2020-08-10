@@ -43,12 +43,13 @@ def parse_cli_args():
     # Add CLI arguments
     parser_info.add_argument(
         '-n', '--network',
-        metavar='NETWORK',
+        metavar='S_NS',
         type=str,
         choices=["ran", "tn", "cn"],
-        nargs='*',
+        nargs='+',
         required=False,
-        help='Type of Service')
+        default=["ran", "tn", "cn"],
+        help='Network Segments')
 
     # Create parser for the creation of slices
     parser_create = subparsers.add_parser(
@@ -167,12 +168,12 @@ def establish_connection(**kwargs):
 
 
 def network_info(socket, **kwargs):
-    info_msg = "ni_ri"
+    info_msg = "ns_ri"
     info_ack = "ri_ack"
     info_nack = "ri_nack"
 
     # Try to get the network segment
-    s_ns = kwargs.get("network", "")
+    s_ns = list(set(kwargs.get("network", "")))
 
     # Send message to the hyperstrator
     socket.send_json({info_msg: {'s_ns': s_ns}})
@@ -195,7 +196,7 @@ def network_info(socket, **kwargs):
             log('Network Information:', head=True)
             # For every returned slice
             for entry in ack:
-                log('Service ID:', entry)
+                log('Network Segment:', entry)
                 log('Info:', ack[entry])
             # Exit gracefully
             exit(0)
@@ -216,9 +217,6 @@ def network_info(socket, **kwargs):
         if (ack is None) and (nack is None):
             log('Failed to parse message:', head=True)
             log('Message:', rep)
-
-
-
 
 
 def service_create(socket, **kwargs):

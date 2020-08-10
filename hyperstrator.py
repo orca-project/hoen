@@ -174,6 +174,24 @@ class orch_base(object):
         else:
             return False, "Missing ACK or NACK: " + str(msg)
 
+    def network_info(self, **kwargs):
+        # Send Info message
+        success, msg = self._send_msg(self.info_ack, self.info_nack,
+                                      **{self.info_msg: kwargs})
+
+        # If the message failed
+        if not success:
+            # Inform the hyperstrator about the failure
+            print('\t', 'Failed requesting information about the' + self.name)
+            return False, msg
+
+        # Otherwise, it succeeded
+        else:
+            # Inform the hyperstrator about the success
+            print('\t', 'Succeeded requesting information about the' + \
+                  self.name)
+            return True, msg
+
     def create_slice(self, **kwargs):
         # Send Creation message
         success, msg = self._send_msg(self.create_ack, self.create_nack,
@@ -279,6 +297,7 @@ class hyperstrator_server(Thread):
             port_key="cn_port",
             default_host=kwargs.get('cn_ip', '134.226.55.122'),
             default_port=str(kwargs.get('cn_port', 2300)),
+            info_msg="ns_cn",
             create_msg="cn_cc",
             request_msg="cn_rc",
             update_msg="cn_uc",
@@ -293,6 +312,7 @@ class hyperstrator_server(Thread):
              port_key="tn_port",
              default_host=kwargs.get('tn_ip', '134.226.55.106'),
              default_port=str(kwargs.get('tn_port', 2200)),
+             info_msg="ns_tn",
              create_msg="tn_cc",
              request_msg="tn_rc",
              update_msg="tn_uc",
@@ -307,6 +327,7 @@ class hyperstrator_server(Thread):
              port_key="ran_port",
              default_host=kwargs.get('ran_ip', '134.226.55.90'),
              default_port=str(kwargs.get('ran_port', 2100)),
+             info_msg="ns_rn",
              create_msg="rn_cc",
              request_msg="rn_rc",
              update_msg="rn_uc",
@@ -322,6 +343,13 @@ class hyperstrator_server(Thread):
     def _parse_kwargs(self, **kwargs):
         # Get the error message header from keyword arguments
         self.error_msg = kwargs.get('error_msg', 'msg_err')
+
+        # Get the network info message from keyword arguments
+        self.info_msg = kwargs.get('info_msg', 'ns_ri')
+        # Get the network info acknowledgment from keyword arguments
+        self.info_ack = "_".join([self.info_msg.split('_')[-1], "ack"])
+        # Get the network info not acknowledgment from keyword arguments
+        self.info_nack = "_".join([self.info_msg.split('_')[-1], "nack"])
 
         # Get the create service message from keyword arguments
         self.create_msg = kwargs.get('create_msg', 'sr_cs')
@@ -391,7 +419,14 @@ class hyperstrator_server(Thread):
 
             # Received a command
             else:
-                # Service transaction , new service
+                # Info transaction, network segments
+                info_transaction = transactions.get(self.info_msg, None)
+
+                # If the message worked
+                if info_transaction is not None:
+                    self._network_info(info_transaction)
+
+                # Service transaction, new service
                 create_transaction = transactions.get(self.create_msg, None)
 
                 # If the message worked
@@ -422,7 +457,8 @@ class hyperstrator_server(Thread):
                 # Check for unknown messages
                 unknown_msg = [x for x in transactions if x not in
                                 [self.create_msg, self.request_msg,
-                                 self.update_msg, self.delete_msg] ]
+                                 self.update_msg, self.delete_msg,
+                                 self.info_msg] ]
 
                 # If there is at least an existing unknown message
                 if unknown_msg:
@@ -443,6 +479,103 @@ class hyperstrator_server(Thread):
         print('Exiting')
         self.shutdown_flag.set()
         self.join()
+
+
+    def _network_info(self, info_transaction):
+        # Start time counter
+        st = time()
+
+        self._log('Network Transaction Transaction', head=True)
+
+        self._log('Gather information about:',
+                  str(info_transaction['s_ns'])[1:-1])
+
+        # Container to hold information about network segments
+        network_info = {}
+
+        # If doing the CN
+        if 'cn' in info_transaction['s_ns'] or not info_transaction['s_ns']:
+            if not self.skip_core:
+                self._log('Send message to CN orchestrator')
+
+                # Send message to the CN orchestrator
+                core_success, core_msg = self.cn_orch.network_info(
+                    **{'s_ns': info_transaction['s_ns']})
+
+                # If there was an error at the CN orchestrator
+                if not core_success:
+                    self._log('Failed requesting CN info')
+                    # Inform the user about the failure
+                    self._send_msg(self.info_nack, core_msg)
+                    # Finish here
+                    return
+
+                # Fill in the network segment info
+                network_info['cn'] = core_msg.get(s_id,
+                                                  "Not reported by CN")
+
+            # If debugging
+            else:
+                # Fill in the network info with a stub
+                network_info.update({'cn': 'stub'})
+
+       # If doing the TN
+        if 'tn' in info_transaction['s_ns'] or not info_transaction['s_ns']:
+            if not self.skip_transport:
+                self._log('Send message to CN orchestrator')
+
+                # Send message to the TN orchestrator
+                transport_success, transport_msg = self.tn_orch.network_info(
+                    **{'s_ns': info_transaction['s_ns']})
+
+                # If there was an error at the TN orchestrator
+                if not transport_success:
+                    self._log('Failed requesting TN info')
+                    # Inform the user about the failure
+                    self._send_msg(self.info_nack, transport_msg)
+                    # Finish here
+                    return
+
+                # Fill in the network segment info
+                network_info['tn'] = transport_msg.get(s_id,
+                                                       "Not reported by TN")
+
+            # If debugging
+            else:
+                # Fill in the network info with a stub
+                network_info.update({'tn': 'stub'})
+
+        # If doing the RAN
+        if 'ran' in info_transaction['s_ns'] or not info_transaction['s_ns']:
+            if not self.skip_radio:
+                self._log('Send message to RAN orchestrator')
+
+                # Send message to the CN orchestrator
+                radio_success, radio_msg = self.ran_orch.network_info(
+                    **{'s_ns': info_transaction['s_ns']})
+
+                # If there was an error at the RAN orchestrator
+                if not radio_success:
+                    self._log('Failed requesting RAN info')
+                    # Inform the user about the failure
+                    self._send_msg(self.info_nack, radio_msg)
+                    # Finish here
+                    return
+
+                # Fill in the network segment info
+                network_info['ran'] = radio_msg.get(s_id,
+                                                    "Not reported by RAN")
+
+            # If debugging
+            else:
+                # Fill in the network info with a stub
+                network_info.update({'ran': 'stub'})
+
+        # Inform the user about the slice information
+        self._send_msg(self.info_ack, network_info)
+        # Measure elapsed time
+        self._log('Get time:', (time() - st)*1000, 'ms')
+
 
     def _create_service(self, create_transaction):
         # Start time counter
@@ -845,6 +978,7 @@ if __name__ == "__main__":
             request_msg='sr_rs',
             update_msg='sr_us',
             delete_msg='sr_ds',
+            info_msg='ns_ri',
             **kwargs
         )
 
