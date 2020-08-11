@@ -33,7 +33,7 @@ class tn_orchestrator(base_orchestrator):
             name="OVS",
             host_key="ovs_host",
             port_key="ovs_port",
-            default_host="127.0.0.1",
+            default_host="20.1.0.1",
             default_port="3200",
             request_key="ovs_req",
             reply_key="ovs_rep",
@@ -47,27 +47,28 @@ class tn_orchestrator(base_orchestrator):
         # TODO: to create a service to fetch these values automatically from ovsdb or ofconfig
         catalog = ndb()
         catalog.set_link_capacity('s01','s02', 30)
+        catalog.set_link_capacity('s01','s04', 30)
+        catalog.set_link_capacity('s02','s03', 30)
         catalog.set_link_capacity('s02','s01', 30)
-        catalog.set_link_capacity('s01','s03', 30)
-        catalog.set_link_capacity('s03','s01', 30)
-        catalog.set_link_capacity('s02','s05', 30)
-        catalog.set_link_capacity('s05','s02', 30)
         catalog.set_link_capacity('s03','s04', 30)
+        catalog.set_link_capacity('s03','s02', 30)
+        catalog.set_link_capacity('s04','s01', 30)
         catalog.set_link_capacity('s04','s03', 30)
-        catalog.set_link_capacity('s04','s05', 30)
-        catalog.set_link_capacity('s05','s04', 30)
 
         '''
         Setting known hosts and networks manually.
         It could be automatic if we develop LLDP and ARP functions in the ovs controller...
         ... but it is out of scope.
         '''
-        catalog.add_network('10.0.4.0/24', 's01', 4)
-        catalog.add_network('10.0.5.0/24', 's01', 5)
-        catalog.add_network('10.0.6.0/24', 's01', 6)
-        catalog.add_network('10.0.7.0/24', 's01', 7)
-        catalog.add_network('10.20.0.0/24', 's05', 3)
-        catalog.add_network('10.30.0.0/24', 's05', 3)
+        #  catalog.add_network('30.0.1.0/24', 's01', 4)
+        #  catalog.add_network('10.0.4.0/24', 's01', 4)
+        catalog.add_network('30.0.5.0/24', 's01', 3)
+        catalog.add_network('30.0.6.0/24', 's01', 4)
+        catalog.add_network('30.0.7.0/24', 's01', 5)
+
+        catalog.add_network('10.0.0.0/24', 's03', 3)
+        #  catalog.add_network('10.20.0.0/24', 's05', 3)
+        #  catalog.add_network('10.30.0.0/24', 's05', 3)
 
     def create_slice(self, **kwargs):
         catalog = ndb()
