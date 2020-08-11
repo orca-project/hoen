@@ -249,36 +249,38 @@ class ovs_ctl(app_manager.RyuApp):
             #  95539282496: 's04',
             #  95533558180: 's05'
             # ORCA second demo -- uncomment the 5 lines below:
-            95532594594: 's01',
-            95534454058: 's02',
-            95536781980: 's03',
-            95531791552: 's04',
-            47102661227: 's05'            
+            #  95532594594: 's01',
+            #  95534454058: 's02',
+            #  95536781980: 's03',
+            #  95531791552: 's04',
+            #  47102661227: 's05'
+            #  95532050795: 's05'
+            # ORCA Final Demo
+            int('000000163ea46de1', 16): 's01',
+            int('000000163e1d4d1f', 16): 's02',
+            int('0000000af789926b', 16): 's03',
+            int('000000163e784ab7', 16): 's04'
         }
 
         self.topology = defaultdict(dict)
-        self.topology['s01']['s02'] = 2
-        self.topology['s02']['s01'] = 1
-        self.topology['s01']['s03'] = 3
-        self.topology['s03']['s01'] = 1
-        self.topology['s02']['s05'] = 2
-        self.topology['s05']['s02'] = 1
-        self.topology['s03']['s04'] = 3
-        self.topology['s04']['s03'] = 1
-        self.topology['s04']['s05'] = 2
-        self.topology['s05']['s04'] = 2
+        self.topology['s01']['s02'] = 1
+        self.topology['s01']['s04'] = 2
+        self.topology['s02']['s03'] = 1
+        self.topology['s02']['s01'] = 2
+        self.topology['s03']['s04'] = 1
+        self.topology['s03']['s02'] = 2
+        self.topology['s04']['s01'] = 1
+        self.topology['s04']['s03'] = 2
 
         self.speed = defaultdict(dict)
         self.speed['s01']['s02'] = 100
+        self.speed['s01']['s04'] = 100
+        self.speed['s02']['s03'] = 100
         self.speed['s02']['s01'] = 100
-        self.speed['s01']['s03'] = 100
-        self.speed['s03']['s01'] = 100
-        self.speed['s02']['s05'] = 100
-        self.speed['s05']['s02'] = 100
         self.speed['s03']['s04'] = 100
+        self.speed['s03']['s02'] = 100
+        self.speed['s04']['s01'] = 100
         self.speed['s04']['s03'] = 100
-        self.speed['s04']['s05'] = 100
-        self.speed['s05']['s04'] = 100
 
         self.ports = {}
         self.arp_disabled_ports = self.ports_to_disable()
@@ -304,7 +306,7 @@ class ovs_ctl(app_manager.RyuApp):
         # Start the OVS SDR Controller Server
         self.ovs_controller_hub = hub.spawn(self.ovs_controller_thread.run)
 
-        self.count = 5
+        self.count = len(self.topology)
         self.switch_config_count = {}
         self.single = {}
         self.st = time.time()
