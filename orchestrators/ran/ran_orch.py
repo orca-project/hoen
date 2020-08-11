@@ -40,10 +40,13 @@ class radio_access_network_orchestrator(base_orchestrator):
             'urllc': 0
         }
 
+        # TODO Dirty and quick statement
+        self.total_resources = 50000
+
         # Keep track of the allocated and free radio resources
         self.radio_resources = [{'queue': None,
                                  'start': 0,
-                                 'end': 49999}]
+                                 'end': self.total_resources-1}]
 
         # Dictionary mapping UE's MAC addresses
         self.service_to_mac = {
@@ -64,7 +67,10 @@ class radio_access_network_orchestrator(base_orchestrator):
         self._log("Retrieve information about the", self.name),
 
         # Inform the user about the network segment
-        return True, {'ran': {"resource_allocation": self.radio_resources}}
+        return True, {'ran': {
+            "total_resources": self.total_resources,
+            "resource_allocation": self.radio_resources
+        }}
 
 
     def create_slice(self, **kwargs):
@@ -95,19 +101,19 @@ class radio_access_network_orchestrator(base_orchestrator):
         eq_del = max((148.6 - i_del) / 133.2, 0.01)
 
         # Get the minimum amount to suffice both delay and throughput
-        req_resources = int(50000 * max(eq_thx, eq_del)) - 1
+        req_resources = int(self.total_resources * max(eq_thx, eq_del)) - 1
 
         # TODO Dirty fix to handle approximation error
-        if req_resources >= 50000 and req_resources <= 51000:
-            req_resources = 49999
+        if req_resources >= self.total_resources and req_resources <= 51000:
+            req_resources = self.total_resources - 1
 
         # If requiring too many resources
-        if req_resources >= 50000:
+        if req_resources >= self.total_resources:
             return False, "Unfeasible request."
 
         # TODO Dirty way around
         if s_ser == 'best-effort':
-            req_resources = 4999
+            req_resources = 5000
 
         # Try to allocate radio sources
         allocated = False
@@ -141,7 +147,7 @@ class radio_access_network_orchestrator(base_orchestrator):
         # Express the amount of resources in a way that SDRCTL can understand
         i_start = self.radio_resources[index]['start']
         i_end = self.radio_resources[index]['end']
-        i_total = 50000
+        i_total = self.total_resources
         i_sln = self.radio_resources[index]['queue']
 
         # Send message to OpenWiFi RAN controller
