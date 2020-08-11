@@ -51,6 +51,12 @@ def parse_cli_args():
         default=["ran", "tn", "cn"],
         help='Network Segments')
 
+    parser_info.add_argument(
+        '-j', '--json',
+        required=False,
+        action='store_true',
+        help='Strip text and return a JSON string')
+
     # Create parser for the creation of slices
     parser_create = subparsers.add_parser(
         'create',
@@ -192,14 +198,21 @@ def network_info(socket, **kwargs):
 
         # If received an acknowledgement
         if ack is not None:
-            # Print information
-            log('Network Information:', head=True)
-            # For every returned slice
-            for entry in ack:
-                log('Network Segment:', entry)
-                log('Info:', ack[entry])
-            # Exit gracefully
-            exit(0)
+            # If returning a human-readable string
+            if not kwargs['json']:
+                # Print information
+                log('Network Information:', head=True)
+                # For every returned slice
+                for entry in ack:
+                    log('Network Segment:', entry)
+                    log('Info:', ack[entry])
+                # Exit gracefully
+                exit(0)
+            # If returning a raw JSON
+            else:
+                print(ack)
+                 # Exit gracefully
+                exit(0)
 
         # Check if there's a not acknowledgement
         nack = rep.get(info_nack, None)
