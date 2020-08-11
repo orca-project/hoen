@@ -71,7 +71,33 @@ class tn_orchestrator(base_orchestrator):
         #  catalog.add_network('10.30.0.0/24', 's05', 3)
 
     def network_info(self, **kwargs):
-        return True, {"tn": "Not implemented yet"}
+
+        # Access resource catalogue
+        catalog = ndb()                      
+
+        # Get network topology
+        (topo_success, topo_msg) = self.ovs_ctl.get_topology()
+        if not topo_success:
+            # Send error message
+            msg = '[ERROR]: Could not retrieve the network topology from ovs controller'
+            print('failed', (time()-st)*1000, 'ms')
+            # Inform the user about the creation
+            return False, msg
+
+        topology = topo_msg.get('topology')
+        catalog.set_topology(topology)
+
+        # Return information
+        return True, {"tn": {                                                                                  
+            "topology": catalog.get_topology(),
+            "capacity": catalog.get_capacity(),
+            "routes": catalog.get_routes(),
+            #  "networks": catalog.get_networks(),
+            "usage": catalog.get_usage(),
+            "flows": catalog.get_flows(),
+            "virtual_ifaces": catalog.get_virtual_ifaces()
+        }}
+
 
     def create_slice(self, **kwargs):
         catalog = ndb()
