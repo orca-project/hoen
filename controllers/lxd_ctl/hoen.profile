@@ -3,7 +3,7 @@ description: ORCA HOEN Profile
 devices:
   root:
     path: /
-    pool: default
+    pool: orca
     type: disk
 name: hoen
 used_by: []

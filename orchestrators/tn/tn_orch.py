@@ -33,7 +33,7 @@ class tn_orchestrator(base_orchestrator):
             name="OVS",
             host_key="ovs_host",
             port_key="ovs_port",
-            default_host="127.0.0.1",
+            default_host="20.1.0.1",
             default_port="3200",
             request_key="ovs_req",
             reply_key="ovs_rep",
@@ -47,27 +47,31 @@ class tn_orchestrator(base_orchestrator):
         # TODO: to create a service to fetch these values automatically from ovsdb or ofconfig
         catalog = ndb()
         catalog.set_link_capacity('s01','s02', 30)
+        catalog.set_link_capacity('s01','s04', 30)
+        catalog.set_link_capacity('s02','s03', 30)
         catalog.set_link_capacity('s02','s01', 30)
-        catalog.set_link_capacity('s01','s03', 30)
-        catalog.set_link_capacity('s03','s01', 30)
-        catalog.set_link_capacity('s02','s05', 30)
-        catalog.set_link_capacity('s05','s02', 30)
         catalog.set_link_capacity('s03','s04', 30)
+        catalog.set_link_capacity('s03','s02', 30)
+        catalog.set_link_capacity('s04','s01', 30)
         catalog.set_link_capacity('s04','s03', 30)
-        catalog.set_link_capacity('s04','s05', 30)
-        catalog.set_link_capacity('s05','s04', 30)
 
         '''
         Setting known hosts and networks manually.
         It could be automatic if we develop LLDP and ARP functions in the ovs controller...
         ... but it is out of scope.
         '''
-        catalog.add_network('10.0.4.0/24', 's01', 4)
-        catalog.add_network('10.0.5.0/24', 's01', 5)
-        catalog.add_network('10.0.6.0/24', 's01', 6)
-        catalog.add_network('10.0.7.0/24', 's01', 7)
-        catalog.add_network('10.20.0.0/24', 's05', 3)
-        catalog.add_network('10.30.0.0/24', 's05', 3)
+        #  catalog.add_network('30.0.1.0/24', 's01', 4)
+        #  catalog.add_network('10.0.4.0/24', 's01', 4)
+        catalog.add_network('30.0.5.0/24', 's01', 3)
+        catalog.add_network('30.0.6.0/24', 's01', 4)
+        catalog.add_network('30.0.7.0/24', 's01', 5)
+
+        catalog.add_network('10.0.0.0/24', 's03', 3)
+        #  catalog.add_network('10.20.0.0/24', 's05', 3)
+        #  catalog.add_network('10.30.0.0/24', 's05', 3)
+
+    def network_info(self, **kwargs):
+        return True, {"tn": "Not implemented yet"}
 
     def create_slice(self, **kwargs):
         catalog = ndb()
@@ -143,7 +147,7 @@ class tn_orchestrator(base_orchestrator):
         catalog = ndb()
         if route is None:
             # Retrieve the route previously applied
-            complete_remove = True            
+            complete_remove = True
             route = catalog.get_route(s_id)
 
             if route is None:
@@ -255,7 +259,7 @@ class tn_orchestrator(base_orchestrator):
         (ipv4_src, ipv4_src_netmask) = self.convert_cidr_to_netmask(src)
         (ipv4_dst, ipv4_dst_netmask) = self.convert_cidr_to_netmask(dst)
         (min_rate, max_rate, priority) = self.define_queue_parameters(requirements)
-        
+
         first_port = src_network.get('port')
         last_port = dst_network.get('port')
         switches = engine.generate_match_switches(topology, path, first_port, last_port)
@@ -327,6 +331,7 @@ if __name__ == "__main__":
             rep_header='tn_rep',
             error_msg='msg_err',
             create_msg='tn_cc',
+            info_msg='ns_tn',
             request_msg='tn_rc',
             update_msg='tn_uc',
             delete_msg='tn_dc',
