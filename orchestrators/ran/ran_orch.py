@@ -85,8 +85,8 @@ class radio_access_network_orchestrator(base_orchestrator):
         # Get the minimum amount to suffice both delay and throughput
         req_resources = int(50000 * max(eq_thx, eq_del)) - 1
 
+        # TODO Dirty fix to handle approximation error
         if req_resources >= 50000 and req_resources <= 51000:
-
             req_resources = 49999
 
         # If requiring too many resources
@@ -94,8 +94,8 @@ class radio_access_network_orchestrator(base_orchestrator):
             return False, "Unfeasible request."
 
         # TODO Dirty way around
-        if s_ser == 'best_effort':
-            req_resources = 49999
+        if s_ser == 'best-effort':
+            req_resources = 4999
 
         # Try to allocate radio sources
         allocated = False
@@ -116,7 +116,7 @@ class radio_access_network_orchestrator(base_orchestrator):
                 self.radio_resources[index] = {
                         'queue': self.service_to_queue.get(s_ser, 3),
                         'start': resource['start'],
-                        'end': req_resources - 1
+                        'end': resource['start'] + req_resources - 1
                 }
                 allocated  = True
                 break
@@ -230,10 +230,29 @@ class radio_access_network_orchestrator(base_orchestrator):
         # Send message to remove slice
         success, msg = self.opw_ctl.delete_slice(**{'s_id': s_id})
 
-
+        # Clear the allocated resources
         for index, resource in enumerate(self.radio_resources):
+            if resource['queue'] == i_sln:
+                # Remove queue number
+                self.radio_resources[index]['queue'] = None
 
+                # If the next radio is also free
+                if (index < len(self.radio_resources)-1) and \
+                        self.radio_resources[index+1]['queue'] is None:
+                    # Merge two free chunks
+                    self.radio_resources[index]['end'] = \
+                        self.radio_resources[index+1]['end']
+                    # And remove the next one
+                    self.radio_resources.pop(index+1)
 
+                # If the previous radio is also free
+                if (index > 0) and \
+                        self.radio_resources[index-1]['queue'] is None:
+                    # Merge two free chunks
+                    self.radio_resources[index]['start'] = \
+                        self.radio_resources[index-1]['start']
+                    # And remove the previous ones
+                    self.radio_resources.pop(index-1)
 
         # Inform the user about the removal
         return success, msg
