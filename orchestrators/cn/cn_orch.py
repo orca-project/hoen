@@ -26,6 +26,8 @@ class core_network_orchestrator(base_orchestrator):
             update_msg='lcc_urs',
             delete_msg='lcc_drs')
 
+    def network_info(self, **kwargs):
+        return True, {"cn": "Not implemented yet"}
 
     def create_slice(self, **kwargs):
         # Extract parameters from keyword arguments
@@ -41,12 +43,14 @@ class core_network_orchestrator(base_orchestrator):
 
         # Send message to LXD CN controller
         self._log("Service:", s_ser, 'Requirements:', str(s_req))
-        self._log('Delegating it to the LXD Controller')
 
         # TODO make a smarter allocation
         f_ram = 2.0 if s_ser in ["embb", "high-throughput"] else 1.0
         i_cpu = 2 if s_ser in ["urllc", "low-latency"] else 1
 
+        self._log("CPU:", i_cpu, "core(s)", "\t", "RAM:", f_ram, "GB(s)")
+
+        self._log('Delegating it to the LXD Controller')
         # Send the message to create a slice
         success, msg = self.lxd_ctl.create_slice(
             **{'s_id': s_id, 'service': s_ser, "f_ram": f_ram, "i_cpu": i_cpu})
@@ -104,6 +108,7 @@ if __name__ == "__main__":
             req_header='cn_req',
             rep_header='cn_rep',
             error_msg='msg_err',
+            info_msg='ns_cn',
             create_msg='cn_cc',
             request_msg='cn_rc',
             update_msg='cn_uc',
