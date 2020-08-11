@@ -169,8 +169,8 @@ def establish_connection(**kwargs):
 
 def network_info(socket, **kwargs):
     info_msg = "ns_ni"
-    info_ack = "ri_ack"
-    info_nack = "ri_nack"
+    info_ack = "ni_ack"
+    info_nack = "ni_nack"
 
     # Try to get the network segment
     s_ns = list(set(kwargs.get("network", "")))
