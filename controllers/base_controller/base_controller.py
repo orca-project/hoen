@@ -343,7 +343,7 @@ class base_controller(Thread):
                 unknown_msg = [x for x in transaction if x not in [
                     self.create_msg, self.request_msg,
                     self.update_msg, self.delete_msg,
-                    self._info_msg, self.topology_msg]]
+                    self.info_msg, self.topology_msg]]
 
                 # If there is at least an existing unknown message
                 if unknown_msg:

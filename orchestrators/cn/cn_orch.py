@@ -9,6 +9,8 @@ from base_orchestrator.base_orchestrator import base_orchestrator, ctl_base, cls
 # Import signal
 import signal
 
+from psutil import cpu_count, cpu_percent, virtual_memory
+
 class core_network_orchestrator(base_orchestrator):
 
     def post_init(self, **kwargs):
@@ -27,7 +29,19 @@ class core_network_orchestrator(base_orchestrator):
             delete_msg='lcc_drs')
 
     def network_info(self, **kwargs):
-        return True, {"cn": "Not implemented yet"}
+        # Get the total resources
+        total_resources = {
+            'cpu': {
+                'total': cpu_count(logical=False),
+                'usage': cpu_percent(interval=1)
+            },
+            'ram': {
+                'total': virtual_memory()[0]/(1024*1024),
+                'usage': virtual_memory()[2]
+            }
+        }
+
+        return True, {"cn": total_resources}
 
     def create_slice(self, **kwargs):
         # Extract parameters from keyword arguments
