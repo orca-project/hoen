@@ -490,6 +490,7 @@ if __name__ == "__main__":
             name='OpenWiFi',
             req_header='opw_req',  # Don't modify
             rep_header='opw_rep',  # Don't modify
+            info_msg='ns_owc',
             create_msg='owc_crs',
             request_msg='owc_rrs',
             update_msg='owc_urs',

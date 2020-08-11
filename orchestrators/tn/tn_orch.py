@@ -69,6 +69,9 @@ class tn_orchestrator(base_orchestrator):
         catalog.add_network('10.20.0.0/24', 's05', 3)
         catalog.add_network('10.30.0.0/24', 's05', 3)
 
+    def network_info(self, **kwargs):
+        return True, {"tn": "Not implemented yet"}
+
     def create_slice(self, **kwargs):
         catalog = ndb()
         st = time()
@@ -143,7 +146,7 @@ class tn_orchestrator(base_orchestrator):
         catalog = ndb()
         if route is None:
             # Retrieve the route previously applied
-            complete_remove = True            
+            complete_remove = True
             route = catalog.get_route(s_id)
 
             if route is None:
@@ -255,7 +258,7 @@ class tn_orchestrator(base_orchestrator):
         (ipv4_src, ipv4_src_netmask) = self.convert_cidr_to_netmask(src)
         (ipv4_dst, ipv4_dst_netmask) = self.convert_cidr_to_netmask(dst)
         (min_rate, max_rate, priority) = self.define_queue_parameters(requirements)
-        
+
         first_port = src_network.get('port')
         last_port = dst_network.get('port')
         switches = engine.generate_match_switches(topology, path, first_port, last_port)
@@ -327,6 +330,7 @@ if __name__ == "__main__":
             rep_header='tn_rep',
             error_msg='msg_err',
             create_msg='tn_cc',
+            info_msg='ns_tn',
             request_msg='tn_rc',
             update_msg='tn_uc',
             delete_msg='tn_dc',

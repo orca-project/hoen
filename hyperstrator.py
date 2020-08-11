@@ -107,6 +107,10 @@ class orch_base(object):
         # Get the error message header from keyword arguments
         self.error_msg = kwargs.get("error_msg", "msg_err")
 
+        self.info_msg = kwargs.get("info_msg", "bo_nsi")
+        self.info_ack = "_".join([self.info_msg.split('_')[-1], "ack"])
+        self.info_nack = "_".join([self.info_msg.split('_')[-1], "nack"])
+
         self.create_msg = kwargs.get("create_msg", "bo_crs")
         self.create_ack = "_".join([self.create_msg.split('_')[-1], "ack"])
         self.create_nack = "_".join([self.create_msg.split('_')[-1], "nack"])
@@ -182,13 +186,13 @@ class orch_base(object):
         # If the message failed
         if not success:
             # Inform the hyperstrator about the failure
-            print('\t', 'Failed requesting information about the' + self.name)
+            print('\t', 'Failed requesting information about the ' + self.name)
             return False, msg
 
         # Otherwise, it succeeded
         else:
             # Inform the hyperstrator about the success
-            print('\t', 'Succeeded requesting information about the' + \
+            print('\t', 'Succeeded requesting information about the ' + \
                   self.name)
             return True, msg
 
@@ -345,7 +349,7 @@ class hyperstrator_server(Thread):
         self.error_msg = kwargs.get('error_msg', 'msg_err')
 
         # Get the network info message from keyword arguments
-        self.info_msg = kwargs.get('info_msg', 'ns_ri')
+        self.info_msg = kwargs.get('info_msg', 'ns_ni')
         # Get the network info acknowledgment from keyword arguments
         self.info_ack = "_".join([self.info_msg.split('_')[-1], "ack"])
         # Get the network info not acknowledgment from keyword arguments
@@ -485,7 +489,7 @@ class hyperstrator_server(Thread):
         # Start time counter
         st = time()
 
-        self._log('Network Transaction Transaction', head=True)
+        self._log('Network Information Transaction', head=True)
 
         self._log('Gather information about:',
                   str(info_transaction['s_ns'])[1:-1])
@@ -511,7 +515,7 @@ class hyperstrator_server(Thread):
                     return
 
                 # Fill in the network segment info
-                network_info['cn'] = core_msg.get(s_id,
+                network_info['cn'] = core_msg.get('cn',
                                                   "Not reported by CN")
 
             # If debugging
@@ -537,7 +541,7 @@ class hyperstrator_server(Thread):
                     return
 
                 # Fill in the network segment info
-                network_info['tn'] = transport_msg.get(s_id,
+                network_info['tn'] = transport_msg.get('tn',
                                                        "Not reported by TN")
 
             # If debugging
@@ -563,7 +567,7 @@ class hyperstrator_server(Thread):
                     return
 
                 # Fill in the network segment info
-                network_info['ran'] = radio_msg.get(s_id,
+                network_info['ran'] = radio_msg.get('ran',
                                                     "Not reported by RAN")
 
             # If debugging
@@ -974,11 +978,11 @@ if __name__ == "__main__":
             host='127.0.0.1',
             port=1100,
             error_msg='msg_err',
+            info_msg='ns_ni',
             create_msg='sr_cs',
             request_msg='sr_rs',
             update_msg='sr_us',
             delete_msg='sr_ds',
-            info_msg='ns_ri',
             **kwargs
         )
 

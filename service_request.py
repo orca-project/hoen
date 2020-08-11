@@ -168,7 +168,7 @@ def establish_connection(**kwargs):
 
 
 def network_info(socket, **kwargs):
-    info_msg = "ns_ri"
+    info_msg = "ns_ni"
     info_ack = "ri_ack"
     info_nack = "ri_nack"
 

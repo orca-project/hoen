@@ -63,6 +63,13 @@ class base_controller(Thread):
         # Get the error message header from keyword arguments
         self.error_msg = kwargs.get('error_msg', 'msg_err')
 
+         # Get the network info message from keyword arguments
+        self.info_msg = kwargs.get('info_msg', 'ct_ni')
+         # Get the network info acknowledgment from keyword arguments
+        self.info_ack = "_".join([self.info_msg.split('_')[-1], "ack"])
+        # Get the network info  not acknowledgment from keyword arguments
+        self.info_nack = "_".join([self.info_msg.split('_')[-1], "nack"])
+
          # Get the create slice message from keyword arguments
         self.create_msg = kwargs.get('create_msg', 'ct_cs')
          # Get the create service acknowledgment from keyword arguments
@@ -121,6 +128,9 @@ class base_controller(Thread):
         # Send a message with a header
         self.socket.send_json({self.rep_header: {message_type: message}})
 
+    def network_info(self, **kwargs):
+        # Must override this method
+        pass
 
     def create_slice(self, **kwargs):
         # Must override this method
@@ -160,6 +170,29 @@ class base_controller(Thread):
             # If the message is valid
             if transaction is not None:
                 self._log('Received Message', head=True)
+
+                # Check whether we should get information about the segment
+                network_info = transaction.get(self.info_msg, None)
+
+                # If we are getting information about the network segment
+                if network_info is not None:
+                    self._log('Get information from the', self.name, head=True)
+                    try:
+                        # Create new slice
+                        success, msg = self.network_info(**network_info)
+                    except Exception:
+                        success = False
+                        msg = str(format_exc())
+
+                    # Log event
+                    self._log("Obtained information"if success else \
+                        "Failed obtaining information", 'Took:',
+                              (time() - st)*1000, 'ms')
+
+                    # Send message
+                    self._send_msg(self.info_ack if success else \
+                                   self.info_nack, msg)
+
                 # Check whether is it a new slice
                 create_slice = transaction.get(self.create_msg, None)
 
@@ -309,7 +342,8 @@ class base_controller(Thread):
                 # Check for unknown messages
                 unknown_msg = [x for x in transaction if x not in [
                     self.create_msg, self.request_msg,
-                    self.update_msg, self.delete_msg, self.topology_msg]]
+                    self.update_msg, self.delete_msg,
+                    self._info_msg, self.topology_msg]]
 
                 # If there is at least an existing unknown message
                 if unknown_msg:
@@ -352,6 +386,7 @@ if __name__ == "__main__":
             req_header='ctl_req',
             rep_header='ctl_rep',
             error_msg='msg_err',
+            info_msg='tc_ni',
             create_msg='tc_cs',
             request_msg='tc_rs',
             update_msg='tc_us',

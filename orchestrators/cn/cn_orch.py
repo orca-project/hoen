@@ -26,6 +26,8 @@ class core_network_orchestrator(base_orchestrator):
             update_msg='lcc_urs',
             delete_msg='lcc_drs')
 
+    def network_info(self, **kwargs):
+        return True, {"cn": "Not implemented yet"}
 
     def create_slice(self, **kwargs):
         # Extract parameters from keyword arguments
@@ -106,6 +108,7 @@ if __name__ == "__main__":
             req_header='cn_req',
             rep_header='cn_rep',
             error_msg='msg_err',
+            info_msg='ns_cn',
             create_msg='cn_cc',
             request_msg='cn_rc',
             update_msg='cn_uc',

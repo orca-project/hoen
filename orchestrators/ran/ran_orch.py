@@ -27,6 +27,7 @@ class radio_access_network_orchestrator(base_orchestrator):
             default_port="3100",
             request_key="opw_req",
             reply_key="opw_rep",
+            info_msg='ns_owc',
             create_msg='owc_crs',
             request_msg='owc_rrs',
             update_msg='owc_urs',
@@ -54,6 +55,17 @@ class radio_access_network_orchestrator(base_orchestrator):
             #  'embb': 'F8:16:54:4C:E1:A4' # Old Dell
         }
         #TODO We might loads this from a file and allow reloading it
+
+    def network_info(self, **kwargs):
+        # Extract parameters from keyword arguments
+        s_ns = kwargs.get('s_ns', None)
+
+        # Send message to OpenWiFi RAN controller
+        self._log("Retrieve information about the", self.name),
+
+        # Inform the user about the network segment
+        return True, {'ran': {"resource_allocation": self.radio_resources}}
+
 
     def create_slice(self, **kwargs):
         a = datetime.datetime.now()
@@ -270,6 +282,7 @@ if __name__ == "__main__":
             req_header='rn_req',
             rep_header='rn_rep',
             error_msg='msg_err',
+            info_msg='ns_rn',
             create_msg='rn_cc',
             request_msg='rn_rc',
             update_msg='rn_uc',

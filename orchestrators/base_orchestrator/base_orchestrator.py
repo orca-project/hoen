@@ -47,6 +47,10 @@ class ctl_base(object):
         # Get the error message header from keyword arguments
         self.error_msg = kwargs.get("error_msg", "msg_err")
 
+        self.info_msg = kwargs.get("info_msg", "ctl_ni")
+        self.info_ack = "_".join([self.info_msg.split('_')[-1], "ack"])
+        self.info_nack = "_".join([self.info_msg.split('_')[-1], "nack"])
+
         self.create_msg = kwargs.get("create_msg", "ctl_cs")
         self.create_ack = "_".join([self.create_msg.split('_')[-1], "ack"])
         self.create_nack = "_".join([self.create_msg.split('_')[-1], "nack"])
@@ -118,6 +122,25 @@ class ctl_base(object):
             return False, msg[nack]
         else:
             return False, "Missing ACK or NACK: " + str(msg)
+
+
+    def network_info(self, **kwargs):
+        # Send Info message
+        success, msg = self._send_msg(self.info_ack, self.info_nack,
+                                      **{self.info_msg: kwargs})
+
+        # If the message failed
+        if not success:
+            # Inform the hyperstrator about the failure
+            print('\t', 'Failed requesting information about the ' + self.name)
+            return False, msg
+
+        # Otherwise, it succeeded
+        else:
+            # Inform the hyperstrator about the success
+            print('\t', 'Succeeded requesting information about the ' + \
+                  self.name)
+            return True, msg
 
     def create_slice(self, **kwargs):
         # Send Creation message
@@ -255,6 +278,13 @@ class base_orchestrator(Thread):
         # Get the reply header from keyword arguments
         self.rep_header = kwargs.get('rep_header', 'sdr_rep')
 
+        # Get the network info message from keyword arguments
+        self.info_msg = kwargs.get('info_msg', 'ns_ri')
+        # Get the network info acknowledgment from keyword arguments
+        self.info_ack = "_".join([self.info_msg.split('_')[-1], "ack"])
+        # Get the network info not acknowledgment from keyword arguments
+        self.info_nack = "_".join([self.info_msg.split('_')[-1], "nack"])
+
         # Get the create service message from keyword arguments
         self.create_msg = kwargs.get('create_msg', 'wl_cr')
          # Get the create service acknowledgment from keyword arguments
@@ -324,6 +354,29 @@ class base_orchestrator(Thread):
             # If the message is valid
             if transaction is not None:
                 self._log('Received Message', head=True)
+
+                # Check whether we should get information about the segment
+                network_info = transaction.get(self.info_msg, None)
+
+                # If we are getting information about the network segment
+                if network_info is not None:
+                    self._log('Get information from the', self.name, head=True)
+                    try:
+                        # Create new slice
+                        success, msg = self.network_info(**network_info)
+                    except Exception:
+                        success = False
+                        msg = str(format_exc())
+
+                    # Log event
+                    self._log("Obtained information"if success else \
+                        "Failed obtaining information", 'Took:',
+                              (time() - st)*1000, 'ms')
+
+                    # Send message
+                    self._send_msg(self.info_ack if success else \
+                                   self.info_nack, msg)
+
                 # Check whether is it a new service
                 create_slice = transaction.get(self.create_msg, None)
 
@@ -411,7 +464,7 @@ class base_orchestrator(Thread):
                                    self.request_nack, msg)
 
                 # Update service transaction
-                update_slice= transaction.get(self.update_msg, None)
+                update_slice = transaction.get(self.update_msg, None)
 
                 # If the flag exists
                 if update_slice is not None:
@@ -469,7 +522,8 @@ class base_orchestrator(Thread):
                 # Check for unknown messages
                 unknown_msg = [x for x in transaction if x not in [
                     self.create_msg, self.request_msg,
-                    self.update_msg, self.delete_msg]]
+                    self.update_msg, self.delete_msg,
+                    self.info_msg]]
 
                 # If there is at least an existing unknown message
                 if unknown_msg:
@@ -513,6 +567,7 @@ if __name__ == "__main__":
             req_header='orc_req',
             rep_header='orc_rep',
             error_msg='msg_err',
+            info_msg='oc_ni',
             create_msg='oc_cs',
             request_msg='oc_rs',
             update_msg='oc_us',
