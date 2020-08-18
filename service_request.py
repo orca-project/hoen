@@ -4,8 +4,10 @@
 import zmq
 # Import the ArgParse modeule
 import argparse
+# Import JSON
+import json
 
-RECV_DELAY = 6*10000
+RECV_DELAY = 60*1000
 
 # Make printing easier. TODO: Implement real logging
 def log(*args, head=False):
@@ -210,8 +212,8 @@ def network_info(socket, **kwargs):
                 exit(0)
             # If returning a raw JSON
             else:
-                print(ack)
-                 # Exit gracefully
+                print(json.dumps(ack))
+                # Exit gracefully
                 exit(0)
 
         # Check if there's a not acknowledgement
@@ -320,7 +322,7 @@ def service_request(socket, **kwargs):
                 exit(0)
             # If returning a raw JSON
             else:
-                print(ack)
+                print(json.dumps(ack))
                  # Exit gracefully
                 exit(0)
 
