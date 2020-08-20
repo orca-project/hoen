@@ -50,24 +50,35 @@ class core_network_orchestrator(base_orchestrator):
         s_req = kwargs.get('requirements', None)
         # Get the service
         s_ser = kwargs.get('service', "best-effort")
+        # Get the application
+        s_app = kwargs.get('application', "bare")
 
         # Append it to the list of service IDs
         self.s_ids[s_id] = {"requirements": s_req,
-                            "service": s_ser}
+                            "service": s_ser,
+                            "application": s_app,
+                            }
 
         # Send message to LXD CN controller
-        self._log("Service:", s_ser, 'Requirements:', str(s_req))
+        self._log("Application", s_app, "Service:", s_ser,
+                  'Requirements:', str(s_req))
 
         # TODO make a smarter allocation
         f_ram = 2.0 if s_ser in ["embb", "high-throughput"] else 1.0
         i_cpu = 2 if s_ser in ["urllc", "low-latency"] else 1
 
+        # Output message
         self._log("CPU:", i_cpu, "core(s)", "\t", "RAM:", f_ram, "GB(s)")
-
         self._log('Delegating it to the LXD Controller')
+
         # Send the message to create a slice
-        success, msg = self.lxd_ctl.create_slice(
-            **{'s_id': s_id, 'service': s_ser, "f_ram": f_ram, "i_cpu": i_cpu})
+        success, msg = self.lxd_ctl.create_slice(**{
+            's_id': s_id,
+            'service': s_ser,
+            'application': s_app,
+            "f_ram": f_ram,
+            "i_cpu": i_cpu
+        })
 
         # Inform the user about the creation
         return success, msg
