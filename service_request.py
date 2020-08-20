@@ -96,6 +96,15 @@ def parse_cli_args():
         type=float,
         help='Required latency [ms]')
 
+    parser_create.add_argument(
+        '-a', '--application',
+        metavar='APPLICATION',
+        type=str,
+        choices=["bare", "video", "robot", "file"],
+        default='bare',
+        #  required=True, # I wonder whether this arguments must be required
+        help='Type of Application')
+
     # Create parser for the getting information about the slices
     parser_request = subparsers.add_parser(
         'request',
@@ -104,7 +113,7 @@ def parse_cli_args():
 
     # Add CLI arguments
     parser_request.add_argument(
-        '-i', '--service-id',
+        '-i', '--s_id',
         metavar='S_ID',
         type=str,
         required=False,
@@ -120,7 +129,7 @@ def parse_cli_args():
         )
 
         parser_updated.add_argument(
-            '-i', '--service-id',
+            '-i', '--s_id',
             metavar='S_ID',
             type=str,
             required=False,
@@ -145,7 +154,7 @@ def parse_cli_args():
 
     # Add CLI arguments
     parser_delete.add_argument(
-        '-i', '--service-id',
+        '-i', '--s_id',
         metavar='S_ID',
         type=str,
         required=False,
@@ -250,6 +259,7 @@ def service_create(socket, **kwargs):
     # Send service request message to the hyperstrator
     socket.send_json({
         create_msg: {'service': kwargs['service'],
+                     'application': kwargs['application'],
                      'requirements': {'throughput': kwargs['throughput'],
                                       'latency': kwargs['latency']}
                      }})
@@ -304,7 +314,7 @@ def service_request(socket, **kwargs):
     request_nack = "rs_nack"
 
     # Try to get the service ID
-    s_id = kwargs.get("service_id", "")
+    s_id = kwargs.get("s_id", "")
 
     # Send service release message to the hyperstrator
     socket.send_json({request_msg: {'s_id': s_id}})
@@ -365,12 +375,12 @@ def service_delete(socket, **kwargs):
     delete_ack = "ds_ack"
     delete_nack = "ds_nack"
 
-    if not kwargs['service_id']:
+    if not kwargs['s_id']:
         log("Missing service ID", head=True)
         exit(121)
 
     # Send service release message to the hyperstrator
-    socket.send_json({delete_msg: {'s_id': kwargs['service_id']}})
+    socket.send_json({delete_msg: {'s_id': kwargs['s_id']}})
 
     try:
         # Receive acknowledgment
@@ -425,9 +435,6 @@ if __name__ == "__main__":
     if 'json_input' in kwargs and kwargs['json_input']:
         for key in kwargs['json_input']:
             kwargs[key] = kwargs['json_input'][key]
-
-        if "s_id" in kwargs["json_input"]:
-            kwargs["service_id"] = kwargs["json_input"]["s_id"]
 
     # Retrieve information about the E2E network
     if 'info' in kwargs['subcommand']:
