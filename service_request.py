@@ -100,7 +100,7 @@ def parse_cli_args():
         '-a', '--application',
         metavar='APPLICATION',
         type=str,
-        choices=["bare", "video", "robot", "file"],
+        choices=["bare", "video", "robot", "files"],
         default='bare',
         #  required=True, # I wonder whether this arguments must be required
         help='Type of Application')

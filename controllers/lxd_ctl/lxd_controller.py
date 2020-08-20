@@ -85,7 +85,7 @@ class lxd_controller(base_controller):
         f_ram = str(int(kwargs.get('f_ram', 1.0)))
 
         # If the application is not known
-        if s_app not in ["bare", "video", "robot", "file"]:
+        if s_app not in ["bare", "video", "robot", "files"]:
             return False, "Unknown application:" + str(s_app)
 
 
@@ -227,10 +227,16 @@ class lxd_controller(base_controller):
         self._log("Starting Docker Service")
         t = time()
 
+        hoen_app = {
+            "video": "hoen-embb",
+            "robot": "hoen-urllc",
+            "files": "networkstatic/iperf3"
+        }
+
         # Ensure docker daemon is already started
         container.execute(["systemctl", "start", "docker"])
         # Run required application
-        container.execute(["docker", "start", s_app])
+        container.execute(["docker", "start", hoen_app[s_app]])
 
         # Running iperf3 for any service just for testing
         #  container.execute(["docker", "start", "test"])
