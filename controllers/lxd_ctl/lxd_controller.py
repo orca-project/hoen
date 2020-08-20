@@ -84,6 +84,11 @@ class lxd_controller(base_controller):
         i_cpu = str(kwargs.get('i_cpu', 1))
         f_ram = str(int(kwargs.get('f_ram', 1.0)))
 
+        # If the application is not known
+        if s_app not in ["bare", "video", "robot", "file"]:
+            return False, "Unknown application:" + str(s_app)
+
+
         if grab_ethernet:
             # Try to get an available interface
             index = 0
@@ -182,7 +187,8 @@ class lxd_controller(base_controller):
 
                 self._log("Configured networking")
 
-                if False:
+                # If not starting a bare container
+                if s_app != "bare":
                     # Start docker service
                     self.start_application(container, s_app)
 
