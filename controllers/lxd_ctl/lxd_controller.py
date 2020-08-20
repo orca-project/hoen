@@ -37,6 +37,13 @@ class lxd_controller(base_controller):
         self._log("Found", len(self.interface_list),
                   "Ethernet ports:", list(self.interface_list.keys()))
 
+    def pre_exit(self):
+        # Before closure, release all resources
+        for s_id in self.s_ids:
+            self.delete_slice(**{'s_id': s_id})
+
+        self._log("Cleared resources")
+
     def prepare_distro_image(self, image_name="hoen-3.0"):
         # Image server locations
         #  image_server = "https://images.linuxcontainers.org"
@@ -72,9 +79,15 @@ class lxd_controller(base_controller):
        # Extract parameters from keyword arguments
         s_id = str(kwargs.get('s_id', None))
         s_ser = kwargs.get('service', "best-effort")
+        s_app = kwargs.get('application', "bare")
         # TODO: Ideally the CN orchestrator would specify the resources
         i_cpu = str(kwargs.get('i_cpu', 1))
         f_ram = str(int(kwargs.get('f_ram', 1.0)))
+
+        # If the application is not known
+        if s_app not in ["bare", "video", "robot", "file"]:
+            return False, "Unknown application:" + str(s_app)
+
 
         if grab_ethernet:
             # Try to get an available interface
@@ -124,7 +137,7 @@ class lxd_controller(base_controller):
                    'profiles': ['hoen'],
                    'devices': {
                        "repo": {"type": "disk",
-                                "source": os.getcwd() + "/services/", #TODO from type of service
+                                "source": os.getcwd() + "/services/",
                                 "path": "/root/services/"}
                    }}
 
@@ -153,7 +166,9 @@ class lxd_controller(base_controller):
             # If attaching an physical ethernet port to it
             if grab_ethernet:
                 # Set the interface's IPenp0s31f6
-                interface_ip = "30.0.{0}.1/24".format(int(available_interface[3]))
+                interface_ip = "30.0.{0}.1/24".format(
+                    int(available_interface[3]))
+
                 container.execute(
                         ["ip", "addr", "add", interface_ip, "dev", "oth0"])
 
@@ -172,9 +187,10 @@ class lxd_controller(base_controller):
 
                 self._log("Configured networking")
 
-                if False:
+                # If not starting a bare container
+                if s_app != "bare":
                     # Start docker service
-                    self.start_service(container, s_ser)
+                    self.start_application(container, s_app)
 
         # In case of issues
         except Exception as e:
@@ -190,8 +206,11 @@ class lxd_controller(base_controller):
         # In case it worked out fine
         else:
             # Append it to the service list
-            self.s_ids[s_id].update({"container": container,
-                                     "service": s_ser})
+            self.s_ids[s_id].update({
+                "container": container,
+                "service": s_ser,
+                "application": s_app
+            })
 
             # If attaching an physical ethernet port to it
             if grab_ethernet:
@@ -204,18 +223,19 @@ class lxd_controller(base_controller):
                 's_id': s_id,
                 "source": interface_ip if grab_ethernet else "127.0.0.1"}
 
-    def start_service(self, container, s_ser):
+    def start_application(self, container, s_app):
         self._log("Starting Docker Service")
         t = time()
 
         # Ensure docker daemon is already started
         container.execute(["systemctl", "start", "docker"])
-        # Run required service
-        container.execute(["docker", "start", s_ser])
-        # Running iperf3 for any service just for testing
-        container.execute(["docker", "start", "test"])
+        # Run required application
+        container.execute(["docker", "start", s_app])
 
-        self._log("Docker services started in", round(time() - t, 3), "seconds")
+        # Running iperf3 for any service just for testing
+        #  container.execute(["docker", "start", "test"])
+
+        self._log("Docker started in", round(time() - t, 3), " [s]")
 
 
     def request_slice(self, **kwargs):
@@ -246,14 +266,15 @@ class lxd_controller(base_controller):
 
             if container.name.split('-',1)[-1] in self.s_ids:
                 # Add it to the message
-                msg[container.name.split('-',1)[-1]].update(
-                    {"service": \
-                         self.s_ids[container.name.split('-',1)[-1]]["service"]
-                     })
+                msg[container.name.split('-',1)[-1]].update({
+                    "service":
+                    self.s_ids[container.name.split('-',1)[-1]]["service"],
+                    "application":
+                    self.s_ids[container.name.split('-',1)[-1]]["application"]
+                })
 
             # If there is an external Ethernet interface
             if grab_ethernet and container.state().network is not None:
-
                 # Add it to the message
                 msg[container.name.split('-',1)[-1]].update(
                     {"network":
