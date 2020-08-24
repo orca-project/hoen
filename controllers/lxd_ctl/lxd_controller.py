@@ -199,12 +199,13 @@ class lxd_controller(base_controller):
                 interface_ip = "30.0.{0}.1/24".format(
                     int(available_interface[3]))
 
+            """
                 container.execute(
                         ["ip", "addr", "add", interface_ip, "dev", "oth0"])
 
                 self._log("Configured IP:", interface_ip)
 
-                sleep(0.5)
+                sleep(1)
                 # Install routes to allow different network communication
                 a = container.execute(
                     ["ip", "route", "add", "default", "dev", "oth0"]
@@ -218,11 +219,11 @@ class lxd_controller(base_controller):
                 )
 
                 self._log("Configured networking")
-
-                # If not starting a bare container
-                if s_app != "bare":
-                    # Start docker service
-                    self.start_application(container, s_app)
+            """
+            # If not starting a bare container
+            if s_app != "bare":
+                # Start docker service
+                self.start_application(container, s_app)
 
         # In case of issues
         except Exception as e:
@@ -268,7 +269,7 @@ class lxd_controller(base_controller):
 
         # Run a specific application
         hoen_app = {
-            "video": ["hoen-embb"],
+            "video": ["-p", "5000:5000", "hoen-embb:latest"],
             "robot": ["hoen-urllc"],
             "debug": "-it --rm -p 5201:5201 networkstatic/iperf3 -s".split(" ")
         }
@@ -281,7 +282,7 @@ class lxd_controller(base_controller):
         # Ensure docker daemon is already started
         container.execute(["systemctl", "start", "docker"])
 
-        sleep(1)
+        sleep(2)
         # Run Docker container
         container.execute(docker_run_arguments)
 

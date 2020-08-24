@@ -6,7 +6,7 @@ app = Flask(__name__)
 @app.route("/video", methods=["GET"])
 def get_movie():
     return send_from_directory(
-                "/root/services/",
+                "/",
                 "video.mp4",
                 conditional=True,
             )

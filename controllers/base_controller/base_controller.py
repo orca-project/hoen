@@ -224,9 +224,9 @@ class base_controller(Thread):
                         msg = str(format_exc())
                         del self.s_ids[create_slice['s_id']]
 
-                    # In case of issues to create slice
+                    # In case of issues for creating slice
                     if not success:
-                        del self.s_ids[create_slice['s_id']]
+                        self.s_ids.pop(create_slice['s_id'], None)
 
                     # Log event
                     self._log("Created Slice" if success else \
