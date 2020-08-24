@@ -526,7 +526,7 @@ class hyperstrator_server(Thread):
        # If doing the TN
         if 'tn' in info_transaction['s_ns'] or not info_transaction['s_ns']:
             if not self.skip_transport:
-                self._log('Send message to CN orchestrator')
+                self._log('Send message to TN orchestrator')
 
                 # Send message to the TN orchestrator
                 transport_success, transport_msg = self.tn_orch.network_info(
