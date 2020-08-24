@@ -16,7 +16,7 @@ from psutil import net_if_addrs
 # Import the Client class from the pylxd module
 from pylxd import Client
 
-from time import time
+from time import time, sleep
 
 #  from threading import Thread
 
@@ -79,17 +79,25 @@ class lxd_controller(base_controller):
        # Extract parameters from keyword arguments
         s_id = str(kwargs.get('s_id', None))
         s_ser = kwargs.get('service', "best-effort")
-        s_app = kwargs.get('application', "bare")
+        s_app = kwargs.get('application', "debug")
         # TODO: Ideally the CN orchestrator would specify the resources
         i_cpu = str(kwargs.get('i_cpu', 1))
         f_ram = str(int(kwargs.get('f_ram', 1.0)))
 
         # If the application is not known
-        if s_app not in ["bare", "video", "robot", "files"]:
+        if s_app not in ["video", "robot", "debug"]:
             return False, "Unknown application:" + str(s_app)
 
+        interface_map = {
+            "video": "enp5s0",
+            "robot": "enp6s0",
+            "debug": "enp7s0"
+        }
+
+        interface = interface_map[s_app]
 
         if grab_ethernet:
+            """
             # Try to get an available interface
             index = 0
             available_interface = ""
@@ -100,6 +108,11 @@ class lxd_controller(base_controller):
                     available_interface = interface
                     self.interface_list[interface]['available'] = False
                     break
+            """
+
+            available_interface = \
+                    interface if self.interface_list[interface]['available'] \
+                    else False
 
             # If there are no interfaces available
             if not available_interface:
@@ -107,6 +120,9 @@ class lxd_controller(base_controller):
                 self._log('Not enough resources!')
                 return False, 'Not enough resources!'
 
+            self.interface_list[interface]['available'] = False
+
+        """
         try:
 
             # Get the latest hoen immage
@@ -151,13 +167,27 @@ class lxd_controller(base_controller):
                 "parent": available_interface,
                 "name": "oth0"}
             })
-
+        """
 
         # Try to create a new container
         try:
             # Create a new container with the specified configuration
-            container = self.lxd_client.containers.create(profile, wait=True)
-            self._log("Created container")
+
+            name_map = {
+                "video": "embb",
+                "robot": "urllc",
+                "debug": "debug"
+            }
+            name = name_map[s_app]
+
+            if self.lxd_client.containers.exists("hoen04-" + name):
+                container = self.lxd_client.containers.get("hoen04-" + name)
+
+            else:
+                return False,  "Could not find: " + name
+
+            #  container = self.lxd_client.containers.create(profile, wait=True)
+            #  self._log("Created container")
 
             # Start the container
             container.start(wait=True)
@@ -174,13 +204,15 @@ class lxd_controller(base_controller):
 
                 self._log("Configured IP:", interface_ip)
 
+                sleep(0.5)
                 # Install routes to allow different network communication
-                container.execute(
+                a = container.execute(
                     ["ip", "route", "add", "default", "dev", "oth0"]
                 )
 
+                sleep(0.5)
                 # Set route to radio
-                container.execute(
+                b = container.execute(
                     ['ip','route','add','10.0.0.0/24','via', '10.0.0.1', 'dev',
                      'oth0']
                 )
@@ -195,7 +227,9 @@ class lxd_controller(base_controller):
         # In case of issues
         except Exception as e:
             # If attaching an physical ethernet port to it
-            if grab_ethernet:
+            #  if grab_ethernet:
+            if grab_ethernet and not self.lxd_client.containers.exists(
+                "hoen04-" + name):
                 # Release resources
                 self.interface_list[interface]['available'] = True
 
@@ -224,19 +258,32 @@ class lxd_controller(base_controller):
                 "source": interface_ip if grab_ethernet else "127.0.0.1"}
 
     def start_application(self, container, s_app):
+        # Output log message
         self._log("Starting Docker Service")
+        # Keep track of time here
         t = time()
 
+        # Base docker run arguments
+        docker_run_arguments = ["docker", "run", "-d"]
+
+        # Run a specific application
         hoen_app = {
-            "video": "hoen-embb",
-            "robot": "hoen-urllc",
-            "files": "networkstatic/iperf3"
+            "video": ["hoen-embb"],
+            "robot": ["hoen-urllc"],
+            "debug": "-it --rm -p 5201:5201 networkstatic/iperf3 -s".split(" ")
         }
+
+        # Extend the run arguments with the application
+        docker_run_arguments.extend(hoen_app[s_app])
+
+        print(docker_run_arguments)
 
         # Ensure docker daemon is already started
         container.execute(["systemctl", "start", "docker"])
-        # Run required application
-        container.execute(["docker", "start", hoen_app[s_app]])
+
+        sleep(1)
+        # Run Docker container
+        container.execute(docker_run_arguments)
 
         # Running iperf3 for any service just for testing
         #  container.execute(["docker", "start", "test"])
@@ -251,17 +298,26 @@ class lxd_controller(base_controller):
         # Container to hold the requested information
         msg = {}
         # Iterate over all containers
+        """
         for container in self.lxd_client.containers.all():
             # If going for a specific S_ID but it does not match
             if (s_id and ("id-" + s_id != container.name)) or \
                     not container.name.startswith("id"):
                 continue
+        """
+        for container_id in self.s_ids:
+            if s_id and s_id != container_id:
+                continue
 
             # Log event and return
-            self._log("Found container:", container.name.split('-',1)[-1])
+            #  self._log("Found container:", container.name.split('-',1)[-1])
+            self._log("Found container:", container_id)
 
-            # Append this information to the output dictionary
-            msg[container.name.split('-',1)[-1]] = {
+            container = self.s_ids[container_id]["container"]
+
+                        # Append this information to the output dictionary
+            #  msg[container.name.split('-',1)[-1]] = {
+            msg[container_id] = {
                 #  'distro': container.config["image.os"]+ "-" + \
                     #  container.config['image.version'],
                 'memory': {"limit": container.config.get('limits.memory', ""),
@@ -270,6 +326,12 @@ class lxd_controller(base_controller):
                     "usage": container.state().cpu['usage']}
             }
 
+            msg[container_id].update({
+                "application": self.s_ids[container_id]["application"],
+                "service": self.s_ids[container_id]["service"]
+            })
+
+            """
             if container.name.split('-',1)[-1] in self.s_ids:
                 # Add it to the message
                 msg[container.name.split('-',1)[-1]].update({
@@ -279,10 +341,12 @@ class lxd_controller(base_controller):
                     self.s_ids[container.name.split('-',1)[-1]]["application"]
                 })
 
+            """
             # If there is an external Ethernet interface
             if grab_ethernet and container.state().network is not None:
                 # Add it to the message
-                msg[container.name.split('-',1)[-1]].update(
+                #  msg[container.name.split('-',1)[-1]].update(
+                msg[container_id].update(
                     {"network":
                      {"oth0": container.state().network["oth0"]['counters']}
                 })
@@ -297,11 +361,28 @@ class lxd_controller(base_controller):
 
         # Default value
         container = None
+        """
         # Iterate over all container and return the matching one
         for ctn in self.lxd_client.containers.all():
             if "id-" + s_id == ctn.name:
                 # Get the right container
                 container = ctn
+                break
+        """
+
+        for container_id in self.s_ids:
+            if s_id == container_id:
+                s_app = self.s_ids[s_id]["application"]
+
+                name_map = {
+                    "video": "embb",
+                    "robot": "urllc",
+                    "debug": "debug"
+                }
+
+                name = name_map[s_app]
+
+                container = self.lxd_client.containers.get("hoen04-" + name)
                 break
 
         # Check whether it exists
@@ -316,6 +397,7 @@ class lxd_controller(base_controller):
             # Log event
             self._log("Stopped container:", s_id)
 
+        """
         try:
             # Delete the container
             container.delete()
@@ -325,6 +407,9 @@ class lxd_controller(base_controller):
             return False, str(e)
         # In case it worked out fine
         else:
+        """
+
+        if True:
             # If set to have its own physical NIC
             if grab_ethernet:
                 # Release resources
@@ -332,7 +417,7 @@ class lxd_controller(base_controller):
                     self.s_ids[s_id]["interface"]]["available"] = True
 
             # Log event and return
-            self._log("Deleted container!")
+            #  self._log("Deleted container!")
             return True, {"s_id": s_id}
 
 if __name__ == "__main__":
