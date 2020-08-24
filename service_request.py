@@ -4,8 +4,10 @@
 import zmq
 # Import the ArgParse modeule
 import argparse
+# Import JSON
+from json import loads, dumps
 
-RECV_DELAY = 6*10000
+RECV_DELAY = 60*1000
 
 # Make printing easier. TODO: Implement real logging
 def log(*args, head=False):
@@ -14,7 +16,6 @@ def log(*args, head=False):
 def parse_cli_args():
     # Instantiate ArgumentParser object
     parser = argparse.ArgumentParser(description='Manage E2E Services')
-
 
     parser.add_argument(
         '-s', '--server',
@@ -29,15 +30,32 @@ def parse_cli_args():
         required=False,
         help='Hyperstrator server port')
 
+
     # Create subparsers
     subparsers = parser.add_subparsers(help='Sub-command Help',
                                        dest='subcommand')
     # Require subcommands
     subparsers.required = True
 
+    # Parent parser for parameters shared among sub-parsers
+    parent_parser = argparse.ArgumentParser(add_help=False)
+
+    parent_parser.add_argument(
+        '-j', '--json_output',
+        required=False,
+        action='store_true',
+        help='Strip text and return a JSON string')
+    parent_parser.add_argument(
+        '-J', '--json_input',
+        required=False,
+        type=loads,
+        help='Input as JSON string')
+
+
     # Create parser for getting information about the network
     parser_info = subparsers.add_parser(
         'info',
+        parents=[parent_parser],
         help='Get information about the network infrastructure')
 
     # Add CLI arguments
@@ -51,9 +69,11 @@ def parse_cli_args():
         default=["ran", "tn", "cn"],
         help='Network Segments')
 
+
     # Create parser for the creation of slices
     parser_create = subparsers.add_parser(
         'create',
+        parents=[parent_parser],
         help='Create a new E2E Network Slice',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
@@ -76,40 +96,43 @@ def parse_cli_args():
         type=float,
         help='Required latency [ms]')
 
+    parser_create.add_argument(
+        '-a', '--application',
+        metavar='APPLICATION',
+        type=str,
+        choices=["video", "robot", "debug"],
+        default='debug',
+        #  required=True, # I wonder whether this arguments must be required
+        help='Type of Application')
 
     # Create parser for the getting information about the slices
     parser_request = subparsers.add_parser(
         'request',
+        parents=[parent_parser],
         help='Request information about  E2E Network Slice')
 
     # Add CLI arguments
     parser_request.add_argument(
-        '-i', '--service-id',
+        '-i', '--s_id',
         metavar='S_ID',
         type=str,
         required=False,
         help='Request information about this service')
-
-    parser_request.add_argument(
-        '-j', '--json',
-        required=False,
-        action='store_true',
-        help='Strip text and return a JSON string'
-    )
 
 
     # TODO Built parsers, but methods remain unimplemented
     if False:
         parser_update = subparsers.add_parsers(
             'update',
+            parents=[parent_parser],
             help='Reconfigure an E2E Network Slice'
         )
 
         parser_updated.add_argument(
-            '-i', '--service-id',
+            '-i', '--s_id',
             metavar='S_ID',
             type=str,
-            required=True,
+            required=False,
             help='Update requirements for this service'
         )
         parser_update.add_argument(
@@ -126,14 +149,15 @@ def parse_cli_args():
     # Create parser for the removal of slices
     parser_delete = subparsers.add_parser(
         'delete',
+        parents=[parent_parser],
         help='Remove an existing E2E Network Slice')
 
     # Add CLI arguments
     parser_delete.add_argument(
-        '-i', '--service-id',
+        '-i', '--s_id',
         metavar='S_ID',
         type=str,
-        required=True,
+        required=False,
         help='Remove service based on the S_ID')
 
 
@@ -169,8 +193,8 @@ def establish_connection(**kwargs):
 
 def network_info(socket, **kwargs):
     info_msg = "ns_ni"
-    info_ack = "ri_ack"
-    info_nack = "ri_nack"
+    info_ack = "ni_ack"
+    info_nack = "ni_nack"
 
     # Try to get the network segment
     s_ns = list(set(kwargs.get("network", "")))
@@ -192,12 +216,19 @@ def network_info(socket, **kwargs):
 
         # If received an acknowledgement
         if ack is not None:
-            # Print information
-            log('Network Information:', head=True)
-            # For every returned slice
-            for entry in ack:
-                log('Network Segment:', entry)
-                log('Info:', ack[entry])
+            # If returning a human-readable string
+            if not kwargs['json_output']:
+                # Print information
+                log('Network Information:', head=True)
+                # For every returned slice
+                for entry in ack:
+                    log('Network Segment:', entry)
+                    log('Info:', ack[entry])
+
+            # If returning a raw JSON
+            else:
+                print(dumps(ack))
+
             # Exit gracefully
             exit(0)
 
@@ -228,6 +259,7 @@ def service_create(socket, **kwargs):
     # Send service request message to the hyperstrator
     socket.send_json({
         create_msg: {'service': kwargs['service'],
+                     'application': kwargs['application'],
                      'requirements': {'throughput': kwargs['throughput'],
                                       'latency': kwargs['latency']}
                      }})
@@ -246,10 +278,16 @@ def service_create(socket, **kwargs):
 
         # If received an acknowledgement
         if ack is not None:
-            log('Created Service:', head=True)
-            # Print information
-            log('Service ID:', ack['s_id'])
-                #  '\t', 'Destination:', ack['destination'])
+            # If returning a human-readable string
+            if not kwargs['json_output']:
+                log('Created Service:', head=True)
+                # Print information
+                log('Service ID:', ack['s_id'])
+                    #  '\t', 'Destination:', ack['destination'])
+
+            # If returning a raw JSON
+            else:
+                print(dumps(ack))
 
             # Exit gracefully
             exit(0)
@@ -276,7 +314,7 @@ def service_request(socket, **kwargs):
     request_nack = "rs_nack"
 
     # Try to get the service ID
-    s_id = kwargs.get("service_id", "")
+    s_id = kwargs.get("s_id", "")
 
     # Send service release message to the hyperstrator
     socket.send_json({request_msg: {'s_id': s_id}})
@@ -296,20 +334,20 @@ def service_request(socket, **kwargs):
         # If received an acknowledgement
         if ack is not None:
             # If returning a human-readable string
-            if not kwargs['json']:
+            if not kwargs['json_output']:
                 # Print information
                 log('Request Service:', head=True)
                 # For every returned slice
                 for entry in ack:
                     log('Service ID:', entry)
                     log('Info:', ack[entry])
-                # Exit gracefully
-                exit(0)
+
             # If returning a raw JSON
             else:
-                print(ack)
-                 # Exit gracefully
-                exit(0)
+                print(dumps(ack))
+
+            # Exit gracefully
+            exit(0)
 
         # Check if there's a not acknowledgement
         nack = rep.get(request_nack, None)
@@ -337,8 +375,12 @@ def service_delete(socket, **kwargs):
     delete_ack = "ds_ack"
     delete_nack = "ds_nack"
 
+    if not kwargs['s_id']:
+        log("Missing service ID", head=True)
+        exit(121)
+
     # Send service release message to the hyperstrator
-    socket.send_json({delete_msg: {'s_id': kwargs['service_id']}})
+    socket.send_json({delete_msg: {'s_id': kwargs['s_id']}})
 
     try:
         # Receive acknowledgment
@@ -354,9 +396,15 @@ def service_delete(socket, **kwargs):
 
         # If received an acknowledgement
         if ack is not None:
-            log('Removed Service:', head=True)
-            # Print information
-            log('Service ID:', ack['s_id'])
+            # If returning a human-readable string
+            if not kwargs['json_output']:
+                log('Removed Service:', head=True)
+                # Print information
+                log('Service ID:', ack['s_id'])
+            # If returning a raw JSON
+            else:
+                print(dumps(ack))
+
             # Exit gracefully
             exit(0)
 
@@ -382,6 +430,11 @@ if __name__ == "__main__":
     kwargs = parse_cli_args()
     # Establish connection to the hyperstrator
     socket = establish_connection()
+
+    # Override input with JSON input
+    if 'json_input' in kwargs and kwargs['json_input']:
+        for key in kwargs['json_input']:
+            kwargs[key] = kwargs['json_input'][key]
 
     # Retrieve information about the E2E network
     if 'info' in kwargs['subcommand']:

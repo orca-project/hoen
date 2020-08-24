@@ -410,6 +410,10 @@ class base_orchestrator(Thread):
                     if not success:
                         self.s_ids.pop(create_slice['s_id'], None)
 
+                    # In case of issues to create slice
+                    if not success:
+                        del self.s_ids[create_slice['s_id']]
+
                     # Log event
                     self._log("Created Slice" if success else \
                         "Failed creating Slice", 'Took:',
