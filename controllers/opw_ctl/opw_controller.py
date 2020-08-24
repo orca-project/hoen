@@ -346,12 +346,21 @@ class opw_controller(base_controller):
         bash("sdrctl dev {0} set slice_end {1}".format(self.sdr_dev, i_end))
         bash("sdrctl dev {0} set slice_total {1}".format(self.sdr_dev, i_total))
 
+        # Sync all commands
+        sync = bash("sdrctl dev {0} set slice_idx 4".format(self.sdr_dev)).code
+
         # Log event
         self._log("Set slice", i_sln, " start/end/total to",
                   i_start, "/", i_end, "/", i_total)
 
+        # Set the slice in question
+        bash("sdrctl dev {0} set slice_idx {1}".format(self.sdr_dev, i_sln))
+
+        print(s_mac)
         # Get MAC address associated with service and map it to 32 bits
         s_mac_32 = s_mac.replace(":","")[4:]
+
+        print(s_mac_32)
 
         # Add MAC address to SDRCTL
         sla = bash("sdrctl dev {0} set addr {1}".format(
@@ -362,7 +371,7 @@ class opw_controller(base_controller):
         sync = bash("sdrctl dev {0} set slice_idx 4".format(self.sdr_dev)).code
 
         if sla or sync:
-            return False, "Slice creation railed."
+            return False, "Slice creation failed."
 
         # Iterate over the slice slice
         for i, x in enumerate(self.ran_slice_list):
@@ -497,8 +506,8 @@ if __name__ == "__main__":
             delete_msg='owc_drs',
             host='0.0.0.0',
             port=3100,
-	    **kwargs
-	)
+            **kwargs
+        )
 
         # Start the OpenWiFi Controller Server
         opw_controller_thread.start()

@@ -9,8 +9,6 @@ from base_orchestrator.base_orchestrator import base_orchestrator, ctl_base, cls
 # Import the System and Name methods from the OS module
 from os import system, name
 
-import datetime
-
 # Import signal
 import signal
 
@@ -49,13 +47,11 @@ class radio_access_network_orchestrator(base_orchestrator):
                                  'end': self.total_resources-1}]
 
         # Dictionary mapping UE's MAC addresses
-        self.service_to_mac = {
-            #  'best-effort': '14:AB:C5:42:B7:33', # New Dell
-            'best-effort': '14:AB:C5:42:B7:33', # New Dell
-            #  'embb': '14:AB:C5:42:B7:33', # New Dell
-            'urllc': 'B8:27:EB:BE:C1:F1', # RasPi
-            'embb': '88:29:9C:02:24:EF' # Phone
-            #  'embb': 'F8:16:54:4C:E1:A4' # Old Dell
+        self.application_to_mac = {
+            #  'video': '14:AB:C5:42:B7:33', # My Dell
+            'video': ' 00:28:F8:26:0B:FB', # CTVR Dell
+            'debug': 'B8:27:EB:BE:C1:F1', # RasPi
+            'robot': '88:29:9C:02:24:EF' # Phone
         }
         #TODO We might loads this from a file and allow reloading it
 
@@ -74,46 +70,52 @@ class radio_access_network_orchestrator(base_orchestrator):
 
 
     def create_slice(self, **kwargs):
-        a = datetime.datetime.now()
         # Extract parameters from keyword arguments
         s_id = kwargs.get('s_id', None)
         # Get the slice requirements
         s_req = kwargs.get('requirements', None)
         # Get the type of service
         s_ser = kwargs.get('service', 'best-effort')
+        s_app= kwargs.get('application', 'debug')
 
         # Check whether the type of service is known
-        if s_ser not in self.service_to_mac.keys():
-                return False, "Invalid type of service: " + str(s_ser)
+        if s_ser not in ['best-effort', 'embb', 'urllc']:
+            return False, "Invalid type of service: " + str(s_ser)
+
+        # Check whether the type of application is known
+        if s_app not in self.application_to_mac.keys():
+            return False, "Invalid type of application: " + str(s_app)
 
         # Get MAC address associated with service
-        s_mac = self.service_to_mac[s_ser]
+        s_mac = self.application_to_mac[s_app]
 
-        # Apply defaults and sanitise input
-        i_thx = s_req.get("throughput", 1)
-        i_thx = float(i_thx) if i_thx is not None else 1
+        # TODO Dirty way around
+        if s_ser == 'best-effort':
+            req_resources = 500
 
-        i_del = s_req.get("latency", 100)
-        i_del = float(i_del) if i_del is not None else 200
+        else:
+            # Apply defaults and sanitise input
+            i_thx = s_req.get("throughput", 1)
+            i_thx = float(i_thx) if i_thx is not None else 1
 
-        # Calculate the required amount of resources
-        eq_thx = max((i_thx - 0.5786)  / 14.19, 0.01)
-        eq_del = max((148.6 - i_del) / 133.2, 0.01)
+            i_del = s_req.get("latency", 100)
+            i_del = float(i_del) if i_del is not None else 200
 
-        # Get the minimum amount to suffice both delay and throughput
-        req_resources = int(self.total_resources * max(eq_thx, eq_del)) - 1
+            # Calculate the required amount of resources
+            eq_thx = max((i_thx - 0.5786)  / 14.19, 0.01)
+            eq_del = max((148.6 - i_del) / 133.2, 0.01)
 
-        # TODO Dirty fix to handle approximation error
-        if req_resources >= self.total_resources and req_resources <= 51000:
-            req_resources = self.total_resources - 1
+            # Get the minimum amount to suffice both delay and throughput
+            req_resources = int(self.total_resources * max(eq_thx, eq_del)) - 1
+
+            # TODO Dirty fix to handle approximation error
+            if req_resources >= self.total_resources and req_resources <= 51000:
+                req_resources = self.total_resources - 1
 
         # If requiring too many resources
         if req_resources >= self.total_resources:
             return False, "Unfeasible request."
 
-        # TODO Dirty way around
-        if s_ser == 'best-effort':
-            req_resources = 5000
 
         # Try to allocate radio sources
         allocated = False
@@ -154,10 +156,6 @@ class radio_access_network_orchestrator(base_orchestrator):
         self._log("Service:", s_ser, 'Requirements:', s_req, "Slice #", i_sln)
         self._log('Delegating it to the OPW Controller')
 
-        b = datetime.datetime.now()
-
-        c = b -a
-        print(c.microseconds)
         # Send the message to create a slice
         success, msg = self.opw_ctl.create_slice(
             **{'s_id': s_id, 's_mac': s_mac,
@@ -168,21 +166,15 @@ class radio_access_network_orchestrator(base_orchestrator):
                    'total': i_total}
                })
 
-        d = datetime.datetime.now()
-
         if success:
             # Append it to the list of service IDs
             self.s_ids[s_id] = {"requirements": s_req,
                                 "service": s_ser,
+                                "application": s_app,
                                 "slice": {"number": i_sln},
                                 "MAC": s_mac,
                                 "destination": msg['destination']}
 
-
-        e = datetime.datetime.now()
-
-        f = e - d
-        print(f.microseconds)
         # Inform the user about the creation
         return success, msg
 
@@ -206,6 +198,7 @@ class radio_access_network_orchestrator(base_orchestrator):
             # Create entry with orchestrator-only info about the virtual radio
             info[virtual_radio] = {
                     "service": self.s_ids[virtual_radio]["service"],
+                    "application": self.s_ids[virtual_radio]["application"],
             }
 
             # Send the message to create a slice
