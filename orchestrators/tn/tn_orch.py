@@ -46,14 +46,14 @@ class tn_orchestrator(base_orchestrator):
         # setting link speeds manually
         # TODO: to create a service to fetch these values automatically from ovsdb or ofconfig
         catalog = ndb()
-        catalog.set_link_capacity('s01','s02', 30)
-        catalog.set_link_capacity('s01','s04', 30)
-        catalog.set_link_capacity('s02','s03', 30)
-        catalog.set_link_capacity('s02','s01', 30)
-        catalog.set_link_capacity('s03','s04', 30)
-        catalog.set_link_capacity('s03','s02', 30)
-        catalog.set_link_capacity('s04','s01', 30)
-        catalog.set_link_capacity('s04','s03', 30)
+        catalog.set_link_capacity('s01','s02', 1000)
+        catalog.set_link_capacity('s01','s04', 1000)
+        catalog.set_link_capacity('s02','s03', 1000)
+        catalog.set_link_capacity('s02','s01', 1000)
+        catalog.set_link_capacity('s03','s04', 1000)
+        catalog.set_link_capacity('s03','s02', 1000)
+        catalog.set_link_capacity('s04','s01', 1000)
+        catalog.set_link_capacity('s04','s03', 1000)
 
         '''
         Setting known hosts and networks manually.
