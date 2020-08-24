@@ -20,7 +20,7 @@ else:
     from eventlet.green import zmq
 
 # Received delay of 10 sec
-RECV_DELAY = 60*1000
+RECV_DELAY = 30*1000
 
 def cls():
     system('cls' if name=='nt' else 'clear')
@@ -104,9 +104,12 @@ class base_controller(Thread):
         self.topology_nack = "_".join([self.topology_msg.split('_')[-1], "nack"])
 
     def post_init(self, **kwargs):
-        # Must overside this method
+        # Must override this method
         pass
 
+    def pre_exit(self):
+        # Must override this method
+        pass
 
     def _server_bind(self, **kwargs):
         # Default HS Server host
@@ -375,6 +378,7 @@ class base_controller(Thread):
     def safe_shutdown(self):
         self._log("Exiting", head=True)
         self.shutdown_flag.set()
+        self.pre_exit()
         self.join()
 
 

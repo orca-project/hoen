@@ -480,7 +480,7 @@ class hyperstrator_server(Thread):
 
     # Method for stopping the server thread nicely
     def safe_shutdown(self):
-        print('Exiting')
+        self._log('Exiting', head=True)
         self.shutdown_flag.set()
         self.join()
 
@@ -526,7 +526,7 @@ class hyperstrator_server(Thread):
        # If doing the TN
         if 'tn' in info_transaction['s_ns'] or not info_transaction['s_ns']:
             if not self.skip_transport:
-                self._log('Send message to CN orchestrator')
+                self._log('Send message to TN orchestrator')
 
                 # Send message to the TN orchestrator
                 transport_success, transport_msg = self.tn_orch.network_info(
@@ -599,8 +599,8 @@ class hyperstrator_server(Thread):
                 **{
                     's_id': s_id,
                     'service': create_transaction['service'],
+                    'application': create_transaction['application'],
                     'requirements': create_transaction['requirements']
-                    #'service': create_transaction['service']
                 })
 
             # If the core allocation failed
@@ -635,8 +635,8 @@ class hyperstrator_server(Thread):
                 **{
                     's_id': s_id,
                     'service': create_transaction['service'],
+                    'application': create_transaction['application'],
                     'requirements': create_transaction['requirements']
-                    #'service': create_transaction['service']
                 })
 
             # If the radio allocation failed
