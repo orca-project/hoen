@@ -273,14 +273,14 @@ class ovs_ctl(app_manager.RyuApp):
         self.topology['s04']['s03'] = 2
 
         self.speed = defaultdict(dict)
-        self.speed['s01']['s02'] = 100
-        self.speed['s01']['s04'] = 100
-        self.speed['s02']['s03'] = 100
-        self.speed['s02']['s01'] = 100
-        self.speed['s03']['s04'] = 100
-        self.speed['s03']['s02'] = 100
-        self.speed['s04']['s01'] = 100
-        self.speed['s04']['s03'] = 100
+        self.speed['s01']['s02'] = 1000
+        self.speed['s01']['s04'] = 1000
+        self.speed['s02']['s03'] = 1000
+        self.speed['s02']['s01'] = 1000
+        self.speed['s03']['s04'] = 1000
+        self.speed['s03']['s02'] = 1000
+        self.speed['s04']['s01'] = 1000
+        self.speed['s04']['s03'] = 1000
 
         self.ports = {}
         self.arp_disabled_ports = self.ports_to_disable()
