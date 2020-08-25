@@ -341,16 +341,21 @@ class lxd_controller(base_controller):
 
             container = self.s_ids[container_id]["container"]
 
-                        # Append this information to the output dictionary
+            a = container.state().cpu['usage']
+            sleep(1)
+            b = container.state().cpu['usage']
+
+            # Append this information to the output dictionary
             #  msg[container.name.split('-',1)[-1]] = {
             msg[container_id] = {
                 #  'distro': container.config["image.os"]+ "-" + \
                     #  container.config['image.version'],
                 'memory': {"limit": container.config.get('limits.memory', ""),
-                    "usage": container.state().memory['usage']},
+                    "usage": container.state().memory['usage']/(
+                        (1024**3) * int(container.config.get('limits.memory', 1)[0]))},
                 'cpu': {"limit":  container.config.get('limits.cpu', ""),
-                    "usage": container.state().cpu['usage']}
-            }
+                    "usage": (b-a)/1e9}
+                }
 
             msg[container_id].update({
                 "application": self.s_ids[container_id]["application"],
