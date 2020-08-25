@@ -67,6 +67,12 @@ class core_network_orchestrator(base_orchestrator):
         f_ram = 2.0 if s_ser in ["embb", "high-throughput"] else 1.0
         i_cpu = 2 if s_ser in ["urllc", "low-latency"] else 1
 
+        if s_ser == "best-effort" or not s_req.get("throughput", None):
+            f_thx = 1.0
+
+        else:
+            f_thx = float(s_req.get("throughput", 1.0))
+
         # Output message
         self._log("CPU:", i_cpu, "core(s)", "\t", "RAM:", f_ram, "GB(s)")
         self._log('Delegating it to the LXD Controller')
@@ -77,7 +83,8 @@ class core_network_orchestrator(base_orchestrator):
             'service': s_ser,
             'application': s_app,
             "f_ram": f_ram,
-            "i_cpu": i_cpu
+            "i_cpu": i_cpu,
+            "f_thx": f_thx
         })
 
         # Inform the user about the creation
