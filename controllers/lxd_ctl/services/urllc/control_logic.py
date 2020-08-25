@@ -70,7 +70,7 @@ class control(Thread):
             else:
 
                 measurement = message.get("measurement", None)
-                print(measurement)
+                #  print(measurement)
 
                 # Angle calculate
                 if measurement == "00100":
@@ -167,6 +167,7 @@ def cali():
 
 if __name__ == '__main__':
     # Handle keyboard interrupt (SIGINT)
+    print("Robot Remote Control Logic")
     try:
         # Start the Remote Unit Server
         control_thread = control(host='0.0.0.0', port=9000)

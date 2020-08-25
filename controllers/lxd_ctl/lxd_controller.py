@@ -294,8 +294,8 @@ class lxd_controller(base_controller):
 
         # Run a specific application
         hoen_app = {
-            "video": ["-p", "5000:5000", "hoen-embb:latest"],
-            "robot": ["hoen-urllc"],
+            "video": ["--rm", "-p", "5000:5000", "hoen-embb:latest"],
+            "robot": ["--rm", "-it", "-p", "9000:9000", "hoen-urllc"],
             "debug": "-it --rm -p 5201:5201 networkstatic/iperf3 -s".split(" ")
         }
 
