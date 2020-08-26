@@ -46,14 +46,11 @@ class sensing(Thread):
         self.bus = smbus.SMBus(1)
         self.address = 0x11
 
-        # Initial direction
-        self.direction = ''
-
         self.references = 5 * [kwargs.get('reference', 600)]
         self.referneces = [600, 600, 600, 600, 800]
-        
+
         self.speed = kwargs.get('speed', 35)
-        self.turn = 44
+        self.turn = 40
 
         picar.setup()
         # Initialise the wheel objects
@@ -75,9 +72,9 @@ class sensing(Thread):
         # Connect ZMQ socket to host:port
         self.socket.connect("tcp://" + host + ":" + str(port))
         # Timeout reception every 500 milliseconds
-        #  self.socket.setsockopt(zmq.RCVTIMEO, 500)
-        #  self.socket.setsockopt(zmq.SNDTIMEO, 500)
-        #  self.socket.setsockopt(zmq.REQ_RELAXED, 1)
+        self.socket.setsockopt(zmq.RCVTIMEO, 1000)
+        #  self.socket.setsockopt(zmq.SNDTIMEO, 1000)
+        self.socket.setsockopt(zmq.REQ_RELAXED, 1)
         #  self.socket.setsockopt(zmq.LINGER, 0)
 
     # Read RAW values from I2C
@@ -122,16 +119,14 @@ class sensing(Thread):
             raise IOError("Line follower read error. Please check the wiring.")
 
     def read_digital(self):
-        lt = self.read_analog()
-        digital_list = []
-        for i in range(0, 5):
-            if lt[i] >= self.references[i]:
-                digital_list.append(0)
-            elif lt[i] < self.references[i]:
-                digital_list.append(1)
-            else:
-                digital_list.append(-1)
-        return digital_list
+        digital_str = ""
+        for analog, reference in zip(self.read_analog(), self.references):
+            if analog >= reference:
+                digital_str += "0"
+            elif analog < reference:
+                digital_str += "1"
+
+        return digital_str
 
     def run(self):
         print('- Started PiCAR')
@@ -156,12 +151,11 @@ class sensing(Thread):
 
             try:
                 # Inform the user about the removal success
-                self.socket.send_json({
-                  'measurement':
-                 "".join(str(x) for x in self.read_digital())
-                })
-            except:
-                raise
+                self.socket.send_json({'measurement':self.read_digital()})
+
+            except zmq.Again:
+                self.back_wheels.stop()
+                continue
 
             else:
 
@@ -177,23 +171,20 @@ class sensing(Thread):
 
                 else:
                     # Extract angle direction from input command
-                    turning_angle = cmd.get('angle', 0)
-                    new_direction = cmd.get('direction', 'front')
+                    if 'angle' in cmd:
+                        # Turn wheels accordingly
+                        self.front_wheels.turn(cmd['angle'])
 
-                    # Turn wheels accordingly
-                    self.front_wheels.turn(turning_angle)
+                    if "front" in cmd.get('direction', []):
+                        self.back_wheels.speed = self.speed
+                        self.back_wheels.backward()
 
-                    if new_direction == 'stop':
-                        break
+                    elif "back"in cmd.get('direction', []):
+                        self.back_wheels.speed = self.speed
+                        self.back_wheels.forward()
 
-                    # Check whether to change directions
-                    if new_direction != self.direction:
-                        # Update direction
-                        self.direction = new_direction
-                        # Change directions
-                        self.back_wheels.backward() if \
-                            new_direction == 'front' else \
-                            self.back_wheels.forward()
+                    else:
+                        self.back_wheels.stop()
 
         #  time.sleep(0.001)
 
@@ -216,7 +207,7 @@ class sensing(Thread):
 
     def wait_tile_center(self):
         while True:
-            lt_status = self.read_digital()
+            lt_status = self.read_digital().split()
             if lt_status[2] == 1:
                 break
 

@@ -37,7 +37,7 @@ class core_network_orchestrator(base_orchestrator):
             },
             'ram': {
                 'total': virtual_memory()[0]/(1024*1024),
-                'usage': virtual_memory()[2]
+                'usage': virtual_memory()[2]/100
             }
         }
 

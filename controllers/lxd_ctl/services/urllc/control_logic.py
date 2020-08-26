@@ -42,7 +42,7 @@ class control(Thread):
         # Bind ZMQ socket to host:port
         self.socket.bind("tcp://" + host + ":" + str(port))
         # Timeout reception every 500 milliseconds
-        #  self.socket.setsockopt(zmq.RCVTIMEO, 500)
+        self.socket.setsockopt(zmq.RCVTIMEO, 1000)
         #  self.socket.setsockopt(zmq.SNDTIMEO, 500)
         #  self.socket.setsockopt(zmq.LINGER, 0)
 
@@ -106,12 +106,13 @@ class control(Thread):
                 else:
                     off_track_count = 0
 
-                self.socket.send_json({'angle': turning_angle})
+                self.socket.send_json({'angle': turning_angle,
+                                       "direction": "front"})
                 #  time.sleep(delay)
 
 
         message = self.socket.recv_json()
-        self.socket.send_json({'angle': 0, "direction": 'stop'})
+        self.socket.send_json({"direction": 'stop'})
         # Leaving the loop
         #  self.socket.send_json({'angle': 90, 'direction': 'stop'})
 
